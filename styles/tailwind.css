@@ -1,0 +1,159 @@
+@import "tailwindcss";
+
+/* ─── Scrollbar Utilities ─────────────────────────────────────────────────── */
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.no-scrollbar,
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ─── Safe Area Insets (notch / Dynamic Island / home indicator) ──────────── */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+  .pl-safe { padding-left: env(safe-area-inset-left, 0px); }
+  .pr-safe { padding-right: env(safe-area-inset-right, 0px); }
+}
+
+/* ─── Mobile Bottom Nav Spacing ───────────────────────────────────────────── */
+/* Sayfaların içeriği mobil nav'ın arkasında kalmasın */
+@media (max-width: 1023px) {
+  main {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ─── Touch Targets (Apple HIG: 44px, Material: 48px) ────────────────────── */
+@media (pointer: coarse) {
+  button, a, [role="button"] {
+    min-height: 44px;       /* iOS HIG minimum dokunma hedefi */
+  }
+  input, select, textarea {
+    font-size: 16px !important; /* iOS'ta odaklanınca zoom engelle */
+    min-height: 44px;
+  }
+}
+
+/* ─── Momentum / Smooth Scrolling ────────────────────────────────────────── */
+.custom-scrollbar {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* ─── Horizontal Table Scroll (mobil tablo yardımcısı) ───────────────────── */
+.table-mobile-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  /* Kaydırılabilir olduğunu gösteren soluk gradient ipucu */
+  background:
+    linear-gradient(to right, transparent 96%, rgba(59,130,246,0.08)),
+    linear-gradient(to left,  transparent 96%, rgba(59,130,246,0.08));
+  background-attachment: local, local;
+}
+
+/* ─── Active / Tap States (dokunma geri bildirimi) ───────────────────────── */
+@media (pointer: coarse) {
+  button:active, [role="button"]:active {
+    opacity: 0.75;
+    transform: scale(0.97);
+    transition: opacity 60ms, transform 60ms;
+  }
+}
+
+/* ─── Landscape Orientation ──────────────────────────────────────────────── */
+@media (max-width: 1023px) and (orientation: landscape) {
+  /* Yatay modda alt nav daha ince — yükseklik kazancı */
+  nav.fixed.bottom-0 {
+    height: 3rem;
+  }
+  /* Yatay modda main padding daha az */
+  main {
+    padding-bottom: calc(3rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ─── Pull-to-Refresh Indicator ──────────────────────────────────────────── */
+.pull-indicator {
+  position: fixed;
+  top: env(safe-area-inset-top, 0px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-100%);
+  z-index: 200;
+  transition: transform 0.2s ease;
+  pointer-events: none;
+}
+
+/* ─── Text Selection on Mobile ───────────────────────────────────────────── */
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.select-text {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* ─── Shimmer animation ──────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* ─── iOS/Android Global Fixes ───────────────────────────────────────────── */
+
+/* Tap highlight kaldır — kendi active state'lerimiz var */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Overscroll — iOS rubber-band olmadan sayfa içi scroll */
+.overscroll-contain {
+  overscroll-behavior: contain;
+}
+
+/* Mobil yatay taşmayı önle */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* ─── Responsive Font Scaling ────────────────────────────────────────────── */
+/* Küçük ekranlarda (< 360px) içerik sığmasın diye %90 ölçek */
+@media (max-width: 360px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+/* ─── Input Focus — iOS Zoom Önleme ──────────────────────────────────────── */
+/* 16px altı font-size iOS'ta input'a odaklanınca sayfa zoom'lar */
+@supports (-webkit-touch-callout: none) {
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="password"],
+  input[type="search"],
+  input[type="date"],
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
+}
+
+/* ─── Momentum Scroll for All Scroll Containers ─────────────────────────── */
+.overflow-y-auto,
+.overflow-x-auto,
+.overflow-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ─── Haptic-ready Button — smooth press feedback ────────────────────────── */
+@media (pointer: coarse) {
+  button:active,
+  [role="button"]:active {
+    transition: transform 60ms ease, opacity 60ms ease;
+  }
+}

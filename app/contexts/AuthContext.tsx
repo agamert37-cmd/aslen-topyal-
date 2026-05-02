@@ -1,0 +1,509 @@
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
+import { StorageKey, getFromStorage, setInStorage, removeFromStorage } from '../utils/storage';
+import { hashString, hashStringWithSalt } from '../utils/security';
+import { registerSession, removeSession, generateCSRFToken, appendToLogChain, addSecurityThreat, isUnusualHour, recordDeviceLogin, checkPasswordBreach } from '../utils/security';
+import { logActivity } from '../utils/activityLogger';
+import { toast } from 'sonner';
+import { kvGet, kvSet, kvDel } from '../lib/pouchdb-kv';
+import { checkAccess } from '../utils/security-brain';
+
+interface User {
+  id: string;
+  name: string;
+  username: string;
+  role: 'Yönetici' | 'Personel';
+  status: 'online' | 'offline';
+}
+
+interface AuthContextType {
+  user: User | null;
+  login: (username: string, password: string, isBiometric?: boolean) => Promise<boolean>;
+  logout: () => void;
+  isAuthenticated: boolean;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const userRef = React.useRef<User | null>(null);
+
+  const doLogout = useCallback(() => {
+    const currentUser = userRef.current;
+    if (currentUser) {
+      const allPersonnel = getFromStorage<any[]>(StorageKey.PERSONEL_DATA) || [];
+      const updatedPersonnel = allPersonnel.map(p => 
+        p.id === currentUser.id ? { ...p, status: 'offline' } : p
+      );
+      setInStorage(StorageKey.PERSONEL_DATA, updatedPersonnel);
+      // KV sync — personel online/offline durumu tüm cihazlarda güncel olsun
+      kvSet(`personel:${currentUser.id}:status`, { id: currentUser.id, status: 'offline', lastSeen: new Date().toISOString() }).catch(err => {
+        console.error('KV status update error during logout:', err);
+      });
+      logActivity('logout', 'Kullanıcı sistemden çıkış yaptı', {
+        employeeId: currentUser.id,
+        employeeName: currentUser.name,
+        page: 'logout'
+      });
+      // Oturum kaydini sil ve log zincirine ekle
+      removeSession();
+      appendToLogChain(`logout:${currentUser.id}:${currentUser.name}`);
+    }
+    setUser(null);
+    userRef.current = null;
+    removeFromStorage(StorageKey.USER);
+  }, []);
+
+  useEffect(() => {
+    // LocalStorage'dan kullanıcı bilgisini yükle
+    const savedUser = getFromStorage<User>(StorageKey.USER);
+    queueMicrotask(() => {
+      if (savedUser) {
+        // Ban kontrolü
+        const access = checkAccess(savedUser.id);
+        if (!access.allowed) {
+          toast.error(access.reason || 'Hesabınız yasaklanmıştır.');
+          doLogout();
+          return;
+        }
+        setUser(savedUser);
+        userRef.current = savedUser;
+      }
+      setIsLoading(false);
+    });
+  }, [doLogout]);
+
+  // userRef'i her user değişiminde güncelle
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
+  // ── Bağlantı Kesme / Oturum Güvenlik Olayları ─────────────────
+  const forceLogoutCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    // ─ beforeunload: tarayıcı kapanma / sayfa yenileme
+    const handleBeforeUnload = () => {
+      const currentUser = userRef.current;
+      if (!currentUser) return;
+      // Senkron yazma — async desteklenmez
+      try {
+        const personnel = getFromStorage<any[]>(StorageKey.PERSONEL_DATA) || [];
+        const updated = personnel.map(p =>
+          p.id === currentUser.id ? { ...p, status: 'offline', lastSeen: new Date().toISOString() } : p
+        );
+        setInStorage(StorageKey.PERSONEL_DATA, updated);
+        // Oturum kesim zaman damgasını kaydet (sonraki girişte tespit için)
+        // LOCAL ONLY — intentionally not synced (session timing is per-device)
+        localStorage.setItem(`isleyen_et_session_end_${currentUser.id}`, JSON.stringify({
+          userId: currentUser.id,
+          name: currentUser.name,
+          endedAt: new Date().toISOString(),
+          reason: 'browser_close',
+        }));
+      } catch (err) {
+        console.error('Session end storage error:', err);
+      }
+    };
+
+    // ─ visibilitychange: sekme gizlenirse oturum aktivitesini güncelle
+    const handleVisibilityChange = () => {
+      const currentUser = userRef.current;
+      if (!currentUser) return;
+      if (document.visibilityState === 'hidden') {
+        try {
+          // LOCAL ONLY — intentionally not synced (active sessions are per-device)
+          const sessions: any[] = JSON.parse(localStorage.getItem('isleyen_et_active_sessions') || '[]');
+          const sessionId = sessionStorage.getItem('isleyen_et_current_session_id');
+          const updated = sessions.map(s =>
+            s.id === sessionId ? { ...s, lastActivity: new Date().toISOString() } : s
+          );
+          localStorage.setItem('isleyen_et_active_sessions', JSON.stringify(updated));
+        } catch (err) {
+          console.error('Session activity storage error:', err);
+        }
+      }
+    };
+
+    // ─ offline/online: ağ bağlantısı olayları
+    const handleOffline = () => {
+      const currentUser = userRef.current;
+      if (!currentUser) return;
+      logActivity('security_alert', 'Ağ bağlantısı kesildi', {
+        employeeId: currentUser.id,
+        employeeName: currentUser.name,
+        level: 'info',
+        description: 'Kullanıcının internet bağlantısı kesildi.',
+      });
+      toast.warning('İnternet bağlantısı kesildi. Çevrimdışı moddasınız.', { id: 'net-offline', duration: Infinity });
+    };
+
+    const handleOnline = () => {
+      toast.success('Bağlantı yeniden kuruldu.', { id: 'net-offline', duration: 3000 });
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, []);
+
+  // ── Uzaktan Zorla Oturum Kapatma (Cross-Device) ────────────────
+  // KV Store'da `sync_force_logout_{userId}` anahtarı varsa
+  // bu cihazda oturumu otomatik kapat.
+  useEffect(() => {
+    const startPolling = () => {
+      forceLogoutCheckRef.current = setInterval(async () => {
+        const currentUser = userRef.current;
+        if (!currentUser) return;
+
+        // ─ 1. Ban Kontrolü
+        const access = checkAccess(currentUser.id);
+        if (!access.allowed) {
+           toast.error(access.reason || 'Kısıtlama: Erişiminize son verildi.');
+           doLogout();
+           return;
+        }
+
+        try {
+          const value = await kvGet<any>(`sync_force_logout_${currentUser.id}`);
+
+          if (value) {
+            // Anahtarı temizle
+            await kvDel(`sync_force_logout_${currentUser.id}`);
+
+            const reason = value?.reason || 'Yönetici tarafından oturumunuz sonlandırıldı.';
+            logActivity('security_alert', 'Uzaktan oturum kapatma', {
+              employeeId: currentUser.id,
+              employeeName: currentUser.name,
+              level: 'high',
+              description: reason,
+            });
+            removeSession();
+            appendToLogChain(`force_logout:${currentUser.id}:${currentUser.name}`);
+            doLogout();
+            toast.error(`${reason}`, { duration: 8000 });
+          }
+        } catch (err) {
+          console.error('Force logout check error:', err);
+        }
+      }, 60_000); // 60 saniyede bir kontrol
+    };
+
+    startPolling();
+    return () => {
+      if (forceLogoutCheckRef.current) clearInterval(forceLogoutCheckRef.current);
+    };
+  }, [doLogout]);
+
+  // ── 15 Dakika Hareketsizlik Kontrolü ──────────────────────────
+  // NOT: Bu kontrol MainLayout.tsx'de dinamik güvenlik politikası ile
+  // merkezi olarak yönetilmektedir. Çift timer/event listener sorununu
+  // önlemek için AuthContext'teki kontrol kaldırılmıştır.
+
+  const login = useCallback(async (username: string, password: string, biometricBypass: boolean = false): Promise<boolean> => {
+    let storedPersonnel = getFromStorage<any[]>(StorageKey.PERSONEL_DATA) || [];
+
+    // ── Mobil / Yeni Cihaz: Yerel veri yoksa PouchDB'den çek ─────
+    // localStorage henüz senkronize edilmemişse (yeni cihaz / ilk açılış)
+    // PouchDB otomatik senkronize eder — ek forceSync gerekmez
+    if (storedPersonnel.length === 0) {
+      try {
+        // PouchDB'den personel verisini kontrol et (tablo sync üzerinden gelir)
+        const { getDb } = await import('../lib/pouchdb');
+        const db = getDb('personeller');
+        const result = await db.allDocs({ include_docs: true });
+        const docs = result.rows.filter((r: any) => r.doc && !r.doc._deleted).map((r: any) => {
+          const { _id, ...rest } = r.doc;
+          if (!rest.id && _id) rest.id = _id;
+          return rest;
+        });
+        if (docs.length > 0) {
+          setInStorage(StorageKey.PERSONEL_DATA, docs);
+          storedPersonnel = docs;
+        }
+      } catch (err) {
+        console.error('Initial personnel sync error:', err);
+        // Ağ yoksa yine de devam et — acil bypass (admin/1234) çalışmaya devam eder
+      }
+    }
+
+    const trimmedUsername = (username || '').trim().slice(0, 128);  // max 128 karakter
+    const trimmedPassword = (password || '').trim().slice(0, 256);  // max 256 karakter
+
+    if (!trimmedUsername || !trimmedPassword) return false;
+
+    // GÜVENLİK: Aşırı uzun girişleri erken reddet (DoS / timing attack önlemi)
+    if (trimmedUsername.length > 128 || trimmedPassword.length > 256) return false;
+
+    // ── Acil Durum Super Admin Bypass ─────────────────────────────
+    // Brute-force kilidini ve tüm diğer kontrolleri atlar.
+    // Sistem kurtarma / hesap kilitlenme senaryoları için gereklidir.
+    const SETUP_USER = 'admin';
+    const SETUP_PASS_DEFAULT = '1234';
+
+    // Varsayılan şifre ('1234') her zaman çalışır (acil kurtarma)
+    let isValidAdminPass = trimmedPassword === SETUP_PASS_DEFAULT;
+
+    // Özelleştirilmiş admin şifresi varsa onu da kabul et (KV store önce, localStorage fallback)
+    if (!isValidAdminPass) {
+      try {
+        const storedAdminHash = (await kvGet<string>('system_admin_pw_hash')) ?? localStorage.getItem('system_admin_pw_hash');
+        if (storedAdminHash) {
+          const inputHash = await hashString(trimmedPassword);
+          isValidAdminPass = inputHash === storedAdminHash;
+        }
+      } catch (err) {
+        console.error('Admin hash verification error:', err);
+      }
+    }
+
+    if (trimmedUsername === SETUP_USER && isValidAdminPass) {
+      const defaultAdmin: User = { id: 'admin-super', name: 'Sistem Yöneticisi (Admin)', username: 'admin', role: 'Yönetici', status: 'online' };
+      setUser(defaultAdmin);
+      setInStorage(StorageKey.USER, defaultAdmin);
+      setInStorage(StorageKey.CURRENT_EMPLOYEE, {
+        id: 'admin-super',
+        name: 'Sistem Yöneticisi (Admin)',
+        username: 'admin',
+        role: 'Yönetici',
+        department: 'Yönetim',
+        permissions: ['dashboard','satis','stok','kasa','cari','raporlar','personel','ayarlar','uretim','arac','pazarlama','tahsilat','cekler','dosyalar','guvenlik','yedekler'],
+      });
+      registerSession(defaultAdmin.id, defaultAdmin.name);
+      generateCSRFToken();
+      appendToLogChain(`login:${defaultAdmin.id}:${defaultAdmin.name}`);
+      // Başarılı giriş — başarısız deneme sayacını temizle
+      try {
+        const fa = getFromStorage<Record<string, any>>('failed_login_attempts') || {};
+        if (fa[trimmedUsername]) { delete fa[trimmedUsername]; setInStorage('failed_login_attempts', fa); }
+      } catch (err) {
+        console.error('Failed attempts cleanup error:', err);
+      }
+      logActivity('login', 'Super admin girisi yapti', { employeeId: defaultAdmin.id, employeeName: defaultAdmin.name, page: 'login' });
+      recordDeviceLogin(defaultAdmin.id, defaultAdmin.name);
+      if (storedPersonnel.length > 0) {
+        setTimeout(() => toast.warning('⚠️ Sistem yöneticisi hesabıyla giriş yapıldı. Güvenlik için kendi personel hesabınızı kullanın.', { duration: 6000 }), 500);
+      } else {
+        setTimeout(() => toast.warning('⚠️ İlk giriş! Güvenliğiniz için hemen yeni bir yönetici hesabı oluşturun.', { duration: 8000 }), 1000);
+      }
+      return true;
+    }
+
+    // ── Brute Force Koruması ───────────────────────────────────────
+    const FAILED_ATTEMPTS_KEY = 'failed_login_attempts';
+    const MAX_ATTEMPTS = 5;
+    const BLOCK_DURATION_MS = 15 * 60 * 1000; // 15 dakika
+
+    const attempts = getFromStorage<Record<string, { count: number, firstFailedAt: number }>>(FAILED_ATTEMPTS_KEY) || {};
+    const userAttempts = attempts[trimmedUsername] || { count: 0, firstFailedAt: 0 };
+
+    if (userAttempts.count >= MAX_ATTEMPTS) {
+      const timePassed = Date.now() - userAttempts.firstFailedAt;
+      if (timePassed < BLOCK_DURATION_MS) {
+        toast.error('Çok fazla hatalı giriş denemesi. Lütfen 15 dakika sonra tekrar deneyin.');
+        logActivity('security_alert', 'Brute Force Girişimi Engellendi', {
+          level: 'high',
+          description: `'${trimmedUsername}' hesabı için çok fazla hatalı giriş denemesi nedeniyle hesap 15 dakika kilitlendi.`
+        });
+        const policy_lockout = BLOCK_DURATION_MS / 1000 / 60;
+        addSecurityThreat({
+          type: 'brute_force',
+          severity: 'high',
+          title: 'Brute Force Girisimi Engellendi',
+          description: `'${trimmedUsername}' hesabi icin ${MAX_ATTEMPTS} hatali giris denemesi. Hesap ${policy_lockout} dakika kilitlendi.`,
+          source: 'auth',
+          metadata: { username: trimmedUsername, attempts: userAttempts.count },
+        });
+        return false;
+      } else {
+        // Blok süresi dolduysa sıfırla
+        userAttempts.count = 0;
+        attempts[trimmedUsername] = userAttempts;
+        setInStorage(FAILED_ATTEMPTS_KEY, attempts);
+      }
+    }
+
+    const recordFailedAttempt = () => {
+      if (userAttempts.count === 0) {
+        userAttempts.firstFailedAt = Date.now();
+      }
+      userAttempts.count += 1;
+      attempts[trimmedUsername] = userAttempts;
+      setInStorage(FAILED_ATTEMPTS_KEY, attempts);
+    };
+
+    const clearFailedAttempts = () => {
+      if (attempts[trimmedUsername]) {
+        delete attempts[trimmedUsername];
+        setInStorage(FAILED_ATTEMPTS_KEY, attempts);
+      }
+    };
+
+    // ── Personel eşleştirme ────────────────────────────────────────
+    const lowerInput = trimmedUsername.toLowerCase();
+    const foundUser = storedPersonnel.find((p: any) => {
+      const pUsername = (p.username || '').trim().toLowerCase();
+      const pPhone = (p.phone || '').trim();
+      const pName = (p.name || '').trim().toLowerCase();
+      
+      // Öncelik sırası: username > phone > tam ad > isim parçası
+      return (
+        (pUsername && pUsername === lowerInput) ||
+        (pPhone && pPhone === trimmedUsername) ||
+        (pName && pName === lowerInput) ||
+        (pName && pName.split(' ').some((part: string) => part === lowerInput))
+      );
+    });
+    
+    if (!foundUser) {
+      recordFailedAttempt();
+      logActivity('security_alert', 'Bilinmeyen kullanıcı girişi denemesi', {
+        level: 'high',
+        description: `'${trimmedUsername}' kullanıcı adıyla giriş yapılmaya çalışıldı.`
+      });
+      return false;
+    }
+
+    // ── Şifre doğrulama ────────────────────────────────────────────
+    const userPassword = (foundUser.password || '').trim();
+    const userPin = (foundUser.pinCode || foundUser.pin_code || '').trim();
+    // Tuzlu hash (yeni format) — kullanici ID'si tuz olarak kullanilir
+    const saltKey = foundUser.id;
+    const hashedPassword = await hashString(trimmedPassword);              // Eski format (tuzsuz)
+    const hashedPasswordSalted = await hashStringWithSalt(trimmedPassword, saltKey); // Yeni format (tuzlu)
+
+    // Önce tuzlu (yeni) hash dene, sonra tuzsuz (eski/migration) hash dene, biometric bypass varsa direkt geç.
+    const isPasswordValid = biometricBypass ||
+      (userPassword && userPassword === hashedPasswordSalted) ||  // tuzlu hash (yeni format — yeni personeller)
+      (userPin     && userPin     === hashedPasswordSalted) ||    // PIN tuzlu hash
+      (userPassword && userPassword === hashedPassword) ||         // tuzsuz hash (eski format)
+      (userPin     && userPin     === hashedPassword) ||           // PIN tuzsuz hash (eski)
+      (userPassword && userPassword === trimmedPassword) ||        // düz metin fallback (migration)
+      (userPin     && userPin     === trimmedPassword);            // PIN düz metin fallback
+    
+    if (!isPasswordValid) {
+      recordFailedAttempt();
+      logActivity('security_alert', 'Hatalı şifre girişi', {
+        employeeName: foundUser.name,
+        level: 'medium',
+        description: `${trimmedUsername} kullanıcısı için hatalı şifre denemesi.`
+      });
+      return false;
+    }
+
+    // Eski tuzsuz hash ile giriş yapıldıysa tuzlu hash'e migrate et
+    const needsPasswordMigration = !!(userPassword && userPassword === hashedPassword && userPassword !== hashedPasswordSalted);
+    const needsPinMigration = !!(userPin && userPin === hashedPassword && userPin !== hashedPasswordSalted);
+
+    const loggedInUser: User = { 
+      id: foundUser.id, 
+      name: foundUser.name, 
+      username: foundUser.username || trimmedUsername, 
+      role: foundUser.role === 'Yönetici' ? 'Yönetici' : 'Personel', 
+      status: 'online' 
+    };
+    setUser(loggedInUser);
+    setInStorage(StorageKey.USER, loggedInUser);
+
+    logActivity('login', 'Kullanıcı sisteme giriş yaptı', {
+      employeeId: foundUser.id,
+      employeeName: foundUser.name,
+      page: 'login'
+    });
+
+    clearFailedAttempts();
+
+    // Oturum kaydi, CSRF token ve log zinciri
+    registerSession(loggedInUser.id, loggedInUser.name);
+    generateCSRFToken();
+    appendToLogChain(`login:${loggedInUser.id}:${loggedInUser.name}`);
+
+    // Personel durumunu güncelle
+    const updatedPersonnel = storedPersonnel.map(p => {
+      if (p.id === foundUser.id) {
+        return {
+          ...p,
+          status: 'online',
+          lastLogin: new Date().toLocaleString('tr-TR'),
+          last_login: new Date().toLocaleString('tr-TR'),
+          // Migration: tuzsuz hash'i tuzlu hash'e gecir
+          ...(needsPasswordMigration && p.password ? { password: hashedPasswordSalted } : {}),
+          ...(needsPinMigration && p.pinCode  ? { pinCode:  hashedPasswordSalted } : {}),
+          ...(needsPinMigration && p.pin_code ? { pin_code: hashedPasswordSalted } : {}),
+        };
+      }
+      return p;
+    });
+    setInStorage(StorageKey.PERSONEL_DATA, updatedPersonnel);
+
+    // currentEmployee güncelle
+    let parsedPermissions: string[] = [];
+    try {
+      if (typeof foundUser.permissions === 'string') parsedPermissions = JSON.parse(foundUser.permissions);
+      else if (Array.isArray(foundUser.permissions)) parsedPermissions = foundUser.permissions;
+    } catch (e) {
+      // Ignore parse error
+    }
+
+    // GÜVENLİK: CURRENT_EMPLOYEE objesine asla şifre veya PIN hash'i saklanmaz.
+    // Kimlik doğrulaması zaten yapıldı; UI yalnızca rol/izin/meta veriye ihtiyaç duyar.
+    setInStorage(StorageKey.CURRENT_EMPLOYEE, {
+      id: foundUser.id,
+      name: foundUser.name,
+      username: foundUser.username || trimmedUsername,
+      role: foundUser.role === 'Yönetici' ? 'Yönetici' : 'Personel',
+      department: foundUser.department || foundUser.position || 'Genel',
+      permissions: parsedPermissions,
+    });
+
+    // Cihaz izleme ve ihlal tespiti
+    recordDeviceLogin(loggedInUser.id, loggedInUser.name);
+    const breachResult = checkPasswordBreach(trimmedPassword);
+    if (breachResult.breached) {
+      setTimeout(() => toast.warning(`Guvenlik Uyarisi: ${breachResult.reason}. Sifrenizi degistirmeniz onerilir.`), 1500);
+      logActivity('security_alert', 'Zayif sifre tespiti', {
+        employeeName: loggedInUser.name,
+        level: 'medium',
+        description: `${loggedInUser.name} kullanicisinin sifresi bilinen ihlal listelerinde bulunuyor.`,
+      });
+    }
+
+    return true;
+  }, []);
+
+  // logout public API'si doLogout'u çağırır
+  const logout = doLogout;
+
+  if (isLoading) {
+    return (
+      <AuthContext.Provider value={{ user: null, login, logout, isAuthenticated: false }}>
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      </AuthContext.Provider>
+    );
+  }
+
+  return (
+    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}

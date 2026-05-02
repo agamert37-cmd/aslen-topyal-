@@ -1,0 +1,1769 @@
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
+import { useEmployee } from '../contexts/EmployeeContext';
+import { useAuth } from '../contexts/AuthContext';
+// [AJAN-2 | claude/serene-gagarin | 2026-03-25] Son düzenleyen: Claude Sonnet 4.6
+import { getFromStorage, setInStorage, StorageKey } from '../utils/storage';
+import { logActivity } from '../utils/activityLogger';
+import { useModuleBus } from '../hooks/useModuleBus';
+import { getPagePermissions } from '../utils/permissions';
+import { usePageSecurity } from '../hooks/usePageSecurity';
+import { useTableSync } from '../hooks/useTableSync';
+import { useGlobalTableData } from '../contexts/GlobalTableSyncContext';
+import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'sonner';
+import {
+  FileEdit,
+  Search,
+  Calendar,
+  Building,
+  Clock,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  Eye,
+  Trash2,
+  Filter,
+  ArrowUpDown,
+  Camera,
+  X,
+  ChevronDown,
+  ChevronUp,
+  RotateCcw,
+  Download,
+  User,
+  Receipt,
+  Banknote,
+  Image as ImageIcon,
+  Plus,
+  History,
+  PieChart,
+  ArrowRight,
+  Send,
+  DollarSign,
+  TrendingUp,
+  TrendingDown,
+  CalendarDays,
+  ArrowDownLeft,
+  ArrowUpRight,
+  ShieldAlert,
+  Landmark,
+  BadgeAlert,
+  CreditCard,
+  Save,
+  Share2,
+} from 'lucide-react';
+
+// ═══════════════════════════════════════════════════════════════
+// TİPLER
+// ═══════════════════════════════════════════════════════════════
+
+export type CekStatus = 'beklemede' | 'tahsil_edildi' | 'karsiliksiz' | 'iade' | 'ciro' | 'odendi';
+export type CekDirection = 'alinan' | 'verilen';
+
+export interface CekAuditEntry {
+  id: string;
+  timestamp: string;
+  action: string;
+  detail: string;
+  user: string;
+}
+
+export interface CekData {
+  id: string;
+  direction: CekDirection;
+  amount: number;
+  collectedAmount?: number;
+  bankName: string;
+  checkNumber?: string;
+  dueDate: string;
+  issueDate: string;
+  // Alınan çekler
+  sourceType: 'musteri' | 'toptanci';
+  sourceName: string;
+  sourceId: string;
+  // Verilen çekler
+  recipientName?: string;
+  paymentReason?: string;
+  // İlişkili fiş
+  relatedFisId?: string;
+  relatedFisDescription?: string;
+  photoFront: string | null;
+  photoBack: string | null;
+  status: CekStatus;
+  statusNote?: string;
+  endorsedTo?: string;
+  endorseDate?: string;
+  auditLog?: CekAuditEntry[];
+  createdAt: string;
+  createdBy: string;
+  updatedAt?: string;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// YARDIMCI FONKSİYONLAR
+// ═══════════════════════════════════════════════════════════════
+
+// Geriye uyumluluk veya son çare için yardımcı fonksiyon
+export function getCekler(): CekData[] {
+  return (getFromStorage<CekData[]>(StorageKey.CEKLER_DATA) || []).map(c => ({
+    ...c,
+    direction: c.direction || 'alinan', // Geriye uyumluluk
+  }));
+}
+
+function addAuditEntry(cek: CekData, action: string, detail: string, user: string): CekData {
+  const entry: CekAuditEntry = {
+    id: `audit-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+    timestamp: new Date().toISOString(),
+    action, detail, user,
+  };
+  return { ...cek, auditLog: [...(cek.auditLog || []), entry] };
+}
+
+function getDaysRemaining(dueDate: string): number {
+  const today = new Date(); 
+  today.setHours(0, 0, 0, 0);
+  
+  // Safe parsing of YYYY-MM-DD to avoid timezone shifting
+  const parts = dueDate.split('T')[0].split('-');
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10) - 1;
+  const day = parseInt(parts[2], 10);
+  
+  const due = new Date(year, month, day);
+  due.setHours(0, 0, 0, 0);
+  
+  // Use Math.round to mitigate daylight saving time boundary issues
+  return Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function getStatusColor(status: CekStatus): string {
+  switch (status) {
+    case 'beklemede': return 'text-yellow-400';
+    case 'tahsil_edildi': return 'text-green-400';
+    case 'odendi': return 'text-green-400';
+    case 'karsiliksiz': return 'text-red-400';
+    case 'iade': return 'text-orange-400';
+    case 'ciro': return 'text-blue-400';
+    default: return 'text-muted-foreground';
+  }
+}
+
+function getStatusBg(status: CekStatus): string {
+  switch (status) {
+    case 'beklemede': return 'bg-yellow-500/10 border-yellow-500/30';
+    case 'tahsil_edildi': return 'bg-green-500/10 border-green-500/30';
+    case 'odendi': return 'bg-green-500/10 border-green-500/30';
+    case 'karsiliksiz': return 'bg-red-500/10 border-red-500/30';
+    case 'iade': return 'bg-orange-500/10 border-orange-500/30';
+    case 'ciro': return 'bg-blue-500/10 border-blue-500/30';
+    default: return 'bg-muted border-border';
+  }
+}
+
+function getStatusIcon(status: CekStatus) {
+  switch (status) {
+    case 'beklemede': return <Clock className="w-4 h-4 text-yellow-400" />;
+    case 'tahsil_edildi': return <CheckCircle className="w-4 h-4 text-green-400" />;
+    case 'odendi': return <CheckCircle className="w-4 h-4 text-green-400" />;
+    case 'karsiliksiz': return <XCircle className="w-4 h-4 text-red-400" />;
+    case 'iade': return <RotateCcw className="w-4 h-4 text-orange-400" />;
+    case 'ciro': return <Send className="w-4 h-4 text-blue-400" />;
+    default: return null;
+  }
+}
+
+function getDaysColor(days: number): string {
+  if (days < 0) return 'text-red-400';
+  if (days <= 7) return 'text-orange-400';
+  if (days <= 30) return 'text-yellow-400';
+  return 'text-green-400';
+}
+
+type ModalType = 'none' | 'status' | 'endorse' | 'partial' | 'addAlinan' | 'addVerilen' | 'photo' | 'history' | 'details';
+
+// ═══════════════════════════════════════════════════════════════
+// ANA SAYFA
+// ═══════════════════════════════════════════════════════════════
+
+export function CeklerPage() {
+  const { t } = useLanguage();
+  const { currentEmployee } = useEmployee();
+  const { user } = useAuth();
+  const { emit } = useModuleBus();
+
+  const { canAdd, canDelete, canEdit } = getPagePermissions(user, currentEmployee, 'cekler');
+  const sec = usePageSecurity('cekler');
+
+  // Bankalar listesi (GlobalTableSyncContext'ten canlı)
+  const rawBankalar = useGlobalTableData<any>('bankalar');
+
+  // PouchDB CRUD — addItem/updateItem/deleteItem PouchDB'ye yazar, CouchDB sync otomatik
+  const {
+    data: syncedCekler,
+    addItem: addCekToPouchDB,
+    updateItem: updateCekInPouchDB,
+    deleteItem: deleteCekFromPouchDB,
+  } = useTableSync<CekData>({
+    tableName: 'cekler',
+    storageKey: StorageKey.CEKLER_DATA,
+    initialData: [],
+    orderBy: 'createdAt',
+    orderAsc: false,
+  });
+
+  const cekler = useMemo(() => {
+    const data = syncedCekler && syncedCekler.length > 0 ? syncedCekler : getFromStorage<CekData[]>(StorageKey.CEKLER_DATA) || [];
+    return data.map(c => ({ ...c, direction: c.direction || 'alinan' }));
+  }, [syncedCekler]);
+
+  // Sayfa ziyaretini logla
+  useEffect(() => {
+    logActivity('page_visit', 'Çekler sayfası görüntülendi', { employeeName: user?.name });
+  }, []);
+  const [activeTab, setActiveTab] = useState<CekDirection>('verilen'); // Verilen çekler öncelikli
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<CekStatus | 'all'>('all');
+  const [sortBy, setSortBy] = useState<'dueDate' | 'amount' | 'createdAt'>('dueDate');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [selectedCek, setSelectedCek] = useState<CekData | null>(null);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [viewTab, setViewTab] = useState<'list' | 'bank'>('list');
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
+
+  // Modal states
+  const [modalType, setModalType] = useState<ModalType>('none');
+  const [modalCek, setModalCek] = useState<CekData | null>(null);
+  const [photoModalData, setPhotoModalData] = useState<{ url: string; title: string } | null>(null);
+
+  const [newStatus, setNewStatus] = useState<CekStatus>('beklemede');
+  const [statusNote, setStatusNote] = useState('');
+  const [endorseTo, setEndorseTo] = useState('');
+  const [endorseDate, setEndorseDate] = useState(new Date().toISOString().split('T')[0]);
+  const [partialAmount, setPartialAmount] = useState('');
+
+  // Alınan çek form
+  const [newAlinanCek, setNewAlinanCek] = useState({
+    amount: '', bankName: '', checkNumber: '', dueDate: '', issueDate: new Date().toISOString().split('T')[0],
+    sourceName: '', sourceType: 'musteri' as 'musteri' | 'toptanci',
+  });
+
+  // Verilen çek form
+  const [newVerilenCek, setNewVerilenCek] = useState({
+    amount: '', bankName: '', checkNumber: '', dueDate: '', issueDate: new Date().toISOString().split('T')[0],
+    recipientName: '', paymentReason: '',
+  });
+
+  const newCekFrontRef = useRef<HTMLInputElement>(null);
+  const newCekBackRef = useRef<HTMLInputElement>(null);
+  const [newCekPhotoFront, setNewCekPhotoFront] = useState<string | null>(null);
+  const [newCekPhotoBack, setNewCekPhotoBack] = useState<string | null>(null);
+
+  // Yöne göre ayır
+  const alinanCekler = useMemo(() => cekler.filter(c => c.direction === 'alinan'), [cekler]);
+  const verilenCekler = useMemo(() => cekler.filter(c => c.direction === 'verilen'), [cekler]);
+  const activeCekler = activeTab === 'alinan' ? alinanCekler : verilenCekler;
+
+  // Filtrele ve sırala
+  const filteredCekler = useMemo(() => {
+    let result = [...activeCekler];
+
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(c =>
+        String(c.sourceName || '').toLowerCase().includes(q) ||
+        String(c.recipientName || '').toLowerCase().includes(q) ||
+        String(c.bankName || '').toLowerCase().includes(q) ||
+        String(c.checkNumber || '').toLowerCase().includes(q) ||
+        String(c.paymentReason || '').toLowerCase().includes(q) ||
+        c.amount.toString().includes(q)
+      );
+    }
+
+    if (statusFilter !== 'all') {
+      result = result.filter(c => c.status === statusFilter);
+    }
+
+    if (dateFrom) result = result.filter(c => c.dueDate >= dateFrom);
+    if (dateTo) result = result.filter(c => c.dueDate <= dateTo);
+
+    result.sort((a, b) => {
+      let cmp: number;
+      if (sortBy === 'dueDate') cmp = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      else if (sortBy === 'amount') cmp = a.amount - b.amount;
+      else cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+
+    return result;
+  }, [activeCekler, searchQuery, statusFilter, sortBy, sortDir, dateFrom, dateTo]);
+
+  // İstatistikler (yöne göre)
+  const stats = useMemo(() => {
+    const data = activeCekler;
+    const beklemede = data.filter(c => c.status === 'beklemede');
+    const buHafta = beklemede.filter(c => { const d = getDaysRemaining(c.dueDate); return d >= 0 && d <= 7; });
+    const gecmis = beklemede.filter(c => getDaysRemaining(c.dueDate) < 0);
+    const tahsilEdilen = data.filter(c => c.status === 'tahsil_edildi' || c.status === 'odendi');
+    const ciro = data.filter(c => c.status === 'ciro');
+    return {
+      toplam: data.length,
+      toplamTutar: data.reduce((s, c) => s + c.amount, 0),
+      beklemede: beklemede.length,
+      beklemedeTutar: beklemede.reduce((s, c) => s + c.amount, 0),
+      buHafta: buHafta.length,
+      buHaftaTutar: buHafta.reduce((s, c) => s + c.amount, 0),
+      gecmis: gecmis.length,
+      gecmisTutar: gecmis.reduce((s, c) => s + c.amount, 0),
+      tahsilAdet: tahsilEdilen.length,
+      tahsilTutar: tahsilEdilen.reduce((s, c) => s + c.amount, 0),
+      karsiliksiz: data.filter(c => c.status === 'karsiliksiz').length,
+      karsiliksizTutar: data.filter(c => c.status === 'karsiliksiz').reduce((s, c) => s + c.amount, 0),
+      ciroAdet: ciro.length,
+      ciroTutar: ciro.reduce((s, c) => s + c.amount, 0),
+    };
+  }, [activeCekler]);
+
+  // Global özet (her iki yön)
+  const globalStats = useMemo(() => {
+    const alinanTotal = alinanCekler.reduce((s, c) => s + c.amount, 0);
+    const alinanBeklemede = alinanCekler.filter(c => c.status === 'beklemede').reduce((s, c) => s + c.amount, 0);
+    const verilenTotal = verilenCekler.reduce((s, c) => s + c.amount, 0);
+    const verilenBeklemede = verilenCekler.filter(c => c.status === 'beklemede').reduce((s, c) => s + c.amount, 0);
+    const verilenGecmis = verilenCekler.filter(c => c.status === 'beklemede' && getDaysRemaining(c.dueDate) < 0);
+    return {
+      alinanTotal, alinanBeklemede, alinanCount: alinanCekler.length,
+      verilenTotal, verilenBeklemede, verilenCount: verilenCekler.length,
+      verilenGecmis: verilenGecmis.length,
+      verilenGecmisTutar: verilenGecmis.reduce((s, c) => s + c.amount, 0),
+      netDurum: alinanBeklemede - verilenBeklemede,
+    };
+  }, [alinanCekler, verilenCekler]);
+
+  // Banka özeti
+  const bankSummary = useMemo(() => {
+    const map = new Map<string, { count: number; total: number; pending: number; collected: number; bounced: number }>();
+    activeCekler.forEach(c => {
+      const existing = map.get(c.bankName) || { count: 0, total: 0, pending: 0, collected: 0, bounced: 0 };
+      existing.count++;
+      existing.total += c.amount;
+      if (c.status === 'beklemede') existing.pending += c.amount;
+      if (c.status === 'tahsil_edildi' || c.status === 'odendi') existing.collected += c.amount;
+      if (c.status === 'karsiliksiz') existing.bounced += c.amount;
+      map.set(c.bankName, existing);
+    });
+    return Array.from(map.entries()).sort((a, b) => b[1].total - a[1].total);
+  }, [activeCekler]);
+
+  const userName = currentEmployee?.name || 'Sistem';
+
+  const statusLabelsAlinan: Record<string, string> = {
+    beklemede: t('checks.statusPending'),
+    tahsil_edildi: t('checks.statusCollected'),
+    karsiliksiz: t('checks.statusBounced'),
+    iade: t('checks.statusReturned'),
+    ciro: t('checks.statusEndorsed'),
+  };
+
+  const statusLabelsVerilen: Record<string, string> = {
+    beklemede: 'Ödeme Bekliyor',
+    odendi: 'Ödendi',
+    karsiliksiz: t('checks.statusBounced'),
+    iade: t('checks.statusReturned'),
+  };
+
+  const currentStatusLabels = activeTab === 'alinan' ? statusLabelsAlinan : statusLabelsVerilen;
+
+  // ═══════════════════════════════════════════════════════════════
+  // HANDLERS
+  // ═══════════════════════════════════════════════════════════════
+
+  const handleStatusChange = () => {
+    if (!canEdit) { sec.logUnauthorized('cek_edit', 'Çek durumu değiştirme yetkisi yok'); return; }
+    if (!modalCek) return;
+    if (!sec.checkRate('edit')) return;
+    let updated: CekData = { ...modalCek, status: newStatus, statusNote: statusNote || modalCek.statusNote, updatedAt: new Date().toISOString() };
+    updated = addAuditEntry(updated, 'status_change', `Durum → ${newStatus}${statusNote ? ` - ${statusNote}` : ''}`, userName);
+    updateCekInPouchDB(updated.id, updated).catch(e => console.error('[CeklerPage] updateCek PouchDB hatası:', e));
+    sec.auditLog('cek_status_change', updated.id, updated.bankName);
+    emit('cek:status_changed', { cekId: updated.id, newStatus, bankName: updated.bankName, direction: updated.direction });
+    if (selectedCek?.id === updated.id) setSelectedCek(updated); // auto update
+    setModalType('none');
+    setStatusNote('');
+    toast.success(t('checks.statusUpdated'));
+  };
+
+  const handleEndorse = () => {
+    if (!canEdit) { sec.logUnauthorized('cek_endorse', 'Ciro yetkisi yok'); return; }
+    if (!modalCek || !endorseTo) return;
+    if (!sec.preCheck('edit', { endorseTo })) return;
+    let updated: CekData = {
+      ...modalCek, status: 'ciro', endorsedTo: endorseTo, endorseDate, updatedAt: new Date().toISOString(),
+    };
+    updated = addAuditEntry(updated, 'endorse', `Ciro → ${endorseTo}`, userName);
+    updateCekInPouchDB(updated.id, updated).catch(e => console.error('[CeklerPage] updateCek PouchDB hatası:', e));
+    sec.auditLog('cek_endorse', updated.id, `${updated.bankName} → ${endorseTo}`);
+    emit('cek:status_changed', { cekId: updated.id, newStatus: 'ciro', bankName: updated.bankName });
+    if (selectedCek?.id === updated.id) setSelectedCek(updated);
+    setModalType('none');
+    setEndorseTo('');
+    toast.success(t('checks.endorseSuccess'));
+  };
+
+  const handlePartialCollect = () => {
+    if (!canEdit) { sec.logUnauthorized('cek_partial', 'Kısmi tahsilat yetkisi yok'); return; }
+    if (!modalCek) return;
+    if (!sec.checkRate('edit')) return;
+    const pAmount = parseFloat(partialAmount);
+    if (isNaN(pAmount) || pAmount <= 0) return;
+    const collected = (modalCek.collectedAmount || 0) + pAmount;
+    const isFullyCollected = collected >= modalCek.amount;
+    const doneStatus = modalCek.direction === 'verilen' ? 'odendi' : 'tahsil_edildi';
+    let updated: CekData = {
+      ...modalCek, collectedAmount: collected, status: isFullyCollected ? doneStatus as CekStatus : 'beklemede',
+      updatedAt: new Date().toISOString(),
+    };
+    updated = addAuditEntry(updated, 'partial_collect', `Kısmi tahsilat ₺${pAmount.toLocaleString()} (Toplam: ₺${collected.toLocaleString()})`, userName);
+    updateCekInPouchDB(updated.id, updated).catch(e => console.error('[CeklerPage] updateCek PouchDB hatası:', e));
+    sec.auditLog('cek_partial_collect', updated.id, `₺${pAmount}`);
+    if (selectedCek?.id === updated.id) setSelectedCek(updated);
+    setModalType('none');
+    setPartialAmount('');
+    toast.success(t('checks.partialSuccess'));
+  };
+
+  const handleAddAlinanCek = () => {
+    if (!canAdd) { sec.logUnauthorized('cek_add', 'Çek ekleme yetkisi yok'); return; }
+    const nc = newAlinanCek;
+    if (!nc.amount || !nc.bankName || !nc.dueDate || !nc.sourceName) {
+      toast.error('Tüm zorunlu alanları doldurun'); return;
+    }
+    if (!sec.preCheck('add', { bankName: nc.bankName, sourceName: nc.sourceName })) return;
+    const cek: CekData = {
+      id: `cek-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      direction: 'alinan',
+      amount: parseFloat(nc.amount),
+      bankName: nc.bankName,
+      checkNumber: nc.checkNumber || undefined,
+      dueDate: nc.dueDate,
+      issueDate: nc.issueDate,
+      sourceType: nc.sourceType,
+      sourceName: nc.sourceName,
+      sourceId: `manual-${Date.now()}`,
+      photoFront: newCekPhotoFront,
+      photoBack: newCekPhotoBack,
+      status: 'beklemede',
+      createdAt: new Date().toISOString(),
+      createdBy: userName,
+      auditLog: [{ id: `audit-${Date.now()}`, timestamp: new Date().toISOString(), action: 'created', detail: 'Alınan çek oluşturuldu', user: userName }],
+    };
+    addCekToPouchDB(cek).catch(e => console.error('[CeklerPage] addCek PouchDB hatası:', e));
+    sec.auditLog('cek_add', cek.id, `ALINAN - ${cek.bankName} - ₺${cek.amount}`);
+    emit('cek:created', { cekId: cek.id, direction: 'alinan', amount: cek.amount });
+    setModalType('none');
+    setNewAlinanCek({ amount: '', bankName: '', checkNumber: '', dueDate: '', issueDate: new Date().toISOString().split('T')[0], sourceName: '', sourceType: 'musteri' });
+    setNewCekPhotoFront(null); setNewCekPhotoBack(null);
+    toast.success('Alınan çek başarıyla kaydedildi');
+  };
+
+  const handleAddVerilenCek = () => {
+    if (!canAdd) { sec.logUnauthorized('cek_add', 'Çek ekleme yetkisi yok'); return; }
+    const nc = newVerilenCek;
+    if (!nc.amount || !nc.bankName || !nc.dueDate || !nc.recipientName) {
+      toast.error('Tüm zorunlu alanları doldurun'); return;
+    }
+    if (!sec.preCheck('add', { bankName: nc.bankName, recipientName: nc.recipientName })) return;
+    const cek: CekData = {
+      id: `cek-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      direction: 'verilen',
+      amount: parseFloat(nc.amount),
+      bankName: nc.bankName,
+      checkNumber: nc.checkNumber || undefined,
+      dueDate: nc.dueDate,
+      issueDate: nc.issueDate,
+      sourceType: 'musteri',
+      sourceName: nc.recipientName,
+      sourceId: `manual-${Date.now()}`,
+      recipientName: nc.recipientName,
+      paymentReason: nc.paymentReason || undefined,
+      photoFront: newCekPhotoFront,
+      photoBack: newCekPhotoBack,
+      status: 'beklemede',
+      createdAt: new Date().toISOString(),
+      createdBy: userName,
+      auditLog: [{ id: `audit-${Date.now()}`, timestamp: new Date().toISOString(), action: 'created', detail: 'Verilen çek oluşturuldu', user: userName }],
+    };
+    addCekToPouchDB(cek).catch(e => console.error('[CeklerPage] addCek PouchDB hatası:', e));
+    sec.auditLog('cek_add', cek.id, `VERİLEN - ${cek.bankName} - ₺${cek.amount} → ${cek.recipientName}`);
+    emit('cek:created', { cekId: cek.id, direction: 'verilen', amount: cek.amount });
+    logActivity('cek_verilen', `Verilen çek: ₺${cek.amount.toLocaleString()} → ${cek.recipientName}`, { employeeName: user?.name });
+    setModalType('none');
+    setNewVerilenCek({ amount: '', bankName: '', checkNumber: '', dueDate: '', issueDate: new Date().toISOString().split('T')[0], recipientName: '', paymentReason: '' });
+    setNewCekPhotoFront(null); setNewCekPhotoBack(null);
+    toast.success('Verilen çek başarıyla kaydedildi');
+  };
+
+  const handleDelete = (id: string, bankName: string) => {
+    if (!canDelete) { sec.logUnauthorized('cek_delete', 'Çek silme yetkisi yok'); return; }
+    if (!sec.checkRate('delete')) return;
+    
+    // PouchDB cekler tablosundan sil (CouchDB ile senkronize olur)
+    deleteCekFromPouchDB(id).catch(e => console.warn('[CeklerPage] PouchDB delete hatası:', e));
+    emit('cek:deleted', { cekId: id, bankName });
+    setSelectedCek(null);
+    sec.auditLog('cek_delete', id, bankName);
+    logActivity('employee_update', 'Çek Silindi', { employeeName: user?.name, page: 'Cekler', description: `${bankName} bankasına ait çek silindi.` });
+    toast.success(t('checks.deleted'));
+  };
+
+  const handleExportCSV = () => {
+    const dirLabel = activeTab === 'alinan' ? 'Alinan' : 'Verilen';
+    const headers = activeTab === 'alinan'
+      ? ['Kaynak', 'Banka', 'Çek No', 'Tutar', 'Vade', 'Durum', 'Oluşturma']
+      : ['Alıcı', 'Ödeme Nedeni', 'Banka', 'Çek No', 'Tutar', 'Vade', 'Durum', 'Oluşturma'];
+    const rows = filteredCekler.map(c => activeTab === 'alinan'
+      ? [c.sourceName, c.bankName, c.checkNumber || '-', c.amount.toString(), c.dueDate, c.status, c.createdAt.split('T')[0]]
+      : [c.recipientName || c.sourceName, c.paymentReason || '-', c.bankName, c.checkNumber || '-', c.amount.toString(), c.dueDate, c.status, c.createdAt.split('T')[0]]
+    );
+    const csv = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url;
+    a.download = `cekler_${dirLabel}_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+    toast.success(t('checks.exportSuccess'));
+  };
+
+  // Fotoğrafı canvas ile sıkıştır — localStorage dolmaması için (max 1200px, %75 JPEG)
+  const compressImage = (file: File, maxWidth = 1200, quality = 0.75): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onloadend = () => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > maxWidth) { height = Math.round((height * maxWidth) / width); width = maxWidth; }
+          const canvas = document.createElement('canvas');
+          canvas.width = width; canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) { reject(new Error('Canvas yok')); return; }
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string | null) => void) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    compressImage(file)
+      .then(setter)
+      .catch(() => toast.error('Fotoğraf yüklenemedi'));
+  };
+
+  // Tema renkleri
+  const isVerilen = activeTab === 'verilen';
+  const accentColor = isVerilen ? 'red' : 'purple';
+  const accentBg = isVerilen ? 'bg-red-600' : 'bg-purple-600';
+  const accentHover = isVerilen ? 'hover:bg-red-700' : 'hover:bg-purple-700';
+  const accentBgLight = isVerilen ? 'bg-red-600/20 border-red-500/30' : 'bg-purple-600/20 border-purple-500/30';
+  const accentText = isVerilen ? 'text-red-400' : 'text-purple-400';
+  const accentRing = isVerilen ? 'focus:ring-red-500/40' : 'focus:ring-purple-500/40';
+
+  // Share handler
+  const handleShare = (cek: CekData) => {
+    if (navigator.share) {
+      const text = `${cek.direction === 'verilen' ? 'Verilen' : 'Alınan'} Çek Bilgisi:\n` +
+                 `Banka: ${cek.bankName}\n` +
+                 `Tutar: ₺${cek.amount.toLocaleString()}\n` +
+                 `Vade: ${new Date(cek.dueDate).toLocaleDateString('tr-TR')}\n` +
+                 `Durum: ${currentStatusLabels[cek.status] || cek.status}`;
+      navigator.share({
+        title: 'Çek Detayı',
+        text: text,
+      }).catch(console.error);
+    } else {
+      navigator.clipboard.writeText(`${cek.bankName} - ₺${cek.amount.toLocaleString()} - ${cek.dueDate}`);
+      toast.success('Bilgiler panoya kopyalandı');
+    }
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  // RENDER
+  // ═══════════════════════════════════════════════════════════════
+
+  return (
+    <div className="p-2 sm:p-6 lg:p-8 space-y-3 bg-background min-h-screen text-foreground font-sans pb-32 sm:pb-8">
+      {/* 📱 HEADER - Ultra Compact on Mobile */}
+      <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl -mx-2 px-2 pb-3 pt-1 border-b border-white/5 sm:static sm:bg-transparent sm:backdrop-blur-none sm:mx-0 sm:px-0 sm:border-0 sm:pb-0">
+        <div className="flex items-center justify-between gap-2 px-1">
+          <div className="flex items-center gap-2">
+            <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl ${accentBgLight} flex items-center justify-center border border-white/10 shadow-sm`}>
+              <FileEdit className={`w-4 h-4 sm:w-5 sm:h-5 ${accentText}`} />
+            </div>
+            <div>
+              <h1 className="text-base sm:text-2xl font-black text-foreground tracking-tight leading-tight">
+                {t('checks.title')}
+              </h1>
+              <p className="hidden sm:block text-xs text-muted-foreground">{t('checks.subtitle')}</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-1.5">
+            <button onClick={handleExportCSV}
+              className="p-2 sm:px-3 sm:py-2 bg-white/5 border border-white/10 rounded-xl text-muted-foreground hover:text-foreground transition-all">
+              <Download className="w-4 h-4" />
+            </button>
+            <button onClick={() => setModalType(isVerilen ? 'addVerilen' : 'addAlinan')}
+              className={`hidden sm:flex px-4 py-2 ${accentBg} ${accentHover} text-foreground rounded-lg text-sm font-bold items-center gap-2 transition-colors shadow-lg shadow-black/20`}>
+              <Plus className="w-4 h-4" />
+              {isVerilen ? 'Verilen Çek Ekle' : 'Alınan Çek Ekle'}
+            </button>
+          </div>
+        </div>
+
+        {/* ═══ MODERN TAB SWITCH (Segmented Control) ═══ */}
+        <div className="mt-3 relative p-1 bg-white/5 rounded-2xl border border-white/5 flex gap-1">
+          {/* Moving Indicator */}
+          <motion.div
+            layoutId="tab-active"
+            initial={false}
+            animate={{ x: activeTab === 'alinan' ? '0%' : '100%' }}
+            className={`absolute left-1 top-1 bottom-1 w-[calc(50%-4px)] rounded-xl ${accentBg} shadow-lg z-0`}
+            transition={{ type: "spring", bounce: 0.15, duration: 0.4 }}
+          />
+          
+          <button
+            onClick={() => { setActiveTab('alinan'); setSelectedCek(null); }}
+            className={`flex-1 relative z-10 py-2.5 rounded-xl text-[12px] font-black transition-colors flex items-center justify-center gap-2 ${
+              activeTab === 'alinan' ? 'text-white' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <ArrowDownLeft className="w-3.5 h-3.5" />
+            <span>ALINAN</span>
+            <span className={`text-[10px] opacity-70 font-bold ${activeTab === 'alinan' ? 'text-white' : ''}`}>
+              ₺{globalStats.alinanBeklemede.toLocaleString()}
+            </span>
+          </button>
+
+          <button
+            onClick={() => { setActiveTab('verilen'); setSelectedCek(null); }}
+            className={`flex-1 relative z-10 py-2.5 rounded-xl text-[12px] font-black transition-colors flex items-center justify-center gap-2 ${
+              activeTab === 'verilen' ? 'text-white' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <ArrowUpRight className="w-3.5 h-3.5" />
+            <span>VERİLEN</span>
+            <span className={`text-[10px] opacity-70 font-bold ${activeTab === 'verilen' ? 'text-white' : ''}`}>
+              ₺{globalStats.verilenBeklemede.toLocaleString()}
+            </span>
+          </button>
+        </div>
+
+        {/* NET DURUM & GECİKENLER BAR */}
+        <div className="mt-2 flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+          <div className={`flex-shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-xl border ${
+            globalStats.netDurum >= 0 ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'
+          }`}>
+            <span className="text-[10px] font-black text-white/40 uppercase tracking-tighter">NET:</span>
+            <span className={`text-xs font-black ${globalStats.netDurum >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              ₺{globalStats.netDurum.toLocaleString()}
+            </span>
+          </div>
+
+          {globalStats.verilenGecmis > 0 && (
+            <div className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-red-500 text-white rounded-xl shadow-lg shadow-red-900/20 animate-pulse-slow">
+              <BadgeAlert className="w-3 h-3" />
+              <span className="text-[10px] font-black tracking-tight uppercase">
+                {globalStats.verilenGecmis} GECİKME
+              </span>
+            </div>
+          )}
+
+          {stats.buHafta > 0 && (
+            <div className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-xl">
+              <Clock className="w-3 h-3" />
+              <span className="text-[10px] font-black tracking-tight uppercase">
+                {stats.buHafta} BU HAFTA
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* DASHBOARD STATS - Elegant Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <DashboardStatItem 
+          label="Bekleyen" 
+          value={`₺${stats.beklemedeTutar.toLocaleString()}`} 
+          count={stats.beklemede} 
+          icon={<Clock className="w-4 h-4" />}
+          color="yellow"
+        />
+        <DashboardStatItem 
+          label={isVerilen ? "Ödenen" : "Tahsil"} 
+          value={`₺${stats.tahsilTutar.toLocaleString()}`} 
+          count={stats.tahsilAdet} 
+          icon={<CheckCircle className="w-4 h-4" />}
+          color="green"
+        />
+        <DashboardStatItem 
+          label="Karşılıksız" 
+          value={`₺${stats.karsiliksizTutar.toLocaleString()}`} 
+          count={stats.karsiliksiz} 
+          icon={<ShieldAlert className="w-4 h-4" />}
+          color="red"
+        />
+        <DashboardStatItem 
+          label="Toplam" 
+          value={`₺${stats.toplamTutar.toLocaleString()}`} 
+          count={stats.toplam} 
+          icon={<TrendingUp className="w-4 h-4" />}
+          color="slate"
+        />
+      </div>
+
+      {/* FILTER & SEARCH */}
+      <div className="flex items-center gap-2 pt-1">
+        <div className="relative flex-1">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+          <input 
+            type="text" 
+            value={searchQuery} 
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={isVerilen ? "Alıcı, banka, çek no..." : "Kaynak, banka, çek no..."}
+            className="w-full bg-white/5 border border-white/5 rounded-2xl pl-10 pr-4 py-3 text-sm font-medium placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-accent/40"
+          />
+        </div>
+        <button 
+          onClick={() => setShowMobileFilters(v => !v)}
+          className={`h-[46px] w-[46px] flex items-center justify-center rounded-2xl border transition-all ${
+            showMobileFilters || dateFrom || dateTo || statusFilter !== 'all'
+            ? `${accentBg} border-transparent shadow-lg` 
+            : 'bg-white/5 border-white/5 text-white/40'
+          }`}
+        >
+          <Filter className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Mobile: expanded filter row */}
+      <AnimatePresence>
+        {showMobileFilters && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+            className="sm:hidden overflow-hidden"
+          >
+          <div className="px-4 pb-4 flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest pl-1">Durum Filtresi</label>
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)}
+                className={`w-full px-4 py-2.5 bg-card border border-border rounded-xl text-foreground text-sm focus:outline-none focus:ring-2 ${accentRing} appearance-none`}>
+                <option value="all">Tüm Durumlar</option>
+                {Object.entries(currentStatusLabels).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest pl-1">Vade Aralığı</label>
+              <div className="flex gap-2">
+                <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+                  className={`flex-1 px-3 py-2.5 bg-card border border-border rounded-xl text-foreground text-sm focus:outline-none focus:ring-2 ${accentRing}`} />
+                <span className="text-muted-foreground text-xs self-center flex-shrink-0">/</span>
+                <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+                  className={`flex-1 px-3 py-2.5 bg-card border border-border rounded-xl text-foreground text-sm focus:outline-none focus:ring-2 ${accentRing}`} />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest pl-1">Sıralama Ölçütü</label>
+              <div className="flex gap-2">
+                <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}
+                  className={`flex-1 px-4 py-2.5 bg-card border border-border rounded-xl text-foreground text-sm focus:outline-none focus:ring-2 ${accentRing} appearance-none`}>
+                  <option value="dueDate">Vade Tarihi</option>
+                  <option value="amount">Tutar</option>
+                  <option value="createdAt">Kayıt Tarihi</option>
+                </select>
+                <button onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+                  className="px-4 bg-card border border-border rounded-xl text-muted-foreground active:bg-secondary transition-colors">
+                  {sortDir === 'asc' ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            {(dateFrom || dateTo || statusFilter !== 'all') && (
+              <button onClick={() => { setDateFrom(''); setDateTo(''); setStatusFilter('all'); }}
+                className="mt-1 w-full py-2.5 bg-white/5 border border-white/10 rounded-xl text-xs font-bold text-muted-foreground hover:text-foreground flex items-center justify-center gap-2 transition-colors">
+                <RotateCcw className="w-3.5 h-3.5" /> Filtreleri Temizle
+              </button>
+            )}
+          </div>
+          </motion.div>
+        )}
+        </AnimatePresence>
+      
+      {/* İÇERİK */}
+      <div className="w-full">
+        {viewTab === 'bank' ? (
+          /* BANKA ÖZETİ */
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+                <Building className={`w-5 h-5 ${accentText}`} />
+                {isVerilen ? 'Verilen Çekler - Banka Özeti' : t('checks.bankSummary')}
+              </h2>
+              {bankSummary.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, x: 12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="flex items-center gap-3 text-xs"
+                >
+                  {[
+                    { label: 'Beklemede', color: 'text-yellow-400', total: bankSummary.reduce((s, [, d]) => s + d.pending, 0) },
+                    { label: isVerilen ? 'Ödenen' : 'Tahsil', color: 'text-green-400', total: bankSummary.reduce((s, [, d]) => s + d.collected, 0) },
+                    { label: 'Karşılıksız', color: 'text-red-400', total: bankSummary.reduce((s, [, d]) => s + d.bounced, 0) },
+                  ].filter(x => x.total > 0).map(x => (
+                    <span key={x.label} className={`font-bold ${x.color}`}>
+                      {x.label}: ₺{x.total.toLocaleString()}
+                    </span>
+                  ))}
+                </motion.div>
+              )}
+            </div>
+
+            {bankSummary.length === 0 ? (
+              <p className="text-muted-foreground text-center py-12">{t('checks.noChecks')}</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {bankSummary.map(([bankName, data], idx) => {
+                  const collectedPct = data.total > 0 ? (data.collected / data.total) * 100 : 0;
+                  const pendingPct = data.total > 0 ? (data.pending / data.total) * 100 : 0;
+                  const bouncedPct = data.total > 0 ? (data.bounced / data.total) * 100 : 0;
+                  return (
+                    <motion.div
+                      key={bankName}
+                      initial={{ opacity: 0, y: 16, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ delay: idx * 0.06, type: 'spring', stiffness: 280, damping: 26 }}
+                      whileHover={{ y: -3, transition: { duration: 0.2 } }}
+                      className="card-premium rounded-xl p-5 space-y-4 hover:border-white/15 transition-colors"
+                    >
+                      {/* Header */}
+                      <div className="flex items-center gap-3">
+                        <motion.div
+                          whileHover={{ rotate: [0, -8, 8, 0] }}
+                          transition={{ duration: 0.4 }}
+                          className={`w-10 h-10 rounded-xl ${accentBgLight} flex items-center justify-center border`}
+                        >
+                          <Building className={`w-5 h-5 ${accentText}`} />
+                        </motion.div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-foreground truncate">{bankName}</p>
+                          <p className="text-xs text-muted-foreground">{data.count} çek</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-base sm:text-lg font-black text-foreground">₺{data.total.toLocaleString()}</p>
+                          {collectedPct > 0 && (
+                            <p className="text-[10px] text-green-400 font-bold">%{Math.round(collectedPct)} tahsil</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Stat chips */}
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        {[
+                          { label: isVerilen ? 'Bekleyen' : t('checks.statusPending'), value: data.pending, color: 'yellow' },
+                          { label: isVerilen ? 'Ödenen' : t('checks.statusCollected'), value: data.collected, color: 'green' },
+                          { label: t('checks.statusBounced'), value: data.bounced, color: 'red' },
+                        ].map(({ label, value, color }) => (
+                          <motion.div
+                            key={label}
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: idx * 0.06 + 0.15, type: 'spring', stiffness: 400 }}
+                            className={`p-2 rounded-xl bg-${color}-500/10 border border-${color}-500/15`}
+                          >
+                            <p className="text-[9px] sm:text-[10px] text-muted-foreground leading-none mb-1">{label}</p>
+                            <p className={`text-xs sm:text-sm font-black text-${color}-400`}>₺{value.toLocaleString()}</p>
+                          </motion.div>
+                        ))}
+                      </div>
+
+                      {/* Animated stacked progress bar */}
+                      <div className="space-y-1.5">
+                        <div className="h-2.5 bg-muted/20 rounded-full overflow-hidden flex gap-px">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${collectedPct}%` }}
+                            transition={{ duration: 0.8, delay: idx * 0.06 + 0.2, ease: [0.16, 1, 0.3, 1] }}
+                            className="bg-green-500 h-full rounded-l-full"
+                          />
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${pendingPct}%` }}
+                            transition={{ duration: 0.8, delay: idx * 0.06 + 0.3, ease: [0.16, 1, 0.3, 1] }}
+                            className="bg-yellow-500 h-full"
+                          />
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${bouncedPct}%` }}
+                            transition={{ duration: 0.8, delay: idx * 0.06 + 0.4, ease: [0.16, 1, 0.3, 1] }}
+                            className="bg-red-500 h-full rounded-r-full"
+                          />
+                        </div>
+                        <div className="flex items-center justify-between text-[9px] text-muted-foreground/60">
+                          <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" /> Tahsil</span>
+                          <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-yellow-500 inline-block" /> Beklemede</span>
+                          <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" /> İade</span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : (
+          /* LİSTE GÖRÜNÜMÜ */
+          filteredCekler.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+              <FileEdit className="w-20 h-20 mb-4 opacity-30" />
+              <p className="text-lg">{isVerilen ? 'Henüz verilen çek yok' : t('checks.noChecks')}</p>
+              <p className="text-sm mt-1">{isVerilen ? 'Dışarıya kestiğiniz çekleri buradan takip edin' : t('checks.noChecksDesc')}</p>
+              <button onClick={() => setModalType(isVerilen ? 'addVerilen' : 'addAlinan')}
+                className={`mt-4 px-4 py-2 ${accentBg} ${accentHover} text-foreground rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}>
+                <Plus className="w-4 h-4" /> {isVerilen ? 'Verilen Çek Ekle' : 'Alınan Çek Ekle'}
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <AnimatePresence>
+                {filteredCekler.map((cek, index) => {
+                  const daysLeft = getDaysRemaining(cek.dueDate);
+                  const isOverdue = daysLeft < 0 && cek.status === 'beklemede';
+                  const isDueToday = daysLeft === 0 && cek.status === 'beklemede';
+                  const isUrgent = daysLeft > 0 && daysLeft <= 3 && cek.status === 'beklemede';
+                  const isUpcoming = daysLeft > 3 && daysLeft <= 7 && cek.status === 'beklemede';
+                  
+                  const isExpanded = selectedCek?.id === cek.id;
+                  const collected = cek.collectedAmount || 0;
+                  const remaining = cek.amount - collected;
+                  const cekIsVerilen = cek.direction === 'verilen';
+
+                  // Dynamic styles based on priority
+                  let cardBg = 'bg-white/5';
+                  let cardBorder = 'border-white/5';
+                  let urgencyLabel: string;
+                  let urgencyColor = 'text-white/40';
+                  let urgencyBg = 'bg-white/5';
+                  let animationProps = {};
+                  let glowColor = '';
+
+                  if (isOverdue) {
+                    cardBg = 'bg-red-500/10';
+                    cardBorder = 'border-red-500/40';
+                    urgencyLabel = `${Math.abs(daysLeft)} GÜN GEÇTİ`;
+                    urgencyColor = 'text-red-400';
+                    urgencyBg = 'bg-red-500/20';
+                    animationProps = { 
+                      animate: { x: [0, -1, 1, -1, 1, 0] },
+                      transition: { repeat: Infinity, duration: 2, repeatDelay: 1 }
+                    };
+                    glowColor = 'shadow-[0_0_20px_-5px_rgba(239,68,68,0.4)]';
+                  } else if (isDueToday) {
+                    cardBg = 'bg-orange-500/15';
+                    cardBorder = 'border-orange-500/50';
+                    urgencyLabel = 'BUGÜN ÖDEME';
+                    urgencyColor = 'text-orange-400';
+                    urgencyBg = 'bg-orange-500/30';
+                    animationProps = {
+                      animate: { scale: [1, 1.01, 1] },
+                      transition: { repeat: Infinity, duration: 1.5 }
+                    };
+                    glowColor = 'shadow-[0_0_25px_-5px_rgba(249,115,22,0.5)]';
+                  } else if (isUrgent) {
+                    cardBg = 'bg-yellow-500/5';
+                    cardBorder = 'border-yellow-500/20';
+                    urgencyLabel = `${daysLeft} GÜN KALDI`;
+                    urgencyColor = 'text-yellow-400';
+                    urgencyBg = 'bg-yellow-500/20';
+                    glowColor = 'shadow-[0_0_15px_-5px_rgba(234,179,8,0.2)]';
+                  } else if (isUpcoming) {
+                    urgencyLabel = `${daysLeft} GÜN`;
+                    urgencyColor = 'text-blue-400';
+                    urgencyBg = 'bg-blue-500/10';
+                  } else {
+                    urgencyLabel = daysLeft > 0 ? `${daysLeft} GÜN` : '';
+                  }
+
+                  return (
+                    <motion.div key={cek.id}
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`group relative border rounded-[32px] overflow-hidden transition-all duration-500 ${cardBg} ${cardBorder} ${glowColor} ${
+                        isExpanded ? 'ring-2 ring-accent/50 scale-[1.01] z-10' : 'hover:bg-white/[0.08] active:scale-[0.98]'
+                      }`}
+                      {...(isDueToday || isOverdue ? animationProps : {})}
+                    >
+                      {/* Status Strip */}
+                      <div className={`absolute top-0 left-0 w-1.5 h-full ${getStatusBg(cek.status).split(' ')[0]} opacity-80`} />
+
+                      {/* Main Content Area */}
+                      <button
+                        onClick={() => {
+                          if (window.innerWidth < 640) {
+                            setModalCek(cek);
+                            setModalType('details');
+                          } else {
+                            setSelectedCek(isExpanded ? null : cek);
+                          }
+                        }}
+                        className="w-full text-left p-5 sm:p-6 pl-6 sm:pl-8"
+                      >
+                        <div className="flex justify-between items-start gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <h4 className="text-base sm:text-xl font-black text-white truncate tracking-tight leading-none">
+                                {cekIsVerilen ? (cek.recipientName || cek.sourceName) : cek.sourceName}
+                              </h4>
+                              {(isOverdue || isDueToday) && (
+                                <motion.div 
+                                  animate={{ scale: [1, 1.4, 1], opacity: [1, 0.4, 1] }}
+                                  transition={{ repeat: Infinity, duration: 0.8 }}
+                                  className="flex-shrink-0 w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_12px_rgba(239,68,68,1)]" 
+                                />
+                              )}
+                            </div>
+                            
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] font-bold text-white/30 uppercase tracking-widest">
+                              <span className="flex items-center gap-1.5 backdrop-blur-sm bg-white/5 px-2 py-0.5 rounded-full">
+                                <Landmark className="w-3 h-3 text-white/50" />
+                                {cek.bankName}
+                              </span>
+                              {cek.checkNumber && (
+                                <span className="flex items-center gap-1.5">
+                                  <Receipt className="w-3 h-3 text-white/20" />
+                                  #{cek.checkNumber}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="text-right flex flex-col items-end gap-1.5">
+                            <p className={`text-xl sm:text-2xl font-black tracking-tighter leading-none ${cekIsVerilen ? 'text-red-400' : 'text-green-400'}`}>
+                              {cekIsVerilen ? '-' : '+'}₺{cek.amount.toLocaleString()}
+                            </p>
+                            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[10px] font-black tracking-widest uppercase shadow-sm ${getStatusBg(cek.status)} ${getStatusColor(cek.status)}`}>
+                              {getStatusIcon(cek.status)}
+                              {currentStatusLabels[cek.status] || cek.status}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-5 pt-4 border-t border-white/5 flex items-center justify-between">
+                          <div className="flex items-center gap-2.5 text-xs font-bold text-white/40">
+                            <div className="p-1.5 bg-white/5 rounded-lg">
+                              <Calendar className="w-4 h-4 text-white/60" />
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-[9px] uppercase tracking-tighter opacity-50">VADE TARİHİ</span>
+                              <span className="text-foreground/90">{new Date(cek.dueDate).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {cek.status === 'beklemede' && daysLeft <= 30 && daysLeft >= 0 && (
+                              <div className="flex items-center gap-2 w-16 sm:w-24 mr-1 sm:mr-2">
+                                <div className="h-1 flex-1 bg-white/10 rounded-full overflow-hidden">
+                                  <motion.div 
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${((30 - daysLeft) / 30) * 100}%` }}
+                                    className={`h-full ${daysLeft <= 3 ? 'bg-red-500' : daysLeft <= 7 ? 'bg-orange-500' : 'bg-green-500'}`}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                            {cek.status === 'beklemede' ? (
+                              <motion.div 
+                                initial={{ scale: 0.9, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                whileHover={{ scale: 1.05 }}
+                                className={`px-3 py-1.5 rounded-2xl border text-[10px] font-black tracking-tighter shadow-inner flex items-center gap-1.5 ${urgencyBg} ${urgencyColor} ${isOverdue || isDueToday ? 'border-transparent' : 'border-white/5'}`}
+                              >
+                                {(isOverdue || isDueToday) && (
+                                  <motion.div
+                                    animate={{ rotate: [0, 15, -15, 0] }}
+                                    transition={{ repeat: Infinity, duration: 1.5 }}
+                                  >
+                                    <BadgeAlert className="w-3.5 h-3.5" />
+                                  </motion.div>
+                                )}
+                                {isUrgent && (
+                                  <motion.div
+                                    animate={{ opacity: [1, 0.5, 1] }}
+                                    transition={{ repeat: Infinity, duration: 2 }}
+                                  >
+                                    <Clock className="w-3.5 h-3.5" />
+                                  </motion.div>
+                                )}
+                                {urgencyLabel}
+                              </motion.div>
+                            ) : (
+                              <span className="flex items-center gap-1.5 text-[10px] font-black text-green-400/50 uppercase tracking-widest">
+                                <CheckCircle className="w-3.5 h-3.5" /> İŞLEM TAMAM
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+
+
+                      {/* === Genişleyen Detay Paneli === */}
+                      <AnimatePresence>
+                        {isExpanded && (
+                          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
+                            <div className="px-4 pb-4 pt-4 border-t border-border/50 bg-secondary/5 space-y-5">
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <DetailField label="Oluşturan" value={cek.createdBy} />
+                                <DetailField label="Düzenleme Tarihi" value={new Date(cek.issueDate).toLocaleDateString('tr-TR')} />
+                                {cekIsVerilen && cek.paymentReason && (
+                                  <DetailField label="Ödeme Nedeni" value={cek.paymentReason} />
+                                )}
+                                {cek.endorsedTo && (
+                                  <DetailField label="Ciro Edilen" value={`${cek.endorsedTo} (${cek.endorseDate || '-'})`} />
+                                )}
+                              </div>
+
+                              {collected > 0 && (
+                                <div className="bg-background border border-border p-3 rounded-xl">
+                                  <div className="flex justify-between text-xs text-muted-foreground mb-1.5 font-medium">
+                                    <span>{cekIsVerilen ? 'Ödenen' : 'Tahsil edilen'}: ₺{collected.toLocaleString()}</span>
+                                    <span>Kalan: ₺{remaining.toLocaleString()}</span>
+                                  </div>
+                                  <div className="h-2 bg-secondary rounded-full overflow-hidden flex">
+                                    <div className={`${cekIsVerilen ? 'bg-red-500' : 'bg-green-500'} h-full transition-all`} style={{ width: `${Math.min((collected / cek.amount) * 100, 100)}%` }} />
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Fotoğraflar */}
+                              <div className="grid grid-cols-2 gap-3">
+                                <PhotoSlot label="Ön Yüz" photo={cek.photoFront} onView={() => cek.photoFront && setPhotoModalData({ url: cek.photoFront, title: 'Ön Yüz' })} />
+                                <PhotoSlot label="Arka Yüz" photo={cek.photoBack} onView={() => cek.photoBack && setPhotoModalData({ url: cek.photoBack, title: 'Arka Yüz' })} />
+                              </div>
+
+                              {cek.statusNote && (
+                                <div className="p-3 rounded-xl bg-card border border-border shadow-sm">
+                                  <p className="text-xs font-bold text-muted-foreground mb-1 uppercase tracking-wider">Durum Notu</p>
+                                  <p className="text-sm text-foreground">{cek.statusNote}</p>
+                                </div>
+                              )}
+
+                              {/* Audit Log */}
+                              {cek.auditLog && cek.auditLog.length > 0 && (
+                                <div>
+                                  <p className="text-xs font-bold text-muted-foreground mb-2 flex items-center gap-1.5 uppercase tracking-wider">
+                                    <History className="w-3.5 h-3.5" /> İşlem Geçmişi
+                                  </p>
+                                  <div className="space-y-1.5 max-h-40 overflow-y-auto no-scrollbar rounded-xl border border-border bg-card p-2">
+                                    {cek.auditLog.slice().reverse().map(entry => (
+                                      <div key={entry.id} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-xs py-2 px-3 hover:bg-secondary/40 rounded-lg transition-colors">
+                                        <span className="text-muted-foreground/60 sm:w-28 flex-shrink-0 font-mono text-[10px] sm:text-xs">
+                                          {new Date(entry.timestamp).toLocaleDateString('tr-TR')} {new Date(entry.timestamp).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                        <span className="text-foreground font-medium flex-1">{entry.detail}</span>
+                                        <span className="text-muted-foreground px-2 py-0.5 bg-secondary rounded-md w-fit mt-1 sm:mt-0">{entry.user}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Aksiyonlar */}
+                              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-2">
+                                <button onClick={() => { setModalCek(cek); setNewStatus(cek.status); setStatusNote(cek.statusNote || ''); setModalType('status'); }}
+                                  className={`flex-1 sm:flex-none justify-center px-4 py-2.5 ${accentBg} ${accentHover} text-foreground text-sm font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm`}>
+                                  <ArrowUpDown className="w-4 h-4" /> Durum Değiştir
+                                </button>
+                                {cek.status === 'beklemede' && !cekIsVerilen && (
+                                  <button onClick={() => { setModalCek(cek); setEndorseTo(''); setEndorseDate(new Date().toISOString().split('T')[0]); setModalType('endorse'); }}
+                                    className="flex-1 sm:flex-none justify-center px-4 py-2.5 bg-blue-500 text-foreground hover:bg-blue-600 text-sm font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm">
+                                    <Send className="w-4 h-4" /> Ciro Et
+                                  </button>
+                                )}
+                                {cek.status === 'beklemede' && (
+                                  <button onClick={() => { setModalCek(cek); setPartialAmount(''); setModalType('partial'); }}
+                                    className="flex-1 sm:flex-none justify-center px-4 py-2.5 bg-green-600 hover:bg-green-700 text-foreground text-sm font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm">
+                                    <DollarSign className="w-4 h-4" /> {cekIsVerilen ? 'Kısmi Ödeme' : 'Kısmi Tahsilat'}
+                                  </button>
+                                )}
+                                <div className="sm:ml-auto w-full sm:w-auto h-0 sm:h-auto"></div>
+                                <button onClick={() => { if (confirm('Bu çeki silmek istediğinize emin misiniz?')) handleDelete(cek.id, cek.bankName); }}
+                                  className="w-full sm:w-auto justify-center px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-sm font-bold rounded-xl transition-colors flex items-center gap-2 border border-red-500/20">
+                                  <Trash2 className="w-4 h-4" /> Çeki Sil
+                                </button>
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
+          )
+        )}
+      </div>
+
+      {/* MOBILE FLOATING ACTION BUTTON */}
+      <div className="fixed bottom-6 right-6 sm:hidden z-40">
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={() => setModalType(isVerilen ? 'addVerilen' : 'addAlinan')}
+          className={`w-14 h-14 rounded-full ${accentBg} text-white shadow-2xl flex items-center justify-center border border-white/20`}
+        >
+          <Plus className="w-6 h-6 stroke-[3px]" />
+        </motion.button>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* MODALS */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+
+      {/* Detay Modal (Mobile-First) */}
+      <AnimatePresence>
+        {modalType === 'details' && modalCek && (
+          <Overlay onClose={() => setModalType('none')}>
+            <ModalCard title="Çek Detayları" icon={<Eye className={`w-5 h-5 ${accentText}`} />} onClose={() => setModalType('none')} wide>
+              <div className="space-y-6">
+                {/* Tutar ve Durum Özeti */}
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-secondary/20 border border-border">
+                  <div>
+                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Tutar</p>
+                    <p className={`text-2xl font-black ${modalCek.direction === 'verilen' ? 'text-red-500' : 'text-green-500'}`}>
+                      ₺{modalCek.amount.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Durum</p>
+                    <span className={`px-2.5 py-1 rounded-lg border text-[10px] font-black tracking-widest uppercase ${getStatusBg(modalCek.status)} ${getStatusColor(modalCek.status)}`}>
+                      {currentStatusLabels[modalCek.status] || modalCek.status}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <DetailField label="Firma / Kişi" value={modalCek.recipientName || modalCek.sourceName} bold />
+                    <DetailField label="Banka" value={modalCek.bankName} icon={<Landmark className="w-3.5 h-3.5" />} />
+                    <DetailField label="Vade Tarihi" value={new Date(modalCek.dueDate).toLocaleDateString('tr-TR')} icon={<Calendar className="w-3.5 h-3.5" />} />
+                    <DetailField label="Çek No" value={modalCek.checkNumber || '-'} icon={<Receipt className="w-3.5 h-3.5" />} />
+                  </div>
+
+                  <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+                    <p className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-2">Açıklama / Detay</p>
+                    <p className="text-sm text-foreground/80 leading-relaxed">
+                      {modalCek.paymentReason || modalCek.statusNote || 'Herhangi bir açıklama bulunmuyor.'}
+                    </p>
+                  </div>
+
+                {/* Kısmi Ödeme Bilgisi */}
+                {(modalCek.collectedAmount || 0) > 0 && (
+                  <div className="p-4 rounded-2xl bg-background border border-border">
+                    <div className="flex justify-between items-center mb-2">
+                       <span className="text-xs font-bold text-muted-foreground">İşlem Gören</span>
+                       <span className="text-sm font-black text-foreground">₺{(modalCek.collectedAmount || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
+                       <div className={`${modalCek.direction === 'verilen' ? 'bg-red-500' : 'bg-green-500'} h-full transition-all`} 
+                            style={{ width: `${Math.min(((modalCek.collectedAmount || 0) / modalCek.amount) * 100, 100)}%` }} />
+                    </div>
+                    <div className="flex justify-between items-center mt-2">
+                       <span className="text-xs font-bold text-muted-foreground">Kalan Bakiye</span>
+                       <span className="text-sm font-black text-yellow-500">₺{(modalCek.amount - (modalCek.collectedAmount || 0)).toLocaleString()}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Fotoğraflar */}
+                <div className="grid grid-cols-2 gap-3">
+                  <PhotoSlot label="Ön Yüz" photo={modalCek.photoFront} onView={() => modalCek.photoFront && setPhotoModalData({ url: modalCek.photoFront, title: 'Ön Yüz' })} />
+                  <PhotoSlot label="Arka Yüz" photo={modalCek.photoBack} onView={() => modalCek.photoBack && setPhotoModalData({ url: modalCek.photoBack, title: 'Arka Yüz' })} />
+                </div>
+
+                {/* Hızlı İşlemler */}
+                <div className="grid grid-cols-2 gap-2">
+                   <button onClick={() => setModalType('status')}
+                      className={`flex items-center justify-center gap-2 py-3.5 bg-secondary hover:bg-secondary/80 rounded-xl text-sm font-bold transition-all active:scale-95`}>
+                      <ArrowUpDown className="w-4 h-4" /> Durum
+                   </button>
+                   <button onClick={() => setModalType('partial')}
+                      className={`flex items-center justify-center gap-2 py-3.5 bg-green-600/10 border border-green-500/20 text-green-400 rounded-xl text-sm font-bold transition-all active:scale-95`}>
+                      <DollarSign className="w-4 h-4" /> Ödeme al
+                   </button>
+                   <button onClick={() => handleShare(modalCek)}
+                      className={`flex items-center justify-center gap-2 py-3.5 bg-blue-600/10 border border-blue-500/20 text-blue-400 rounded-xl text-sm font-bold transition-all active:scale-95`}>
+                      <Share2 className="w-4 h-4" /> Paylaş
+                   </button>
+                   <button onClick={() => { if (confirm('Silmek istediğinize emin misiniz?')) { handleDelete(modalCek.id, modalCek.bankName); setModalType('none'); } }}
+                      className={`flex items-center justify-center gap-2 py-3.5 bg-red-600/10 border border-red-500/20 text-red-400 rounded-xl text-sm font-bold transition-all active:scale-95`}>
+                      <Trash2 className="w-4 h-4" /> Sil
+                   </button>
+                </div>
+              </div>
+            </ModalCard>
+          </Overlay>
+        )}
+      </AnimatePresence>
+
+      {/* Fotoğraf Modal */}
+      <AnimatePresence>
+        {photoModalData && (
+          <Overlay onClose={() => setPhotoModalData(null)}>
+            <div className="max-w-3xl max-h-[80vh] relative" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-foreground font-medium">{photoModalData.title}</p>
+                <button onClick={() => setPhotoModalData(null)} className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors">
+                  <X className="w-5 h-5 text-foreground" />
+                </button>
+              </div>
+              <img src={photoModalData.url} alt={photoModalData.title} className="max-w-full max-h-[70vh] object-contain rounded-xl border border-border" />
+            </div>
+          </Overlay>
+        )}
+      </AnimatePresence>
+
+      {/* Durum Değiştirme Modal */}
+      <AnimatePresence>
+        {modalType === 'status' && modalCek && (
+          <Overlay onClose={() => setModalType('none')}>
+            <ModalCard title="Durum Değiştir" icon={<ArrowUpDown className={`w-5 h-5 ${accentText}`} />} onClose={() => setModalType('none')}>
+              <div className="mb-4">
+                <p className="text-sm text-muted-foreground mb-1">Mevcut Durum</p>
+                <p className={`font-medium ${getStatusColor(modalCek.status)}`}>{currentStatusLabels[modalCek.status] || modalCek.status}</p>
+              </div>
+              <div className="mb-4">
+                <label className="text-sm font-medium text-foreground mb-2 block">Yeni Durum</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(currentStatusLabels).filter(([s]) => s !== 'ciro').map(([s, label]) => (
+                    <button key={s} onClick={() => setNewStatus(s as CekStatus)}
+                      className={`p-3 rounded-lg border text-sm font-medium transition-all flex items-center gap-2 ${
+                        newStatus === s ? `${getStatusBg(s as CekStatus)} ${getStatusColor(s as CekStatus)} ring-1 ${isVerilen ? 'ring-red-500/40' : 'ring-purple-500/40'}` : 'bg-card border-border text-muted-foreground hover:text-foreground'
+                      }`}>
+                      {getStatusIcon(s as CekStatus)} {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="mb-4">
+                <label className="text-sm font-medium text-foreground mb-2 block">Not</label>
+                <textarea value={statusNote} onChange={(e) => setStatusNote(e.target.value)} placeholder="Açıklama ekleyin..." rows={3}
+                  className={`w-full px-4 py-3 bg-card border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 ${accentRing} resize-none`} />
+              </div>
+              <div className="flex gap-3">
+                <button onClick={handleStatusChange} className={`flex-1 py-3 ${accentBg} ${accentHover} text-foreground font-bold rounded-lg transition-colors`}>Güncelle</button>
+                <button onClick={() => setModalType('none')} className="px-6 py-3 bg-card hover:bg-secondary text-foreground font-medium rounded-lg transition-colors border border-border">{t('common.cancel')}</button>
+              </div>
+            </ModalCard>
+          </Overlay>
+        )}
+      </AnimatePresence>
+
+      {/* Ciro Modal */}
+      <AnimatePresence>
+        {modalType === 'endorse' && modalCek && (
+          <Overlay onClose={() => setModalType('none')}>
+            <ModalCard title="Çek Ciro Et" icon={<Send className="w-5 h-5 text-blue-400" />} onClose={() => setModalType('none')}>
+              <div className="mb-4 p-3 rounded-lg bg-blue-900/20 border border-blue-800">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Tutar</span>
+                  <span className="font-bold text-foreground">₺{modalCek.amount.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-sm mt-1">
+                  <span className="text-muted-foreground">Banka</span>
+                  <span className="text-foreground">{modalCek.bankName}</span>
+                </div>
+              </div>
+              <div className="mb-4">
+                <label className="text-sm font-medium text-foreground mb-2 block">Kime Ciro Edilecek <span className="text-red-400">*</span></label>
+                <input type="text" value={endorseTo} onChange={(e) => setEndorseTo(e.target.value)} placeholder="Firma / kişi adı"
+                  className="w-full px-4 py-3 bg-card border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/40" />
+              </div>
+              <div className="mb-4">
+                <label className="text-sm font-medium text-foreground mb-2 block">Ciro Tarihi</label>
+                <input type="date" value={endorseDate} onChange={(e) => setEndorseDate(e.target.value)}
+                  className="w-full px-4 py-3 bg-card border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/40" />
+              </div>
+              <div className="flex gap-3">
+                <button onClick={handleEndorse} disabled={!endorseTo} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-foreground font-bold rounded-lg transition-colors">Ciro Et</button>
+                <button onClick={() => setModalType('none')} className="px-6 py-3 bg-card hover:bg-secondary text-foreground font-medium rounded-lg transition-colors border border-border">{t('common.cancel')}</button>
+              </div>
+            </ModalCard>
+          </Overlay>
+        )}
+      </AnimatePresence>
+
+      {/* Kısmi Tahsilat / Ödeme Modal */}
+      <AnimatePresence>
+        {modalType === 'partial' && modalCek && (
+          <Overlay onClose={() => setModalType('none')}>
+            <ModalCard title={modalCek.direction === 'verilen' ? 'Kısmi Ödeme' : 'Kısmi Tahsilat'} icon={<DollarSign className="w-5 h-5 text-green-400" />} onClose={() => setModalType('none')}>
+              <div className="mb-4 p-3 rounded-lg bg-green-900/20 border border-green-800 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Çek Tutarı</span>
+                  <span className="font-bold text-foreground">₺{modalCek.amount.toLocaleString()}</span>
+                </div>
+                {(modalCek.collectedAmount || 0) > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">{modalCek.direction === 'verilen' ? 'Ödenen' : 'Tahsil Edilen'}</span>
+                    <span className="font-bold text-green-400">₺{(modalCek.collectedAmount || 0).toLocaleString()}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Kalan</span>
+                  <span className="font-bold text-yellow-400">₺{(modalCek.amount - (modalCek.collectedAmount || 0)).toLocaleString()}</span>
+                </div>
+              </div>
+              <div className="mb-4">
+                <label className="text-sm font-medium text-foreground mb-2 block">Tutar (₺)</label>
+                <input type="number" value={partialAmount} onChange={(e) => setPartialAmount(e.target.value)} placeholder="0.00" step="0.01"
+                  className="w-full px-4 py-3 bg-card border border-border rounded-lg text-foreground text-xl font-bold placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500/40" />
+                <div className="flex gap-2 mt-2">
+                  <button onClick={() => setPartialAmount((modalCek.amount - (modalCek.collectedAmount || 0)).toString())}
+                    className="px-3 py-1.5 bg-green-600/20 border border-green-500/30 text-green-400 text-xs rounded-lg hover:bg-green-600/30 transition-colors">
+                    Tamamını Öde (₺{(modalCek.amount - (modalCek.collectedAmount || 0)).toLocaleString()})
+                  </button>
+                  <button onClick={() => setPartialAmount(((modalCek.amount - (modalCek.collectedAmount || 0)) / 2).toFixed(2))}
+                    className="px-3 py-1.5 bg-blue-600/20 border border-blue-500/30 text-blue-400 text-xs rounded-lg hover:bg-blue-600/30 transition-colors">
+                    %50
+                  </button>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={handlePartialCollect} disabled={!partialAmount || parseFloat(partialAmount) <= 0}
+                  className="flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-foreground font-bold rounded-lg transition-colors">
+                  {modalCek.direction === 'verilen' ? 'Ödemeyi Kaydet' : 'Tahsilatı Kaydet'}
+                </button>
+                <button onClick={() => setModalType('none')} className="px-6 py-3 bg-card hover:bg-secondary text-foreground font-medium rounded-lg transition-colors border border-border">{t('common.cancel')}</button>
+              </div>
+            </ModalCard>
+          </Overlay>
+        )}
+      </AnimatePresence>
+
+      {/* ═══ ALINAN ÇEK EKLEME MODAL ═══ */}
+      <AnimatePresence>
+        {modalType === 'addAlinan' && (
+          <Overlay onClose={() => setModalType('none')}>
+            <ModalCard title="Alınan Çek Ekle" icon={<ArrowDownLeft className="w-5 h-5 text-purple-400" />} onClose={() => setModalType('none')} wide>
+              <div className="mb-4">
+                <label className="text-xs font-bold text-muted-foreground mb-1.5 block uppercase tracking-wider">Tutar (₺) <span className="text-red-400">*</span></label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-muted-foreground/50">₺</span>
+                  <input type="number" value={newAlinanCek.amount} onChange={e => setNewAlinanCek({ ...newAlinanCek, amount: e.target.value })} placeholder="0.00" step="0.01"
+                    className="w-full pl-10 pr-4 py-4 bg-background border border-border rounded-xl text-foreground text-3xl font-black placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-purple-500/40" />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 mb-5">
+                <div>
+                  <label className="text-xs font-bold text-muted-foreground mb-1.5 block uppercase tracking-wider">Müşteri / Firma <span className="text-red-400">*</span></label>
+                  <input type="text" value={newAlinanCek.sourceName} onChange={e => setNewAlinanCek({ ...newAlinanCek, sourceName: e.target.value })} placeholder="Nereden alındı?"
+                    className="w-full px-4 py-3.5 bg-background border border-border rounded-xl text-foreground font-medium placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-purple-500/40" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-muted-foreground mb-1.5 block uppercase tracking-wider">Vade Tarihi <span className="text-red-400">*</span></label>
+                  <input type="date" value={newAlinanCek.dueDate} onChange={e => setNewAlinanCek({ ...newAlinanCek, dueDate: e.target.value })}
+                    className="w-full px-4 py-3.5 bg-background border border-border rounded-xl text-foreground font-medium focus:outline-none focus:ring-2 focus:ring-purple-500/40" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-muted-foreground mb-1.5 block uppercase tracking-wider">Banka <span className="text-red-400">*</span></label>
+                  <select value={newAlinanCek.bankName} onChange={e => setNewAlinanCek({ ...newAlinanCek, bankName: e.target.value })}
+                    className="w-full px-4 py-3.5 bg-background border border-border rounded-xl text-foreground font-medium focus:outline-none focus:ring-2 focus:ring-purple-500/40 appearance-none">
+                    <option value="">Banka seçiniz</option>
+                    {rawBankalar.map((b: any) => (
+                      <option key={b.id} value={b.name}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-muted-foreground mb-1.5 block uppercase tracking-wider">Çek No (Opsiyonel)</label>
+                  <input type="text" value={newAlinanCek.checkNumber} onChange={e => setNewAlinanCek({ ...newAlinanCek, checkNumber: e.target.value })} placeholder="Çek numarasını yazın"
+                    className="w-full px-4 py-3.5 bg-background border border-border rounded-xl text-foreground font-medium placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-purple-500/40" />
+                </div>
+              </div>
+
+              {/* Fotoğraflar */}
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
+                <div>
+                  <label className="text-xs font-bold text-muted-foreground mb-1.5 block uppercase tracking-wider">Ön Yüz (İsteğe Bağlı)</label>
+                  {newCekPhotoFront ? (
+                    <div className="relative group">
+                      <img src={newCekPhotoFront} alt="Ön yüz" className="w-full h-24 object-cover rounded-xl border border-border" />
+                      <button onClick={() => setNewCekPhotoFront(null)} className="absolute top-1 right-1 p-1.5 bg-red-600/90 hover:bg-red-500 rounded-full shadow-lg transition-colors scale-90 sm:scale-100 sm:opacity-0 group-hover:opacity-100"><X className="w-3.5 h-3.5 text-foreground" /></button>
+                    </div>
+                  ) : (
+                    <button onClick={() => newCekFrontRef.current?.click()} className="w-full h-24 border-2 border-dashed border-border rounded-xl hover:border-purple-600/50 hover:bg-purple-500/5 flex flex-col items-center justify-center gap-1.5 text-muted-foreground hover:text-purple-400 transition-colors">
+                      <Camera className="w-6 h-6" /><span className="text-[10px] font-bold uppercase tracking-wider">Fotoğraf Çek</span>
+                    </button>
+                  )}
+                  <input ref={newCekFrontRef} type="file" accept="image/*" onChange={e => handlePhotoUpload(e, setNewCekPhotoFront)} className="hidden" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-muted-foreground mb-1.5 block uppercase tracking-wider">Arka Yüz (İsteğe Bağlı)</label>
+                  {newCekPhotoBack ? (
+                    <div className="relative group">
+                      <img src={newCekPhotoBack} alt="Arka yüz" className="w-full h-24 object-cover rounded-xl border border-border" />
+                      <button onClick={() => setNewCekPhotoBack(null)} className="absolute top-1 right-1 p-1.5 bg-red-600/90 hover:bg-red-500 rounded-full shadow-lg transition-colors scale-90 sm:scale-100 sm:opacity-0 group-hover:opacity-100"><X className="w-3.5 h-3.5 text-foreground" /></button>
+                    </div>
+                  ) : (
+                    <button onClick={() => newCekBackRef.current?.click()} className="w-full h-24 border-2 border-dashed border-border rounded-xl hover:border-purple-600/50 hover:bg-purple-500/5 flex flex-col items-center justify-center gap-1.5 text-muted-foreground hover:text-purple-400 transition-colors">
+                      <Camera className="w-6 h-6" /><span className="text-[10px] font-bold uppercase tracking-wider">Fotoğraf Çek</span>
+                    </button>
+                  )}
+                  <input ref={newCekBackRef} type="file" accept="image/*" onChange={e => handlePhotoUpload(e, setNewCekPhotoBack)} className="hidden" />
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button onClick={handleAddAlinanCek} className="w-full py-4 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-foreground font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-purple-900/30 transition-all">
+                  <Save className="w-5 h-5" /> Kaydet
+                </button>
+              </div>
+            </ModalCard>
+          </Overlay>
+        )}
+      </AnimatePresence>
+
+      {/* ═══ VERİLEN ÇEK EKLEME MODAL ═══ */}
+      <AnimatePresence>
+        {modalType === 'addVerilen' && (
+          <Overlay onClose={() => setModalType('none')}>
+            <ModalCard title="Verilen Çek Ekle" icon={<ArrowUpRight className="w-5 h-5 text-red-400" />} onClose={() => setModalType('none')} wide>
+              <div className="mb-4">
+                <label className="text-xs font-bold text-muted-foreground mb-1.5 block uppercase tracking-wider">Tutar (₺) <span className="text-red-400">*</span></label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-muted-foreground/50">₺</span>
+                  <input type="number" value={newVerilenCek.amount} onChange={e => setNewVerilenCek({ ...newVerilenCek, amount: e.target.value })} placeholder="0.00" step="0.01"
+                    className="w-full pl-10 pr-4 py-4 bg-background border border-border rounded-xl text-foreground text-3xl font-black placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-red-500/40" />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 mb-5">
+                <div>
+                  <label className="text-xs font-bold text-muted-foreground mb-1.5 block uppercase tracking-wider">Alıcı (Kime Verildi) <span className="text-red-400">*</span></label>
+                  <input type="text" value={newVerilenCek.recipientName} onChange={e => setNewVerilenCek({ ...newVerilenCek, recipientName: e.target.value })} placeholder="Firma / kişi adı"
+                    className="w-full px-4 py-3.5 bg-background border border-border rounded-xl text-foreground font-medium placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-red-500/40" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-muted-foreground mb-1.5 block uppercase tracking-wider">Vade Tarihi <span className="text-red-400">*</span></label>
+                  <input type="date" value={newVerilenCek.dueDate} onChange={e => setNewVerilenCek({ ...newVerilenCek, dueDate: e.target.value })}
+                    className="w-full px-4 py-3.5 bg-background border border-border rounded-xl text-foreground font-medium focus:outline-none focus:ring-2 focus:ring-red-500/40" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-muted-foreground mb-1.5 block uppercase tracking-wider">Banka <span className="text-red-400">*</span></label>
+                  <select value={newVerilenCek.bankName} onChange={e => setNewVerilenCek({ ...newVerilenCek, bankName: e.target.value })}
+                    className="w-full px-4 py-3.5 bg-background border border-border rounded-xl text-foreground font-medium focus:outline-none focus:ring-2 focus:ring-red-500/40 appearance-none">
+                    <option value="">Banka seçiniz</option>
+                    {rawBankalar.map((b: any) => (
+                      <option key={b.id} value={b.name}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-muted-foreground mb-1.5 block uppercase tracking-wider">Çek No (Opsiyonel)</label>
+                  <input type="text" value={newVerilenCek.checkNumber} onChange={e => setNewVerilenCek({ ...newVerilenCek, checkNumber: e.target.value })} placeholder="Çek numarasını yazın"
+                    className="w-full px-4 py-3.5 bg-background border border-border rounded-xl text-foreground font-medium placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-red-500/40" />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-bold text-muted-foreground mb-1.5 block uppercase tracking-wider">Ödeme Nedeni / Açıklama (Opsiyonel)</label>
+                  <input type="text" value={newVerilenCek.paymentReason} onChange={e => setNewVerilenCek({ ...newVerilenCek, paymentReason: e.target.value })} placeholder="Örn: Mal alımı, hizmet bedeli..."
+                    className="w-full px-4 py-3.5 bg-background border border-border rounded-xl text-foreground font-medium placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-red-500/40" />
+                </div>
+              </div>
+
+              {/* Fotoğraflar */}
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
+                <div>
+                  <label className="text-xs font-bold text-muted-foreground mb-1.5 block uppercase tracking-wider">Ön Yüz (İsteğe Bağlı)</label>
+                  {newCekPhotoFront ? (
+                    <div className="relative group">
+                      <img src={newCekPhotoFront} alt="Ön yüz" className="w-full h-24 object-cover rounded-xl border border-border" />
+                      <button onClick={() => setNewCekPhotoFront(null)} className="absolute top-1 right-1 p-1.5 bg-red-600/90 hover:bg-red-500 rounded-full shadow-lg transition-colors scale-90 sm:scale-100 sm:opacity-0 group-hover:opacity-100"><X className="w-3.5 h-3.5 text-foreground" /></button>
+                    </div>
+                  ) : (
+                    <button onClick={() => newCekFrontRef.current?.click()} className="w-full h-24 border-2 border-dashed border-border rounded-xl hover:border-red-600/50 hover:bg-red-500/5 flex flex-col items-center justify-center gap-1.5 text-muted-foreground hover:text-red-400 transition-colors">
+                      <Camera className="w-6 h-6" /><span className="text-[10px] font-bold uppercase tracking-wider">Fotoğraf Çek</span>
+                    </button>
+                  )}
+                  <input ref={newCekFrontRef} type="file" accept="image/*" onChange={e => handlePhotoUpload(e, setNewCekPhotoFront)} className="hidden" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-muted-foreground mb-1.5 block uppercase tracking-wider">Arka Yüz (İsteğe Bağlı)</label>
+                  {newCekPhotoBack ? (
+                    <div className="relative group">
+                      <img src={newCekPhotoBack} alt="Arka yüz" className="w-full h-24 object-cover rounded-xl border border-border" />
+                      <button onClick={() => setNewCekPhotoBack(null)} className="absolute top-1 right-1 p-1.5 bg-red-600/90 hover:bg-red-500 rounded-full shadow-lg transition-colors scale-90 sm:scale-100 sm:opacity-0 group-hover:opacity-100"><X className="w-3.5 h-3.5 text-foreground" /></button>
+                    </div>
+                  ) : (
+                    <button onClick={() => newCekBackRef.current?.click()} className="w-full h-24 border-2 border-dashed border-border rounded-xl hover:border-red-600/50 hover:bg-red-500/5 flex flex-col items-center justify-center gap-1.5 text-muted-foreground hover:text-red-400 transition-colors">
+                      <Camera className="w-6 h-6" /><span className="text-[10px] font-bold uppercase tracking-wider">Fotoğraf Çek</span>
+                    </button>
+                  )}
+                  <input ref={newCekBackRef} type="file" accept="image/*" onChange={e => handlePhotoUpload(e, setNewCekPhotoBack)} className="hidden" />
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button onClick={handleAddVerilenCek} className="w-full py-4 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-foreground font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-red-900/30 transition-all">
+                  <Save className="w-5 h-5" /> Kaydet
+                </button>
+              </div>
+            </ModalCard>
+          </Overlay>
+        )}
+      </AnimatePresence>
+
+      {/* FAB: Mobile Quick Action Button */}
+      <div className="sm:hidden fixed bottom-24 right-5 z-40">
+        <button
+          onClick={() => setModalType(isVerilen ? 'addVerilen' : 'addAlinan')}
+          className={`w-14 h-14 rounded-full ${accentBg} shadow-[0_8px_25px_-5px_rgba(0,0,0,0.5)] border border-white/20 flex items-center justify-center text-foreground active:scale-95 transition-transform`}
+        >
+          <Plus className="w-7 h-7" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// YARDIMCI BİLEŞENLER
+// ═══════════════════════════════════════════════════════════════
+
+function DashboardStatItem({ label, value, count, icon, color }: { label: string; value: string; count: number; icon: React.ReactNode; color: 'yellow' | 'green' | 'red' | 'slate' | 'orange' }) {
+  const colors = {
+    yellow: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+    green: 'bg-green-500/10 text-green-400 border-green-500/20',
+    red: 'bg-red-500/10 text-red-500 border-red-500/20',
+    slate: 'bg-white/5 text-white/70 border-white/10',
+    orange: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+  };
+  
+  return (
+    <div className={`p-3 rounded-2xl border ${colors[color]} space-y-1`}>
+      <div className="flex items-center justify-between">
+        <div className="p-1.5 rounded-lg bg-background/50">{icon}</div>
+        <span className="text-[10px] font-black opacity-60">{count}</span>
+      </div>
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-wider opacity-60 leading-none mb-1">{label}</p>
+        <p className="text-sm font-black truncate tracking-tight">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function CompactStatCard({ label, value, count, color, bgColor, highlight = false }: { label: string; value: string; count: number; color: string; bgColor: string; highlight?: boolean }) {
+  return (
+    <div className={`min-w-[110px] sm:min-w-[140px] snap-start p-2.5 rounded-xl border border-border/50 bg-card/40 flex flex-col items-start gap-1 transition-all ${highlight ? 'ring-1 ring-red-500/30 bg-red-500/5' : ''}`}>
+      <div className="flex items-center justify-between w-full">
+        <span className="text-[9px] font-black uppercase text-muted-foreground/60 tracking-wider leading-none">{label}</span>
+        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${bgColor} ${color}`}>{count}</span>
+      </div>
+      <p className={`text-xs sm:text-sm font-black ${color} truncate w-full tracking-tight`}>{value}</p>
+    </div>
+  );
+}
+
+function StatCard({ label, value, sub, color, highlight }: { label: string; value: string; sub: string; color: string; highlight?: boolean }) {
+  return (
+    <div className={`card-premium rounded-xl p-3 sm:p-4 ${highlight ? 'ring-1 ring-red-500/40 animate-pulse' : ''} h-full flex flex-col justify-between`}>
+      <p className="text-[10px] sm:text-xs text-muted-foreground mb-1 font-bold uppercase tracking-tight truncate leading-tight">{label}</p>
+      <div>
+        <p className={`text-base sm:text-xl font-black ${color} truncate leading-none mb-1`}>{value}</p>
+        <p className="text-[10px] sm:text-sm text-muted-foreground/80 font-medium truncate">{sub}</p>
+      </div>
+    </div>
+  );
+}
+
+function DetailField({ label, value, bold, icon }: { label: string; value: string; bold?: boolean; icon?: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground mb-1">{label}</p>
+      <p className={`text-sm ${bold ? 'text-lg font-bold' : 'font-medium'} text-foreground flex items-center gap-1`}>
+        {icon}{value}
+      </p>
+    </div>
+  );
+}
+
+function PhotoSlot({ label, photo, onView }: { label: string; photo: string | null; onView: () => void }) {
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground mb-1">{label}</p>
+      {photo ? (
+        <button onClick={onView} className="w-full h-28 rounded-lg border border-border overflow-hidden hover:border-purple-500/50 transition-colors group relative">
+          <img src={photo} alt={label} className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+            <Eye className="w-6 h-6 text-foreground" />
+          </div>
+        </button>
+      ) : (
+        <div className="w-full h-28 rounded-lg border border-dashed border-border flex items-center justify-center text-muted-foreground/50">
+          <Camera className="w-8 h-8" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Overlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }} 
+      animate={{ opacity: 1 }} 
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center z-[100] p-0 sm:p-4" 
+      onClick={onClose}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function ModalCard({ children, title, icon, onClose, wide }: { children: React.ReactNode; title: string; icon: React.ReactNode; onClose: () => void; wide?: boolean }) {
+  return (
+    <motion.div 
+      initial={{ y: "100%" }} 
+      animate={{ y: 0 }} 
+      exit={{ y: "100%" }} 
+      transition={{ type: "spring", damping: 30, stiffness: 300, mass: 0.8 }}
+      className={`bg-[#0a0a0a] rounded-t-[40px] sm:rounded-3xl p-6 w-full ${wide ? 'sm:w-[95vw] sm:max-w-2xl' : 'sm:w-[95vw] sm:max-w-md'} border-t border-white/10 h-[92vh] sm:h-auto sm:max-h-[85vh] overflow-y-auto shadow-[0_-20px_50px_-20px_rgba(0,0,0,0.5)] flex flex-col`}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-6 sm:hidden shrink-0" />
+      <div className="flex items-center justify-between mb-6 shrink-0">
+        <h3 className="text-xl font-black text-foreground flex items-center gap-3">{icon}{title}</h3>
+        <button onClick={onClose} className="p-2 bg-white/5 rounded-full text-white/40 hover:text-white transition-colors">
+          <X className="w-6 h-6 sm:w-5 sm:h-5" />
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto no-scrollbar pb-10 sm:pb-0">
+        {children}
+      </div>
+    </motion.div>
+  );
+}

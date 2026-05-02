@@ -1,0 +1,161 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { Lock, LogIn } from 'lucide-react';
+import { isAppLocked, unlockApp, stopLockTimer, startLockTimer, updateActivity, onAppLock } from '../lib/secure-storage';
+import { broadcastLock } from '../lib/broadcast-sync';
+import { useAuth } from '../contexts/AuthContext';
+
+/**
+ * Uygulama Kilit Ekranı
+ * - 10 dakika hareketsizlikte otomatik kilitler
+ * - Kullanıcı adı/şifresiyle açılır (PIN yerine — ek altyapı gerekmez)
+ * - Tüm sekmelere broadcastLock() gönderilir
+ *
+ * Önemli: Kimlik doğrulanmamış kullanıcı kilit ekranında tutulmaz —
+ * giriş ekranı zaten kendi başına koruma sağlar. Aksi halde login öncesi
+ * zamanlayıcı tetiklenirse kullanıcı kilit ekranında sıkışır.
+ */
+export function AppLockScreen({ children }: { children: React.ReactNode }) {
+  const { user, login, logout } = useAuth();
+  const [locked, setLocked] = useState(() => isAppLocked());
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // Kimlik doğrulanmamış kullanıcı için kilidi temizle (sıkışmayı önle)
+  useEffect(() => {
+    if (!user) {
+      if (isAppLocked()) unlockApp();
+      queueMicrotask(() => {
+        setLocked(false);
+      });
+      stopLockTimer();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    // Sadece giriş yapmış kullanıcı için kilit mantığı çalışsın
+    if (!user) return;
+
+    // Kilit zamanlayıcısını başlat
+    startLockTimer();
+
+    // Başka sekmeden kilit mesajı gelirse
+    const unsubLock = onAppLock(() => setLocked(true));
+
+    // Kullanıcı etkileşimlerini izle
+    const activity = () => updateActivity();
+    const events = ['mousedown', 'keydown', 'touchstart', 'scroll'];
+    events.forEach(e => document.addEventListener(e, activity, { passive: true }));
+
+    return () => {
+      unsubLock();
+      events.forEach(e => document.removeEventListener(e, activity));
+    };
+  }, [user]);
+
+  const handleUnlock = useCallback(async () => {
+    if (!pin.trim() || !user) return;
+    setLoading(true);
+    setError('');
+
+    try {
+      const ok = await login(user.username || user.name || '', pin);
+      if (ok) {
+        unlockApp();
+        setLocked(false);
+        setPin('');
+      } else {
+        setError('Yanlış şifre. Tekrar deneyin.');
+      }
+    } catch {
+      setError('Giriş başarısız.');
+    } finally {
+      setLoading(false);
+    }
+  }, [pin, user, login]);
+
+  // Kilitle butonu (toolbar vb. için export edilebilir)
+  useEffect(() => {
+    const handleManualLock = () => {
+      broadcastLock();
+      setLocked(true);
+    };
+    window.addEventListener('mert:lock_app', handleManualLock);
+    return () => window.removeEventListener('mert:lock_app', handleManualLock);
+  }, []);
+
+  // Kilit yoksa veya kullanıcı yoksa normal akış (login ekranı zaten koruma sağlar)
+  if (!locked || !user) return <>{children}</>;
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#06090f]">
+      <div className="w-full max-w-sm px-6 py-8 flex flex-col items-center gap-6">
+        {/* İkon */}
+        <div className="w-20 h-20 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+          <Lock className="w-10 h-10 text-blue-400" />
+        </div>
+
+        <div className="text-center">
+          <h2 className="text-xl font-bold text-foreground">Uygulama Kilitlendi</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Devam etmek için şifrenizi girin
+          </p>
+          {user && (
+            <p className="text-xs text-blue-400 mt-1">{user.name}</p>
+          )}
+        </div>
+
+        <div className="w-full space-y-3">
+          <input
+            type="password"
+            value={pin}
+            onChange={e => { setPin(e.target.value); setError(''); }}
+            onKeyDown={e => e.key === 'Enter' && handleUnlock()}
+            placeholder="Şifreniz"
+            autoFocus
+            className="w-full px-4 py-3 bg-white/[0.05] border border-border rounded-xl text-foreground text-center text-lg tracking-widest placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+          />
+
+          {error && (
+            <p className="text-xs text-red-400 text-center">{error}</p>
+          )}
+
+          <button
+            onClick={handleUnlock}
+            disabled={loading || !pin.trim()}
+            className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-foreground font-bold rounded-xl transition-colors"
+          >
+            {loading ? (
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <LogIn className="w-4 h-4" />
+            )}
+            Kilidi Aç
+          </button>
+        </div>
+
+        <p className="text-xs text-gray-600 text-center">
+          10 dakika hareketsizlik sonrası otomatik kilitlendi
+        </p>
+
+        {/* Acil çıkış: farklı kullanıcı veya şifre hatırlamama durumu */}
+        <button
+          onClick={() => {
+            unlockApp();
+            logout();
+            setLocked(false);
+            setPin('');
+          }}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline"
+        >
+          Farklı bir hesapla giriş yap
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Uygulamayı manuel kilitlemek için çağrılır */
+export function lockApp(): void {
+  window.dispatchEvent(new Event('mert:lock_app'));
+}

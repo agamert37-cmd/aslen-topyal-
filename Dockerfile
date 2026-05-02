@@ -1,0 +1,105 @@
+# ─── Aşama 1: Build ───────────────────────────────────────────
+FROM node:22-alpine AS builder
+
+# CouchDB bağlantı bilgileri (docker-compose.yml'den build args olarak gelir)
+ARG VITE_COUCHDB_URL=http://localhost:5984
+ARG VITE_COUCHDB_USER=adm1n
+ARG VITE_COUCHDB_PASSWORD=135790
+ENV VITE_COUCHDB_URL=$VITE_COUCHDB_URL
+ENV VITE_COUCHDB_USER=$VITE_COUCHDB_USER
+ENV VITE_COUCHDB_PASSWORD=$VITE_COUCHDB_PASSWORD
+
+# Electron indirmesini Docker içinde atla ki Alpine Linux'ta hata vermesin
+ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1
+
+WORKDIR /app
+
+# Bağımlılıkları önce kopyala — Docker cache katmanı için
+COPY package*.json ./
+
+# node_modules'u temiz kur (ci = package-lock'a göre tam uyumlu)
+RUN npm ci --prefer-offline || npm install
+
+# Kaynak kodları kopyala
+COPY . .
+
+# Olası önceki dist kalıntılarını temizle
+RUN rm -rf dist
+
+# Production build
+RUN npm run build
+
+# ─── Aşama 2: Servis (nginx) ───────────────────────────────────
+FROM nginx:1.27-alpine
+
+# Build çıktısını nginx'e kopyala
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# React Router + CouchDB Proxy nginx yapılandırması
+# Not: CouchDB veritabanı kurulumu docker-compose'daki couchdb-init servisi tarafından yapılır
+# - Tüm route'lar index.html'e yönlendirilir (SPA)
+# - /couchdb/ istekleri CouchDB'ye proxy edilir (CORS sorunu önlenir)
+# - gzip sıkıştırma aktif
+# - Cache başlıkları ayarlanmış
+RUN cat > /etc/nginx/conf.d/default.conf << 'NGINX_CONF'
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # CouchDB reverse proxy — CORS sorunlarını önler
+    # NOT: HTTP/1.1 + Connection "" olmadan CouchDB _changes long-polling
+    # bağlantıları nginx tarafından erken kapatılır (mobilde sık bağlantı kopuşu).
+    location /couchdb/ {
+        proxy_pass http://couchdb:5984/;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Authorization $http_authorization;
+        proxy_buffering off;
+        proxy_read_timeout 600s;
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 60s;
+    }
+
+    # SPA route yönlendirmesi
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Static dosyalar için agresif cache
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
+
+    # index.html cache'lenmemeli (her zaman güncel)
+    location = /index.html {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma no-cache;
+        add_header Expires 0;
+    }
+
+    # Güvenlik başlıkları
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+
+    # Sıkıştırma
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript image/svg+xml;
+    gzip_min_length 256;
+    gzip_comp_level 6;
+}
+NGINX_CONF
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

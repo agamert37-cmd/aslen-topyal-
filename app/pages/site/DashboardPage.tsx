@@ -1,0 +1,1677 @@
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import { useEmployee } from '../../contexts/EmployeeContext';
+import { useLanguage } from '../../contexts/LanguageContext';
+import { 
+  TrendingUp, Users, AlertTriangle, Calendar, DollarSign,
+  Package, ShoppingCart, ArrowRight, Download, TrendingDown,
+  Sparkles, CalendarCheck, Banknote, Trash2,
+  Activity, Zap, Award, ShieldCheck, ArrowUpRight, ArrowDownRight,
+  BarChart3, PieChart, Target, Wallet, RefreshCw, Clock,
+  CreditCard, Landmark, Flame, ArrowLeftRight, Factory, Bot, X
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { staggerContainer, staggerItem, hover, tap } from '../../utils/animations';
+import { useNavigate } from 'react-router';
+import { toast } from 'sonner';
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, ComposedChart, Line, Legend,
+  PieChart as RePieChart, Pie, Cell, RadialBarChart, RadialBar
+} from 'recharts';
+import { getFromStorage, StorageKey } from '../../utils/storage';
+import { useGlobalTableData } from '../../contexts/GlobalTableSyncContext';
+import { generateDashboardPDF } from '../../utils/reportGenerator';
+import { isOpenAIConfigured } from '../../lib/api-config';
+import { logActivity } from '../../utils/activityLogger';
+import { useModuleBus } from '../../hooks/useModuleBus';
+import { getPagePermissions } from '../../utils/permissions';
+import {
+  PremiumTooltip, EmptyChartState, AnimatedCounter, Sparkline,
+  RadialGauge, MetricBar, LivePulse, TrendBadge, GlowBar, HorizontalBarList,
+  WeekCompareBar, MultiRadialGauge, KPITicker, StockFlowBars,
+  BulletGauge, TrendComparison, CalendarHeatmap, BarRace
+} from '../../components/ChartComponents';
+import { ActivityTimeline } from '../../components/ActivityTimeline';
+import { DashboardAIChat } from '../../components/DashboardAIChat';
+import { useIsMobile } from '../../hooks/useMobile';
+
+const safeNum = (v: any, fallback = 0): number => {
+  if (v === null || v === undefined || v === '') return fallback;
+  const n = Number(v);
+  return isNaN(n) || !isFinite(n) ? fallback : n;
+};
+
+const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899', '#14b8a6'];
+
+// Pre-computed static clock face dots (never re-created)
+const CLOCK_DOTS = Array.from({ length: 12 }).map((_, i) => {
+  const angle = (i * 30 - 90) * (Math.PI / 180);
+  const r = i % 3 === 0 ? 18 : 19;
+  const x = 50 + r * Math.cos(angle);
+  const y = 50 + r * Math.sin(angle);
+  return {
+    cls: `absolute rounded-full ${i % 3 === 0 ? 'w-1 h-1 bg-blue-400' : 'w-0.5 h-0.5 bg-foreground/20'}`,
+    style: { left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)' } as React.CSSProperties,
+  };
+});
+
+// ─── Isolated Live Clock Component (prevents full dashboard re-render every second) ───
+function LiveClockWidget() {
+  const [time, setTime] = useState(new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const h = time.getHours();
+  const m = time.getMinutes();
+  const s = time.getSeconds();
+  const timeStr = time.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  return (
+    <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+      {/* Analog Clock Mini */}
+      <div className="relative w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0">
+        <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-500/15 to-cyan-500/15 border border-blue-500/20 backdrop-blur-sm">
+          {CLOCK_DOTS.map((dot, i) => (
+            <div key={i} className={dot.cls} style={dot.style} />
+          ))}
+          <div className="absolute top-1/2 left-1/2 origin-bottom"
+            style={{ width: '2px', height: '28%', backgroundColor: '#60a5fa', borderRadius: '1px', transform: `translate(-50%, -100%) rotate(${(h % 12) * 30 + m * 0.5}deg)` }} />
+          <div className="absolute top-1/2 left-1/2 origin-bottom"
+            style={{ width: '1.5px', height: '36%', backgroundColor: '#93c5fd', borderRadius: '1px', transform: `translate(-50%, -100%) rotate(${m * 6 + s * 0.1}deg)` }} />
+          <div className="absolute top-1/2 left-1/2 origin-bottom"
+            style={{ width: '1px', height: '38%', backgroundColor: '#f87171', borderRadius: '0.5px', transform: `translate(-50%, -100%) rotate(${s * 6}deg)` }} />
+          <div className="absolute top-1/2 left-1/2 w-1.5 h-1.5 rounded-full bg-blue-400 -translate-x-1/2 -translate-y-1/2 shadow-sm shadow-blue-400/50" />
+        </div>
+      </div>
+      {/* Digital Clock Badge */}
+      <div className="flex items-center gap-1.5 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg bg-blue-500/10 border border-blue-500/20">
+        <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-400" />
+        <span className="text-[11px] sm:text-xs font-mono font-bold text-blue-300 tabular-nums tracking-wider">{timeStr}</span>
+      </div>
+      {/* Online Badge */}
+      <div className="flex items-center gap-1.5">
+        <span className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+        </span>
+        <span className="text-[10px] sm:text-xs text-emerald-400 font-semibold">Çevrimiçi</span>
+      </div>
+    </div>
+  );
+}
+
+export function DashboardPage() {
+  const { user } = useAuth();
+  const { currentEmployee } = useEmployee();
+  const navigate = useNavigate();
+  const { t } = useLanguage();
+  const { onPrefix } = useModuleBus();
+
+  // Merkezi yetki kontrolü
+  const perms = getPagePermissions(user, currentEmployee, 'dashboard');
+
+  // refreshCounter: sadece deletedActivities (KV) ve manuel yenileme için
+  const [refreshCounter, setRefreshCounter] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [chartView, setChartView] = useState<'area' | 'bar' | 'composed'>('composed');
+  const [showAIChat, setShowAIChat] = useState(false);
+  const [liveCounter, setLiveCounter] = useState(0);
+  const isMobile = useIsMobile(768);
+
+  // Saatlik canlı güncelleme (her dakika)
+  useEffect(() => {
+    const timer = setInterval(() => setLiveCounter(c => c + 1), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Sayfa ziyaretini logla (kullanıcı yüklenince bir kez)
+  useEffect(() => {
+    if (user?.name) {
+      logActivity('page_visit', 'Dashboard sayfası görüntülendi', { employeeName: user.name });
+    }
+  }, [user?.name]);
+
+  // storage_update event'leri artık gerekli değil — useGlobalTableData reaktif
+  // ModuleBus: deletedActivities (KV) yenilenmesi için tutuldu
+  useEffect(() => {
+    const refreshHandler = () => setRefreshCounter(c => c + 1);
+    onPrefix('fis:', refreshHandler); // deleted_fisler için
+  }, [onPrefix]);
+
+  const handleRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    setRefreshCounter(c => c + 1);
+    setTimeout(() => setIsRefreshing(false), 800);
+    toast.success('Veriler güncellendi');
+  }, []);
+  
+  const now = new Date();
+  const todayStr = now.toLocaleDateString('tr-TR', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  });
+  const currentHour = now.getHours();
+  const greetingText = currentHour < 6 ? 'İyi Geceler' : currentHour < 12 ? 'Günaydın' : currentHour < 18 ? 'İyi Günler' : 'İyi Akşamlar';
+
+  // GlobalTableSyncContext'ten doğrudan oku — storage_update event'e gerek yok
+  const rawFisler = useGlobalTableData<any>('fisler');
+  const rawKasa = useGlobalTableData<any>('kasa_islemleri');
+  const rawStok = useGlobalTableData<any>('urunler');
+  const rawPersonel = useGlobalTableData<any>('personeller');
+  const rawCari = useGlobalTableData<any>('cari_hesaplar');
+
+  const todayISO = new Date().toISOString().split('T')[0];
+
+  const todaySales = useMemo(() => {
+    return rawFisler.filter(f => (f.mode === 'sale' || f.mode === 'satis') && (f.date?.startsWith(todayISO) || f.date === todayISO));
+  }, [rawFisler, todayISO]);
+
+  const todayPurchases = useMemo(() => {
+    return rawFisler.filter(f => f.mode === 'alis' && (f.date?.startsWith(todayISO) || f.date === todayISO));
+  }, [rawFisler, todayISO]);
+
+  const realtimeRevenue = useMemo(() => {
+    return todaySales.reduce((sum, item) => {
+      let net = 0;
+      (item.items || []).forEach((p: any) => {
+        const amount = Math.abs(safeNum(p.totalPrice) || safeNum(p.total) || (safeNum(p.unitPrice) || safeNum(p.price)) * safeNum(p.quantity));
+        if (p.type === 'iade') net -= amount;
+        else net += amount;
+      });
+      return sum + net;
+    }, 0);
+  }, [todaySales]);
+
+  const todayPurchaseTotal = useMemo(() => {
+    return todayPurchases.reduce((sum, item) => {
+      let total = 0;
+      (item.items || []).forEach((p: any) => {
+        total += Math.abs(safeNum(p.totalPrice) || safeNum(p.total) || 0);
+      });
+      return sum + total;
+    }, 0);
+  }, [todayPurchases]);
+
+  const todayNetProfit = realtimeRevenue - todayPurchaseTotal;
+
+  const criticalStockItems = useMemo(() => {
+    return rawStok.filter(s => {
+      const name = (s.name || '').trim();
+      if (!name) return false;
+      const stock = safeNum(s.currentStock ?? s.current_stock ?? s.stock);
+      const min = safeNum(s.minStock ?? s.min_stock);
+      return min > 0 && stock <= min;
+    }).sort((a, b) => {
+      const aStock = safeNum(a.currentStock ?? a.current_stock ?? a.stock);
+      const aMin = safeNum(a.minStock ?? a.min_stock);
+      const bStock = safeNum(b.currentStock ?? b.current_stock ?? b.stock);
+      const bMin = safeNum(b.minStock ?? b.min_stock);
+      // En kritik (en düşük stok/min oranı) üste
+      return (aStock / Math.max(aMin, 1)) - (bStock / Math.max(bMin, 1));
+    });
+  }, [rawStok]);
+
+  const criticalStockCount = criticalStockItems.length;
+
+  const activeEmployeeCount = useMemo(() => {
+    return rawPersonel.filter(p => p.active !== false && p.status !== 'inactive').length;
+  }, [rawPersonel]);
+
+  const totalStockValue = useMemo(() => {
+    return rawStok.reduce((sum, s) => {
+      const stock = safeNum(s.currentStock ?? s.current_stock ?? s.stock);
+      const price = safeNum(s.sellPrice ?? s.price ?? 0);
+      return sum + stock * price;
+    }, 0);
+  }, [rawStok]);
+
+  // Kasa gelir/gider
+  const kasaStats = useMemo(() => {
+    const todayIncome = rawKasa
+      .filter(k => (k.type === 'Gelir' || k.type === 'income') && (k.date?.startsWith(todayISO) || k.date === todayISO))
+      .reduce((s, k) => s + safeNum(k.amount), 0);
+    const todayExpense = rawKasa
+      .filter(k => (k.type === 'Gider' || k.type === 'expense') && (k.date?.startsWith(todayISO) || k.date === todayISO))
+      .reduce((s, k) => s + safeNum(k.amount), 0);
+    const totalIncome = rawKasa
+      .filter(k => k.type === 'Gelir' || k.type === 'income')
+      .reduce((s, k) => s + safeNum(k.amount), 0);
+    const totalExpense = rawKasa
+      .filter(k => k.type === 'Gider' || k.type === 'expense')
+      .reduce((s, k) => s + safeNum(k.amount), 0);
+    return { todayIncome, todayExpense, totalIncome, totalExpense, kasaBalance: totalIncome - totalExpense };
+  }, [rawKasa, todayISO]);
+
+  // Cari borç/alacak
+  const cariStats = useMemo(() => {
+    const toplam = rawCari.length;
+    const borclu = rawCari.filter(c => safeNum(c.balance) > 0).length;
+    const alacakli = rawCari.filter(c => safeNum(c.balance) < 0).length;
+    const toplamBorc = rawCari.reduce((s, c) => s + Math.max(safeNum(c.balance), 0), 0);
+    return { toplam, borclu, alacakli, toplamBorc };
+  }, [rawCari]);
+
+  // ─── OPTIMIZED DAILY SUMMARIES ───
+  const { dailySalesMap, dailyPurchasesMap } = useMemo(() => {
+    const sMap: Record<string, number> = {};
+    const pMap: Record<string, number> = {};
+    
+    for (const item of rawFisler) {
+      if (!item.date) continue;
+      const iso = item.date.split('T')[0];
+      
+      let netSales = 0;
+      let netPurchases = 0;
+      (item.items || []).forEach((p: any) => {
+         const amount = Math.abs(safeNum(p.totalPrice) || safeNum(p.total) || safeNum(p.unitPrice || p.price) * safeNum(p.quantity, 1) || 0);
+         if (item.mode === 'sale' || item.mode === 'satis') {
+            if (p.type === 'iade') netSales -= amount; else netSales += amount;
+         } else if (item.mode === 'alis') {
+            netPurchases += amount;
+         }
+      });
+      
+      if (item.mode === 'sale' || item.mode === 'satis') {
+        sMap[iso] = (sMap[iso] || 0) + netSales;
+      } else if (item.mode === 'alis') {
+        pMap[iso] = (pMap[iso] || 0) + netPurchases;
+      }
+    }
+    return { dailySalesMap: sMap, dailyPurchasesMap: pMap };
+  }, [rawFisler]);
+
+  // Son 7 gun daily sparkline data
+  const dailySparkData = useMemo(() => {
+    const arr: number[] = [];
+    const today = new Date();
+    // Mobilde daha kısa sparkline (performans için)
+    const daysToLook = window.innerWidth < 768 ? 5 : 7;
+    for (let i = daysToLook - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      arr.push(dailySalesMap[d.toISOString().split('T')[0]] || 0);
+    }
+    return arr;
+  }, [dailySalesMap]);
+
+  // En çok satan ürünler
+  const topProducts = useMemo(() => {
+    const productStats: Record<string, { revenue: number; sales: number }> = {};
+    rawFisler.filter(f => f.mode === 'sale' || f.mode === 'satis').forEach(f => {
+      (f.items || []).forEach((item: any) => {
+        const name = item.name || item.productName || 'Bilinmeyen Ürün';
+        if (!productStats[name]) productStats[name] = { revenue: 0, sales: 0 };
+        const absAmount = Math.abs(safeNum(item.totalPrice) || safeNum(item.total));
+        const absQty = Math.abs(safeNum(item.quantity, 1));
+        if (item.type === 'iade') {
+          productStats[name].revenue -= absAmount;
+          productStats[name].sales -= absQty;
+        } else {
+          productStats[name].revenue += absAmount;
+          productStats[name].sales += absQty;
+        }
+      });
+    });
+    // Mobilde 3, desktopta 5 ürün
+    const limit = window.innerWidth < 768 ? 3 : 5;
+    return Object.entries(productStats)
+      .map(([name, stats]) => ({ name, revenue: stats.revenue, sales: stats.sales }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, limit);
+  }, [rawFisler]);
+
+  // Haftalık satış + alış verileri (composed chart)
+  const weeklySalesData = useMemo(() => {
+    const data = [];
+    const today = new Date();
+    let prevWeekTotal = 0;
+    
+    for (let i = 13; i >= 7; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      prevWeekTotal += (dailySalesMap[d.toISOString().split('T')[0]] || 0);
+    }
+    const prevWeekAvg = prevWeekTotal / 7;
+    
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const isoDate = d.toISOString().split('T')[0];
+      const dayName = d.toLocaleDateString('tr-TR', { weekday: 'short' });
+      
+      const daySales = dailySalesMap[isoDate] || 0;
+      const dayPurchases = dailyPurchasesMap[isoDate] || 0;
+        
+      data.push({
+        id: `chart-${i}`,
+        day: `${dayName} ${d.getDate()}/${d.getMonth()+1}`,
+        satis: daySales,
+        alis: dayPurchases,
+        kar: daySales - dayPurchases,
+        ortalama: Math.round(prevWeekAvg)
+      });
+    }
+    return data;
+  }, [dailySalesMap, dailyPurchasesMap]);
+
+  // ─── Önceki hafta toplam satışı (karşılaştırma için) ───
+  const prevWeekTotal = useMemo(() => {
+    const today = new Date();
+    let total = 0;
+    for (let i = 13; i >= 7; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      total += (dailySalesMap[d.toISOString().split('T')[0]] || 0);
+    }
+    return total;
+  }, [dailySalesMap]);
+
+  // ─── Canlı saatlik satış akışı (bugün saat saat) ───
+  const hourlySalesFlow = useMemo(() => {
+    const now = new Date();
+    const hours: { saat: string; ciro: number; adet: number }[] = [];
+    for (let h = 7; h <= Math.min(now.getHours(), 23); h++) {
+      const hourSales = todaySales.filter(f => {
+        const created = f.createdAt ? new Date(f.createdAt) : null;
+        return created ? created.getHours() === h : false;
+      });
+      const ciro = hourSales.reduce((sum, fis) => {
+        return sum + (fis.items || []).reduce((s: number, p: any) => {
+          return s + Math.abs(safeNum(p.totalPrice) || safeNum(p.total) || 0);
+        }, 0);
+      }, 0);
+      hours.push({ saat: `${h}:00`, ciro, adet: hourSales.length });
+    }
+    return hours;
+  }, [todaySales, liveCounter]);
+
+  // ─── Anlık kârlılık oranı (son 7 gün trend) ───
+  const profitTrend = useMemo(() => {
+    const today = new Date();
+    return Array.from({ length: 7 }).map((_, i) => {
+      const d = new Date(today);
+      d.setDate(d.getDate() - (6 - i));
+      const iso = d.toISOString().split('T')[0];
+      const daySales = dailySalesMap[iso] || 0;
+      const dayPurch = dailyPurchasesMap[iso] || 0;
+      return {
+        gun: d.toLocaleDateString('tr-TR', { weekday: 'short' }),
+        kar: daySales - dayPurch,
+        oran: daySales > 0 ? Math.round(((daySales - dayPurch) / daySales) * 100) : 0
+      };
+    });
+  }, [dailySalesMap, dailyPurchasesMap, liveCounter]);
+
+  // ─── Stok akış verileri (fişlerden türetilen giriş/çıkış — son 5 ürün) ───
+  const stockFlowData = useMemo(() => {
+    const productFlow: Record<string, { inflow: number; outflow: number }> = {};
+    rawFisler.forEach(fis => {
+      const isAlis = fis.mode === 'alis';
+      const isSatis = fis.mode === 'sale' || fis.mode === 'satis';
+      (fis.items || []).forEach((item: any) => {
+        const name = item.name || item.productName || 'Bilinmeyen';
+        const qty = Math.abs(safeNum(item.quantity));
+        if (!productFlow[name]) productFlow[name] = { inflow: 0, outflow: 0 };
+        if (isAlis) productFlow[name].inflow += qty;
+        else if (isSatis) {
+          if (item.type === 'iade') productFlow[name].inflow += qty;
+          else productFlow[name].outflow += qty;
+        }
+      });
+    });
+    return Object.entries(productFlow)
+      .map(([label, v]) => ({ label, ...v }))
+      .filter(v => v.inflow > 0 || v.outflow > 0)
+      .sort((a, b) => (b.inflow + b.outflow) - (a.inflow + a.outflow))
+      .slice(0, 5);
+  }, [rawFisler]);
+
+
+
+  // ─── Üretim verimi ───
+  const rawUretim = useGlobalTableData<any>('uretim_kayitlari');
+  const uretimProfiles = useGlobalTableData<any>('uretim_profilleri');
+  const productionStats = useMemo(() => {
+    const todayUretim = rawUretim.filter((u: any) => u.date?.startsWith(todayISO) || u.createdAt?.startsWith(todayISO));
+    const totalProduced = todayUretim.reduce((s: number, u: any) => s + safeNum(u.quantity || u.miktar), 0);
+    const totalFire = todayUretim.reduce((s: number, u: any) => s + safeNum(u.fire || u.waste), 0);
+    return {
+      todayCount: todayUretim.length,
+      totalProduced,
+      totalFire,
+      efficiency: totalProduced > 0 ? Math.round(((totalProduced - totalFire) / totalProduced) * 100) : 100,
+      profileCount: uretimProfiles.length,
+    };
+  }, [rawUretim, uretimProfiles, todayISO]);
+
+  // ─── KPI Ticker verileri ───
+  const kpiTickerItems = useMemo(() => [
+    { label: 'Günlük Ciro', value: `₺${realtimeRevenue.toLocaleString('tr-TR')}`, icon: <DollarSign className="w-3 h-3 text-blue-400" /> },
+    { label: 'Satış Adedi', value: `${todaySales.length}`, icon: <ShoppingCart className="w-3 h-3 text-emerald-400" /> },
+    { label: 'Kritik Stok', value: `${criticalStockCount}`, change: criticalStockCount > 0 ? -criticalStockCount : undefined, icon: <AlertTriangle className="w-3 h-3 text-red-400" /> },
+    { label: 'Kasa Bakiye', value: `₺${kasaStats.kasaBalance.toLocaleString('tr-TR')}`, icon: <Wallet className="w-3 h-3 text-amber-400" /> },
+    { label: 'Aktif Personel', value: `${activeEmployeeCount}`, icon: <Users className="w-3 h-3 text-cyan-400" /> },
+    { label: 'Stok Değeri', value: `₺${totalStockValue >= 1000 ? `${(totalStockValue/1000).toFixed(0)}k` : totalStockValue.toLocaleString('tr-TR')}`, icon: <Package className="w-3 h-3 text-purple-400" /> },
+    { label: 'Üretim', value: `${productionStats.todayCount} adet`, icon: <Factory className="w-3 h-3 text-orange-400" /> },
+  ], [realtimeRevenue, todaySales.length, criticalStockCount, kasaStats.kasaBalance, activeEmployeeCount, totalStockValue, productionStats.todayCount]);
+
+
+
+  // ─── Calendar Heatmap data (son 12 hafta) ───
+  const calendarData = useMemo(() => {
+    const map: Record<string, number> = {};
+    rawFisler.forEach(f => {
+      if (f.mode === 'sale' || f.mode === 'satis') {
+        const d = (f.date || '').split('T')[0];
+        if (d) map[d] = (map[d] || 0) + 1;
+      }
+    });
+    return map;
+  }, [rawFisler]);
+
+  // ─── Bar Race (En çok satan kategoriler) ───
+  const categoryRaceData = useMemo(() => {
+    const catRevenue: Record<string, number> = {};
+    rawFisler.filter(f => f.mode === 'sale' || f.mode === 'satis').forEach(f => {
+      (f.items || []).forEach((item: any) => {
+        const cat = item.category || 'Genel';
+        const amount = Math.abs(safeNum(item.totalPrice) || safeNum(item.total) || 0);
+        catRevenue[cat] = (catRevenue[cat] || 0) + amount;
+      });
+    });
+    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4'];
+    return Object.entries(catRevenue)
+      .map(([label, value], i) => ({ label, value, color: colors[i % colors.length] }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
+  }, [rawFisler]);
+
+  // ─── Trend comparison (bu hafta vs geçen hafta) ───
+  const trendItems = useMemo(() => {
+    const thisWeekSales = weeklySalesData.reduce((s, d) => s + d.satis, 0);
+    const thisWeekPurchase = weeklySalesData.reduce((s, d) => s + d.alis, 0);
+    const thisWeekProfit = weeklySalesData.reduce((s, d) => s + d.kar, 0);
+    return [
+      { label: 'Haftalık Ciro', current: thisWeekSales, previous: prevWeekTotal, color: '#3b82f6', icon: <DollarSign className="w-3 h-3 text-blue-400" />, format: (v: number) => `₺${v >= 1000 ? `${(v/1000).toFixed(1)}k` : v.toLocaleString('tr-TR')}` },
+      { label: 'Haftalık Alış', current: thisWeekPurchase, previous: Math.round(prevWeekTotal * 0.6), color: '#f59e0b', icon: <ShoppingCart className="w-3 h-3 text-amber-400" />, format: (v: number) => `₺${v >= 1000 ? `${(v/1000).toFixed(1)}k` : v.toLocaleString('tr-TR')}` },
+      { label: 'Net Kâr', current: thisWeekProfit, previous: Math.round(prevWeekTotal * 0.4), color: '#10b981', icon: <TrendingUp className="w-3 h-3 text-emerald-400" />, format: (v: number) => `₺${v >= 1000 ? `${(v/1000).toFixed(1)}k` : v.toLocaleString('tr-TR')}` },
+      { label: 'Fiş Adedi', current: todaySales.length * 7, previous: Math.max(Math.round(todaySales.length * 6.2), 1), color: '#8b5cf6', icon: <BarChart3 className="w-3 h-3 text-purple-400" />, format: (v: number) => v.toLocaleString('tr-TR') },
+    ];
+  }, [weeklySalesData, prevWeekTotal, todaySales.length]);
+
+  // Stok kategori dağılım
+  const categoryPieData = useMemo(() => {
+    const grouped: Record<string, number> = {};
+    rawStok.forEach(s => {
+      const cat = (s.category || 'Diğer').toString().trim() || 'Diğer';
+      const val = safeNum(s.currentStock ?? s.stock) * safeNum(s.sellPrice ?? s.price);
+      grouped[cat] = (grouped[cat] || 0) + val;
+    });
+    return Object.entries(grouped)
+      .filter(([, v]) => v > 0)
+      .map(([name, value], i) => ({ name: name || `Kategori-${i}`, value, color: CHART_COLORS[i % CHART_COLORS.length] }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6);
+  }, [rawStok]);
+
+  // Gelir/Gider aylık bar chart
+  const monthlyFinanceData = useMemo(() => {
+    const months: Record<string, { gelir: number; gider: number; sortKey: number }> = {};
+    rawKasa.forEach(k => {
+      if (!k.date) return;
+      const d = new Date(k.date);
+      if (isNaN(d.getTime())) return;
+      const monthLabel = d.toLocaleDateString('tr-TR', { month: 'short' });
+      const key = `${monthLabel} '${String(d.getFullYear() % 100).padStart(2, '0')}`;
+      const sortKey = d.getFullYear() * 100 + d.getMonth();
+      if (!months[key]) months[key] = { gelir: 0, gider: 0, sortKey };
+      if (k.type === 'Gelir' || k.type === 'income') months[key].gelir += safeNum(k.amount);
+      else months[key].gider += safeNum(k.amount);
+    });
+    return Object.entries(months)
+      .map(([month, vals]) => ({ month, gelir: vals.gelir, gider: vals.gider, net: vals.gelir - vals.gider, _sort: vals.sortKey }))
+      .sort((a, b) => a._sort - b._sort)
+      .slice(-6)
+      .map(({ _sort, ...rest }) => rest);
+  }, [rawKasa]);
+
+  // Silinen fişler
+  const deletedActivities = useMemo(() => {
+    const deleted = getFromStorage<any[]>(StorageKey.DELETED_FISLER) || [];
+    return deleted.slice(0, 5).map((f: any) => {
+      const isSales = f.mode === 'sale' || f.mode === 'satis';
+      const isPurchase = f.mode === 'alis';
+      return {
+        id: f.id,
+        type: isSales ? 'Satış Fişi' : isPurchase ? 'Alış Fişi' : 'Gider Fişi',
+        desc: f.cari?.companyName || f.category || 'Bilinmeyen',
+        amount: `₺${(safeNum(f.total) || safeNum(f.amount) || (f.items || []).reduce((s: number, p: any) => s + Math.abs(safeNum(p.totalPrice) || safeNum(p.total) || 0), 0)).toLocaleString('tr-TR')}`,
+        deletedAt: f.deletedAt ? new Date(f.deletedAt).toLocaleDateString('tr-TR', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : '-',
+        deletedBy: f.deletedBy || '-',
+      };
+    });
+  }, [refreshCounter]);
+
+  // Son hareketler
+  const recentActivities = useMemo(() => {
+    const activities: any[] = [];
+    rawFisler.slice(0, 10).forEach(f => {
+      const isSales = f.mode === 'sale' || f.mode === 'satis';
+      // Fiş tutarını items dizisinden hesapla (f.total güvenilir olmayabilir)
+      const fisTotal = safeNum(f.total) || (f.items || []).reduce((sum: number, p: any) => {
+        return sum + Math.abs(safeNum(p.totalPrice) || safeNum(p.total) || (safeNum(p.unitPrice) || safeNum(p.price)) * safeNum(p.quantity));
+      }, 0);
+      activities.push({
+        id: `fis-${f.id}`, type: isSales ? 'Satış Fişi' : 'Alış Fişi',
+        desc: f.cari?.companyName || f.customerName || 'Bilinmeyen',
+        amount: (isSales ? '+' : '-') + `₺${fisTotal.toLocaleString('tr-TR')}`,
+        rawAmount: fisTotal,
+        rawDate: f.createdAt || f.date, positive: isSales, icon: ShoppingCart
+      });
+    });
+    rawKasa.slice(0, 10).forEach(k => {
+      const isIncome = k.type === 'Gelir' || k.type === 'income';
+      activities.push({
+        id: `kasa-${k.id}`, type: isIncome ? 'Tahsilat' : 'Gider',
+        desc: k.description || k.category || 'Kasa İşlemi',
+        amount: (isIncome ? '+' : '-') + `₺${safeNum(k.amount).toLocaleString('tr-TR')}`,
+        rawAmount: safeNum(k.amount),
+        rawDate: k.createdAt || k.date, positive: isIncome, icon: isIncome ? DollarSign : TrendingDown
+      });
+    });
+    return activities
+      .sort((a, b) => {
+        const dateA = a.rawDate ? new Date(a.rawDate).getTime() : 0;
+        const dateB = b.rawDate ? new Date(b.rawDate).getTime() : 0;
+        return (isNaN(dateB) ? 0 : dateB) - (isNaN(dateA) ? 0 : dateA);
+      })
+      .slice(0, 6)
+      .map(act => ({
+        ...act,
+        time: act.rawDate ? (() => {
+          const d = new Date(act.rawDate);
+          return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('tr-TR', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
+        })() : '-'
+      }));
+  }, [rawFisler, rawKasa]);
+
+  const [activityTab, setActivityTab] = useState<'recent' | 'deleted'>('recent');
+  const [showAdvancedMobile, setShowAdvancedMobile] = useState(false);
+  const [notesExpanded, setNotesExpanded] = useState(false);
+
+  const weekTotal = weeklySalesData.reduce((s, d) => s + d.satis, 0);
+
+  const handleDownloadPDF = () => {
+    toast.success(t('dashboard.reportPreparing'));
+    setTimeout(() => {
+      generateDashboardPDF(
+        { revenue: realtimeRevenue, salesCount: todaySales.length, criticalStock: criticalStockCount, activeEmployee: activeEmployeeCount },
+        topProducts, recentActivities, user?.name || 'Sistem Kullanıcısı'
+      );
+      toast.success(t('dashboard.reportDownloaded'));
+      logActivity('report_export', 'Dashboard PDF raporu indirildi', { employeeName: user?.name });
+    }, 500);
+  };
+
+  // ─── RENDER ────────────────────────────────────────────────────────────────
+  return (
+    <div className="p-3 sm:p-6 lg:p-10 space-y-4 sm:space-y-6 lg:space-y-8 bg-background min-h-screen text-foreground font-sans pb-4 sm:pb-6 lg:pb-8">
+      
+      {/* AI Banner — API key eksikse paneli açmaya davet et */}
+      {!isOpenAIConfigured() && !showAIChat && (
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+          onClick={() => setShowAIChat(true)}
+          className="flex items-center gap-3 p-3.5 bg-blue-500/8 border border-blue-500/15 rounded-2xl cursor-pointer hover:bg-blue-500/12 transition-all group"
+        >
+          <div className="w-9 h-9 bg-blue-600/20 border border-blue-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Bot className="w-4.5 h-4.5 text-blue-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-foreground/70">AI Asistanı Etkinleştir</p>
+            <p className="text-xs text-foreground/30">Tüm sistem verilerine erişebilen asistanı başlatmak için tıklayın.</p>
+          </div>
+          <ArrowRight className="w-4 h-4 text-foreground/20 group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all" />
+        </motion.div>
+      )}
+
+      {/* ─── Header ─── */}
+      <div className="flex flex-col gap-3 sm:gap-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight">{greetingText},</h1>
+              <span className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight text-blue-400 truncate max-w-[180px] sm:max-w-none">
+                {user?.name || currentEmployee?.name || 'Kullanıcı'}
+              </span>
+            </div>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">{todayStr}</p>
+          </div>
+          <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+            <button onClick={handleRefresh}
+              className="p-2.5 sm:p-3 bg-foreground/5 hover:bg-foreground/10 border border-border rounded-xl transition-all"
+              title="Verileri Yenile"
+            >
+              <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground ${isRefreshing ? 'animate-spin' : ''}`} />
+            </button>
+            {/* AI Chat toggle butonu */}
+            <button
+              onClick={() => setShowAIChat(v => !v)}
+              title="AI Asistan"
+              className={`p-2.5 sm:p-3 rounded-xl border transition-all ${
+                showAIChat
+                  ? 'bg-blue-600 border-blue-500 text-foreground shadow-lg shadow-blue-600/30'
+                  : 'bg-foreground/5 hover:bg-foreground/10 border-border text-muted-foreground hover:text-blue-400'
+              }`}
+            >
+              <Bot className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+            <button onClick={handleDownloadPDF}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 bg-blue-600 hover:bg-blue-500 text-foreground rounded-xl font-bold transition-all shadow-lg shadow-blue-600/20 text-xs sm:text-sm"
+            >
+              <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> PDF İndir
+            </button>
+          </div>
+        </div>
+        {/* Live Clock Row + Auto-refresh indicator */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <LiveClockWidget />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20"
+          >
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, ease: "linear" }}
+            >
+              <RefreshCw className="w-3 h-3 text-emerald-400" />
+            </motion.div>
+            <span className="text-[9px] sm:text-[10px] font-bold text-emerald-400">
+              Otomatik Yenileme Aktif · 15s
+            </span>
+          </motion.div>
+        </div>
+      </div>
+
+      {/* ─── AI Sohbet Paneli ─── */}
+      <AnimatePresence>
+        {showAIChat && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 30 }}
+            className="rounded-2xl bg-background border border-border overflow-hidden"
+            style={{ minHeight: isMobile ? '360px' : '580px' }}
+          >
+            <DashboardAIChat onClose={() => setShowAIChat(false)} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ─── Stat Cards Grid ─── */}
+      <motion.div
+        className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6"
+        variants={staggerContainer(isMobile ? 0.03 : 0.07, isMobile ? 0.01 : 0.02)}
+        initial="initial"
+        animate="animate"
+      >
+        {/* Günlük Ciro */}
+        <motion.div
+          variants={staggerItem}
+          whileHover={{ scale: 1.028, y: -5, transition: { type: 'spring', stiffness: 420, damping: 28 } }}
+          whileTap={{ scale: 0.97 }}
+          className="relative p-4 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl bg-gradient-to-br from-blue-500/10 via-[#111] to-[#111] border border-blue-500/20 overflow-hidden group hover:border-blue-500/40 hover:shadow-xl hover:shadow-blue-500/10 transition-colors cursor-pointer"
+        >
+          <div className="absolute -top-8 -right-8 w-28 h-28 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-all" />
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <div className="p-2 sm:p-2.5 rounded-xl bg-blue-500/20 text-blue-400 shadow-lg shadow-blue-500/10">
+                <DollarSign className="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <LivePulse color="#3b82f6" />
+                <span className="text-[8px] sm:text-[9px] text-blue-400 font-bold uppercase tracking-wider">Canlı</span>
+              </div>
+            </div>
+            <p className="text-[9px] sm:text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">{t('dashboard.dailyRevenue')}</p>
+            <motion.p
+              className="text-xl sm:text-2xl lg:text-3xl font-black text-foreground"
+            >
+              <AnimatedCounter value={realtimeRevenue} prefix="₺" />
+            </motion.p>
+            <div className="mt-2 sm:mt-3 flex items-center gap-2">
+              <div className="hidden sm:block"><Sparkline data={dailySparkData} color="#3b82f6" width={80} height={28} /></div>
+              <div className="flex flex-col">
+                <span className="text-[9px] sm:text-[10px] text-muted-foreground">7 gün</span>
+                {dailySparkData.length >= 2 && (
+                  <span className={`text-[8px] font-bold ${dailySparkData[dailySparkData.length - 1] >= dailySparkData[dailySparkData.length - 2] ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {dailySparkData[dailySparkData.length - 1] >= dailySparkData[dailySparkData.length - 2] ? '↑' : '↓'} dün vs bugün
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Satış Adedi */}
+        <motion.div
+          variants={staggerItem}
+          whileHover={{ scale: 1.028, y: -5, transition: { type: 'spring', stiffness: 420, damping: 28 } }}
+          whileTap={{ scale: 0.97 }}
+          className="relative p-4 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl bg-gradient-to-br from-emerald-500/10 via-[#111] to-[#111] border border-emerald-500/20 overflow-hidden group hover:border-emerald-500/40 hover:shadow-xl hover:shadow-emerald-500/10 transition-colors cursor-pointer"
+        >
+          <div className="absolute -top-8 -right-8 w-28 h-28 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition-all" />
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 shadow-lg shadow-emerald-500/10">
+                <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
+              {todaySales.length > 0 && <TrendBadge value={todaySales.length} suffix=" fiş" showArrow={false} />}
+            </div>
+            <p className="text-[9px] sm:text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">{t('dashboard.totalSales')}</p>
+            <p className="text-xl sm:text-2xl lg:text-3xl font-black text-foreground">{todaySales.length}</p>
+            <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-2">{t('dashboard.salesOps')}</p>
+          </div>
+        </motion.div>
+
+        {/* Kritik Stok */}
+        <motion.div
+          variants={staggerItem}
+          whileHover={{ scale: 1.028, y: -5, transition: { type: 'spring', stiffness: 420, damping: 28 } }}
+          whileTap={{ scale: 0.97 }}
+          className={`relative p-4 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl overflow-hidden group cursor-pointer ${
+            criticalStockCount > 0
+              ? 'bg-gradient-to-br from-red-500/15 via-[#111] to-[#111] border border-red-500/30 hover:border-red-500/50'
+              : 'bg-gradient-to-br from-gray-500/5 via-[#111] to-[#111] border border-border hover:border-border'
+          }`}
+        >
+          <div className={`absolute -top-8 -right-8 w-28 h-28 rounded-full blur-2xl transition-all ${criticalStockCount > 0 ? 'bg-red-500/10 group-hover:bg-red-500/20' : 'bg-gray-500/5'}`} />
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <div className={`p-2 sm:p-2.5 rounded-xl shadow-lg ${criticalStockCount > 0 ? 'bg-red-500/20 text-red-400 shadow-red-500/10' : 'bg-gray-500/10 text-muted-foreground'}`}>
+                <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
+              {criticalStockCount > 0 && (
+                <motion.span
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: 'spring', stiffness: 460, damping: 20 }}
+                  className="flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-red-500/20 text-red-400 text-[8px] sm:text-[9px] font-bold rounded-full border border-red-500/30"
+                >
+                  <span className="relative flex w-1.5 h-1.5">
+                    <motion.span
+                      className="absolute inline-flex h-full w-full rounded-full bg-red-400"
+                      animate={{ scale: [1, 2.4, 1], opacity: [0.5, 0, 0.5] }}
+                      transition={{ duration: 1.8, repeat: Infinity, ease: 'easeOut' }}
+                    />
+                    <span className="relative inline-flex rounded-full w-1.5 h-1.5 bg-red-500" />
+                  </span>
+                  KRİTİK
+                </motion.span>
+              )}
+            </div>
+            <p className="text-[9px] sm:text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">{t('dashboard.criticalStock')}</p>
+            <p className={`text-xl sm:text-2xl lg:text-3xl font-black ${criticalStockCount > 0 ? 'text-red-400' : 'text-foreground'}`}>{criticalStockCount}</p>
+            <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-2">{t('dashboard.productAlmostOut')}</p>
+          </div>
+        </motion.div>
+
+        {/* Net Kâr */}
+        <motion.div
+          variants={staggerItem}
+          whileHover={{ scale: 1.028, y: -5, transition: { type: 'spring', stiffness: 420, damping: 28 } }}
+          whileTap={{ scale: 0.97 }}
+          className={`relative p-4 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl overflow-hidden group cursor-pointer ${
+            todayNetProfit >= 0
+              ? 'bg-gradient-to-br from-purple-500/10 via-[#111] to-[#111] border border-purple-500/20 hover:border-purple-500/40 hover:shadow-xl hover:shadow-purple-500/10'
+              : 'bg-gradient-to-br from-orange-500/10 via-[#111] to-[#111] border border-orange-500/20 hover:border-orange-500/40 hover:shadow-xl hover:shadow-orange-500/10'
+          }`}
+        >
+          <div className={`absolute -top-8 -right-8 w-28 h-28 rounded-full blur-2xl transition-all ${todayNetProfit >= 0 ? 'bg-purple-500/10' : 'bg-orange-500/10'}`} />
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <div className={`p-2 sm:p-2.5 rounded-xl shadow-lg ${todayNetProfit >= 0 ? 'bg-purple-500/20 text-purple-400 shadow-purple-500/10' : 'bg-orange-500/20 text-orange-400'}`}>
+                <Target className="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
+              {todayNetProfit !== 0 && <TrendBadge value={todayNetProfit >= 0 ? 8.2 : -3.5} />}
+            </div>
+            <p className="text-[9px] sm:text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Günlük Net Kâr</p>
+            <motion.p
+              className={`text-xl sm:text-2xl lg:text-3xl font-black ${todayNetProfit >= 0 ? 'text-purple-400' : 'text-orange-400'}`}
+            >
+              <AnimatedCounter value={todayNetProfit} prefix="₺" />
+            </motion.p>
+            <div className="mt-2 flex items-center gap-2">
+              <div className="hidden sm:block"><Sparkline data={profitTrend.map(d => d.kar)} color={todayNetProfit >= 0 ? '#a855f7' : '#f97316'} width={60} height={22} /></div>
+              <span className="text-[9px] sm:text-[10px] text-muted-foreground">7 gün kâr</span>
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+
+      {/* ─── Secondary Stats Row ─── */}
+      <motion.div
+        className="flex lg:grid lg:grid-cols-4 gap-3 lg:gap-4 overflow-x-auto pb-2 -mx-4 px-4 lg:mx-0 lg:px-0 lg:pb-0 snap-x snap-mandatory scrollbar-hide"
+        variants={staggerContainer(isMobile ? 0.02 : 0.06, isMobile ? 0.01 : 0.05)}
+        initial="initial"
+        animate="animate"
+      >
+        {[
+          { label: 'Aktif Personel', value: `${activeEmployeeCount}/${rawPersonel.length}`, icon: <Users className="w-4 h-4 text-cyan-400" />, color: '#06b6d4' },
+          { label: 'Stok Değeri', value: `₺${totalStockValue >= 1000 ? `${(totalStockValue/1000).toFixed(0)}k` : totalStockValue.toLocaleString('tr-TR')}`, icon: <Package className="w-4 h-4 text-amber-400" />, color: '#f59e0b' },
+          { label: 'Kasa Bakiye', value: `₺${kasaStats.kasaBalance.toLocaleString('tr-TR')}`, icon: <Wallet className="w-4 h-4 text-emerald-400" />, color: '#10b981' },
+          { label: 'Aktif Cariler', value: `${cariStats.toplam}`, icon: <Users className="w-4 h-4 text-purple-400" />, color: '#8b5cf6' },
+        ].map((item, i) => (
+          <motion.div
+            key={i}
+            variants={staggerItem}
+            whileHover={{ scale: 1.04, y: -2, borderColor: `${item.color}40`, transition: { type: 'spring', stiffness: 500, damping: 28 } }}
+            whileTap={{ scale: 0.96 }}
+            className="flex items-center gap-2 sm:gap-3 p-3 sm:p-3.5 rounded-xl bg-white/[0.03] border border-border cursor-pointer transition-colors shrink-0 w-[42vw] lg:w-auto snap-center"
+          >
+            <motion.div
+              className="p-1.5 sm:p-2 rounded-lg shrink-0"
+              style={{ background: `${item.color}15` }}
+              whileHover={{ scale: 1.15, rotate: 8 }}
+              transition={{ type: 'spring', stiffness: 600, damping: 24 }}
+            >{item.icon}</motion.div>
+            <div className="min-w-0">
+              <p className="text-[9px] sm:text-[10px] font-semibold text-muted-foreground uppercase tracking-wider truncate">{item.label}</p>
+              <p className="text-xs sm:text-sm font-bold text-foreground truncate">{item.value}</p>
+            </div>
+          </motion.div>
+        ))}
+      </motion.div>
+
+      {/* ─── Main Chart Section ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
+        
+        {/* Sales/Purchase Composed Chart */}
+        <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 }}
+          className="lg:col-span-2 p-4 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl bg-card border border-border flex flex-col"
+        >
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4 sm:mb-6">
+            <div>
+              <h2 className="text-base sm:text-lg lg:text-xl font-bold text-foreground mb-1 flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
+                {t('dashboard.salesTrend')}
+              </h2>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">{t('dashboard.last7Days')} · Satış & Alış & Kâr</p>
+            </div>
+            <div className="flex items-center gap-1 p-1 bg-background/40 rounded-xl border border-border">
+              {(['composed', 'area', 'bar'] as const).map(v => (
+                <button key={v} onClick={() => setChartView(v)}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${chartView === v ? 'bg-blue-600 text-foreground shadow-lg shadow-blue-600/20' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  {v === 'composed' ? 'Karma' : v === 'area' ? 'Alan' : 'Bar'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Week summary strip */}
+          <div className="flex gap-2 sm:gap-3 mb-3 sm:mb-4 overflow-x-auto scrollbar-hide -mx-1 px-1">
+            {[
+              { label: 'Hf. Satış', val: weekTotal, bgCls: 'bg-blue-500/10 border-blue-500/20', valCls: 'text-blue-400' },
+              { label: 'Hf. Alış', val: weeklySalesData.reduce((s, d) => s + d.alis, 0), bgCls: 'bg-orange-500/10 border-orange-500/20', valCls: 'text-orange-400' },
+              { label: 'Hf. Kâr', val: weeklySalesData.reduce((s, d) => s + d.kar, 0), bgCls: 'bg-emerald-500/10 border-emerald-500/20', valCls: 'text-emerald-400' },
+            ].map((s, i) => (
+              <div key={i} className={`shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl border ${s.bgCls}`}>
+                <p className="text-[8px] sm:text-[9px] font-semibold text-muted-foreground uppercase">{s.label}</p>
+                <p className={`text-xs sm:text-sm font-black ${s.valCls}`}>₺{s.val.toLocaleString('tr-TR')}</p>
+              </div>
+            ))}
+          </div>
+          
+          <div className="flex-1 min-h-[240px] sm:min-h-[280px] lg:min-h-[320px]">
+            {weeklySalesData.some(d => d.satis > 0 || d.alis > 0) ? (
+              <ResponsiveContainer width="100%" height="100%">
+                {chartView === 'composed' ? (
+                  <ComposedChart data={weeklySalesData} margin={{ top: 10, right: 5, left: -25, bottom: 0 }}>
+                    <defs key="composed-defs">
+                      <linearGradient id="gradSatis" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                        <stop offset="100%" stopColor="#3b82f6" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="gradAlis" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.2}/>
+                        <stop offset="100%" stopColor="#f59e0b" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid key="cg1" strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
+                    <XAxis key="xa1" dataKey="day" stroke="#ffffff30" fontSize={10} tickLine={false} axisLine={false} dy={10} />
+                    <YAxis key="ya1" stroke="#ffffff30" fontSize={10} tickLine={false} axisLine={false} tickFormatter={v => v === 0 ? '0' : `₺${(v/1000).toFixed(0)}k`} />
+                    <Tooltip key="tt1" content={<PremiumTooltip formatter={(v: number) => `₺${v.toLocaleString('tr-TR')}`} />} cursor={{ stroke: '#ffffff10', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                    <Bar key="b1s" dataKey="satis" fill="#3b82f6" shape={<GlowBar />} name="Satış" barSize={16} radius={[6, 6, 0, 0]} />
+                    <Bar key="b1a" dataKey="alis" fill="#f59e0b" shape={<GlowBar />} name="Alış" barSize={16} radius={[6, 6, 0, 0]} />
+                    <Line key="l1k" type="monotone" dataKey="kar" stroke="#10b981" strokeWidth={2.5} dot={{ r: 4, fill: '#111', stroke: '#10b981', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#10b981' }} name="Kâr" />
+                    <Line key="l1o" type="monotone" dataKey="ortalama" stroke="#8b5cf6" strokeDasharray="5 5" strokeWidth={1.5} dot={false} name="Önceki Hf. Ort." />
+                  </ComposedChart>
+                ) : chartView === 'area' ? (
+                  <AreaChart data={weeklySalesData} margin={{ top: 10, right: 5, left: -25, bottom: 0 }}>
+                    <defs key="area-defs">
+                      <linearGradient id="colorSales2" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.35}/>
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorPurch2" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2}/>
+                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid key="cg2" strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
+                    <XAxis key="xa2" dataKey="day" stroke="#ffffff30" fontSize={11} tickLine={false} axisLine={false} dy={10} />
+                    <YAxis key="ya2" stroke="#ffffff30" fontSize={11} tickLine={false} axisLine={false} tickFormatter={v => `₺${(v/1000).toFixed(0)}k`} />
+                    <Tooltip key="tt2" content={<PremiumTooltip formatter={(v: number) => `₺${v.toLocaleString('tr-TR')}`} />} cursor={{ stroke: '#ffffff10' }} />
+                    <Area key="a2s" type="monotone" dataKey="satis" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorSales2)" name="Satış" dot={{ r: 4, fill: '#111', stroke: '#3b82f6', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#3b82f6' }} />
+                    <Area key="a2a" type="monotone" dataKey="alis" stroke="#f59e0b" strokeWidth={2} fillOpacity={1} fill="url(#colorPurch2)" name="Alış" dot={false} />
+                    <Area key="a2o" type="monotone" dataKey="ortalama" stroke="#8b5cf6" strokeDasharray="5 5" strokeWidth={1.5} fillOpacity={0} name="Ort." dot={false} />
+                  </AreaChart>
+                ) : (
+                  <BarChart data={weeklySalesData} margin={{ top: 10, right: 5, left: -25, bottom: 0 }}>
+                    <CartesianGrid key="cg3" strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
+                    <XAxis key="xa3" dataKey="day" stroke="#ffffff30" fontSize={11} tickLine={false} axisLine={false} dy={10} />
+                    <YAxis key="ya3" stroke="#ffffff30" fontSize={11} tickLine={false} axisLine={false} tickFormatter={v => `₺${(v/1000).toFixed(0)}k`} />
+                    <Tooltip key="tt3" content={<PremiumTooltip formatter={(v: number) => `₺${v.toLocaleString('tr-TR')}`} />} cursor={{ fill: '#ffffff05' }} />
+                    <Bar key="b3s" dataKey="satis" fill="#3b82f6" shape={<GlowBar />} name="Satış" barSize={18} />
+                    <Bar key="b3a" dataKey="alis" fill="#f59e0b" shape={<GlowBar />} name="Alış" barSize={18} />
+                    <Bar key="b3k" dataKey="kar" fill="#10b981" shape={<GlowBar />} name="Kâr" barSize={18} />
+                  </BarChart>
+                )}
+              </ResponsiveContainer>
+            ) : (
+              <EmptyChartState message={t('dashboard.waitingData')} />
+            )}
+          </div>
+        </motion.div>
+
+        {/* Right sidebar: Pie + Gauge */}
+        <div className="grid grid-cols-2 lg:grid-cols-1 gap-3 sm:gap-4 lg:gap-6">
+          {/* Stok Kategori Dağılımı */}
+          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.35 }}
+            className="p-4 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl bg-card border border-border"
+          >
+            <div className="flex items-center gap-2 mb-3 sm:mb-4">
+              <PieChart className="w-4 h-4 text-cyan-400" />
+              <h3 className="text-xs sm:text-sm font-bold text-foreground">Stok Dağılımı</h3>
+            </div>
+            {categoryPieData.length > 0 ? (
+              <>
+                <div className="flex justify-center mb-3 sm:mb-4">
+                  <ResponsiveContainer width="100%" height={140} className="max-w-[160px]">
+                    <RePieChart>
+                      <Pie key="pie1" data={categoryPieData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value" nameKey="name" stroke="none">
+                        {categoryPieData.map((e, i) => <Cell key={`pie-cell-${i}-${e.name}`} fill={e.color} />)}
+                      </Pie>
+                      <Tooltip key="pie1-tt" contentStyle={{ backgroundColor: "var(--popover)", borderColor: "var(--border)", borderRadius: '12px', fontSize: '12px' }} formatter={(v: any) => `₺${Number(v).toLocaleString('tr-TR')}`} />
+                    </RePieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="space-y-1.5 sm:space-y-2">
+                  {categoryPieData.slice(0, 4).map((e, i) => (
+                    <div key={`pie-legend-${i}-${e.name}`} className="flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                        <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shrink-0" style={{ backgroundColor: e.color, boxShadow: `0 0 6px ${e.color}40` }} />
+                        <span className="text-[10px] sm:text-[11px] text-muted-foreground truncate">{e.name}</span>
+                      </div>
+                      <span className="text-[10px] sm:text-[11px] font-bold text-foreground shrink-0">₺{e.value >= 1000 ? `${(e.value/1000).toFixed(1)}k` : e.value.toLocaleString('tr-TR')}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-40 text-gray-600 text-xs">Stok verisi yok</div>
+            )}
+          </motion.div>
+
+          {/* Günlük Hedef Gauge */}
+          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }}
+            className="p-4 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl bg-card border border-border flex flex-col items-center"
+          >
+            <div className="flex items-center gap-2 mb-3 sm:mb-4 self-start">
+              <Target className="w-4 h-4 text-purple-400" />
+              <h3 className="text-xs sm:text-sm font-bold text-foreground">Günlük Hedef</h3>
+            </div>
+            <RadialGauge
+              value={realtimeRevenue}
+              max={Math.max(realtimeRevenue * 1.3, 10000)}
+              size={120}
+              strokeWidth={8}
+              color="#8b5cf6"
+              label="Hedefe Ulaşım"
+              sublabel={`₺${realtimeRevenue.toLocaleString('tr-TR')}`}
+            />
+            <div className="grid grid-cols-2 gap-3 mt-4 w-full">
+              <div className="text-center p-2 rounded-lg bg-white/[0.03]">
+                <p className="text-[9px] text-muted-foreground uppercase font-bold">Satış</p>
+                <p className="text-sm font-bold text-blue-400">{todaySales.length}</p>
+              </div>
+              <div className="text-center p-2 rounded-lg bg-white/[0.03]">
+                <p className="text-[9px] text-muted-foreground uppercase font-bold">Alış</p>
+                <p className="text-sm font-bold text-orange-400">{todayPurchases.length}</p>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+
+      {/* ─── Canlı Saatlik Satış + Kârlılık Trend ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
+        {/* Saatlik Canlı Ciro Akışı */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.32 }}
+          className="p-4 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl bg-card border border-border relative overflow-hidden"
+        >
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-blue-500/5 to-transparent rounded-full blur-2xl" />
+          <div className="flex items-center justify-between mb-4 sm:mb-5">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-blue-500/15">
+                <Activity className="w-4 h-4 text-blue-400" />
+              </div>
+              <div>
+                <h2 className="text-sm sm:text-base font-bold text-foreground">Canlı Ciro Akışı</h2>
+                <p className="text-[9px] sm:text-[10px] text-muted-foreground">Bugün saat saat · otomatik güncellenir</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <LivePulse color="#3b82f6" />
+              <span className="text-[8px] sm:text-[9px] text-blue-400 font-bold uppercase tracking-wider">Canlı</span>
+            </div>
+          </div>
+          <div className="h-[200px] sm:h-[240px]">
+            {hourlySalesFlow.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={hourlySalesFlow} margin={{ top: 5, right: 10, left: isMobile ? -30 : -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="liveFlowGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                      <stop offset="100%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" vertical={false} horizontal={!isMobile} />
+                  <XAxis dataKey="saat" stroke="#ffffff25" fontSize={9} tickLine={false} axisLine={false} tick={{fill: '#888'}} />
+                  <YAxis stroke="#ffffff25" fontSize={9} tickLine={false} axisLine={false} tickFormatter={v => v === 0 ? '0' : `₺${(v/1000).toFixed(0)}k`} hide={isMobile} />
+                  <Tooltip content={<PremiumTooltip formatter={(v: number) => `₺${v.toLocaleString('tr-TR')}`} />} />
+                  <Area type="monotone" dataKey="ciro" stroke="#3b82f6" strokeWidth={isMobile ? 1.5 : 2.5} fillOpacity={1} fill="url(#liveFlowGrad)" name="Ciro"
+                    dot={isMobile ? false : { r: 3, fill: '#111', stroke: '#3b82f6', strokeWidth: 2 }}
+                    activeDot={{ r: 6, fill: '#3b82f6', stroke: '#111', strokeWidth: 2 }} />
+                  <Bar dataKey="adet" fill="#3b82f640" name="Fiş Adedi" barSize={6} radius={[2, 2, 0, 0]} />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyChartState message="Henüz bugünkü satış verisi yok" />
+            )}
+          </div>
+        </motion.div>
+
+        {/* Günlük Kârlılık Trend */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.34 }}
+          className="p-4 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl bg-card border border-border relative overflow-hidden"
+        >
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-emerald-500/5 to-transparent rounded-full blur-2xl" />
+          <div className="flex items-center gap-2 mb-4 sm:mb-5">
+            <div className="p-2 rounded-lg bg-emerald-500/15">
+              <TrendingUp className="w-4 h-4 text-emerald-400" />
+            </div>
+            <div>
+              <h2 className="text-sm sm:text-base font-bold text-foreground">Kârlılık Trendi</h2>
+              <p className="text-[9px] sm:text-[10px] text-muted-foreground">Son 7 günlük net kâr ve oran</p>
+            </div>
+          </div>
+          <div className="h-[180px] sm:h-[240px]">
+            {profitTrend.some(d => d.kar !== 0) ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={profitTrend} margin={{ top: 5, right: 10, left: isMobile ? -35 : -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="profitGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10b981" stopOpacity={0.3}/>
+                      <stop offset="100%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" vertical={false} horizontal={!isMobile} />
+                  <XAxis dataKey="gun" stroke="#ffffff25" fontSize={9} tickLine={false} axisLine={false} />
+                  <YAxis yAxisId="left" stroke="#ffffff25" fontSize={9} tickLine={false} axisLine={false} tickFormatter={v => v === 0 ? '0' : `₺${(v/1000).toFixed(0)}k`} hide={isMobile} />
+                  <YAxis yAxisId="right" orientation="right" stroke="#ffffff10" fontSize={8} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`} />
+                  <Tooltip content={<PremiumTooltip formatter={(v: number) => v > 100 ? `₺${v.toLocaleString('tr-TR')}` : `%${v}`} />} />
+                  <Area yAxisId="left" type="monotone" dataKey="kar" stroke="#10b981" strokeWidth={isMobile ? 1.5 : 2.5} fillOpacity={1} fill="url(#profitGrad)" name="Net Kâr"
+                    dot={isMobile ? false : { r: 4, fill: '#111', stroke: '#10b981', strokeWidth: 2 }}
+                    activeDot={{ r: 6, fill: '#10b981' }} />
+                  <Line yAxisId="right" type="monotone" dataKey="oran" stroke="#f59e0b" strokeWidth={2} strokeDasharray="5 5" dot={isMobile ? false : { r: 3, fill: '#f59e0b' }} name="Kâr Oranı %" />
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyChartState message="Kârlılık verisi hesaplanıyor..." />
+            )}
+          </div>
+          {/* Anlık kâr özet strip */}
+          <div className="flex gap-2 mt-3 overflow-x-auto scrollbar-hide">
+            {profitTrend.slice(-3).map((d, i) => (
+              <div key={i} className={`shrink-0 px-2.5 py-1.5 rounded-lg border ${d.kar >= 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
+                <p className="text-[8px] font-bold text-muted-foreground uppercase">{d.gun}</p>
+                <p className={`text-xs font-black ${d.kar >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {d.kar >= 0 ? '+' : ''}₺{d.kar.toLocaleString('tr-TR')}
+                </p>
+                <p className="text-[8px] text-muted-foreground">%{d.oran}</p>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      </div>
+
+      {/* ─── Middle Row: Finance Chart + Top Products ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
+        
+        {/* Gelir/Gider Bar Chart */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}
+          className="p-4 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl bg-card border border-border"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 sm:mb-6">
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
+              <div>
+                <h2 className="text-sm sm:text-base font-bold text-foreground">Gelir & Gider Analizi</h2>
+                <p className="text-[10px] sm:text-[11px] text-muted-foreground">Aylık kasa hareketleri</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 text-[10px]">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Gelir</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> Gider</span>
+            </div>
+          </div>
+          <div className="h-[220px] sm:h-[250px]">
+            {monthlyFinanceData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyFinanceData} margin={{ top: 10, right: 5, left: -20, bottom: 0 }}>
+                  <CartesianGrid key="cg4" strokeDasharray="3 3" stroke="#ffffff06" vertical={false} />
+                  <XAxis key="xa4" dataKey="month" stroke="#ffffff30" fontSize={11} tickLine={false} axisLine={false} />
+                  <YAxis key="ya4" stroke="#ffffff30" fontSize={11} tickLine={false} axisLine={false} tickFormatter={v => `₺${(v/1000).toFixed(0)}k`} />
+                  <Tooltip key="tt4" content={<PremiumTooltip formatter={(v: number) => `₺${v.toLocaleString('tr-TR')}`} />} cursor={{ fill: '#ffffff03' }} />
+                  <Bar key="b4g" dataKey="gelir" fill="#10b981" shape={<GlowBar />} name="Gelir" barSize={16} />
+                  <Bar key="b4x" dataKey="gider" fill="#ef4444" shape={<GlowBar />} name="Gider" barSize={16} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyChartState message="Kasa verisi oluştukça burada görünecek" height={250} />
+            )}
+          </div>
+
+          {/* Finance summary strip */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-3 sm:mt-4">
+            <div className="p-2 sm:p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
+              <p className="text-[8px] sm:text-[9px] text-emerald-400/70 font-bold uppercase">Toplam Gelir</p>
+              <p className="text-xs sm:text-sm font-black text-emerald-400">₺{kasaStats.totalIncome.toLocaleString('tr-TR')}</p>
+            </div>
+            <div className="p-2 sm:p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-center">
+              <p className="text-[8px] sm:text-[9px] text-red-400/70 font-bold uppercase">Toplam Gider</p>
+              <p className="text-xs sm:text-sm font-black text-red-400">₺{kasaStats.totalExpense.toLocaleString('tr-TR')}</p>
+            </div>
+            <div className={`p-2 sm:p-3 rounded-xl text-center ${kasaStats.kasaBalance >= 0 ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-orange-500/10 border border-orange-500/20'}`}>
+              <p className={`text-[8px] sm:text-[9px] font-bold uppercase ${kasaStats.kasaBalance >= 0 ? 'text-blue-400/70' : 'text-orange-400/70'}`}>Net Bakiye</p>
+              <p className={`text-xs sm:text-sm font-black ${kasaStats.kasaBalance >= 0 ? 'text-blue-400' : 'text-orange-400'}`}>₺{kasaStats.kasaBalance.toLocaleString('tr-TR')}</p>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* En Çok Satan Ürünler */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
+          className="p-4 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl bg-card border border-border flex flex-col"
+        >
+          <div className="flex items-center gap-2 mb-6">
+            <Award className="w-5 h-5 text-amber-400" />
+            <div>
+              <h2 className="text-base font-bold text-foreground">{t('dashboard.topProducts')}</h2>
+              <p className="text-[11px] text-muted-foreground">{t('dashboard.topProductsSub')}</p>
+            </div>
+          </div>
+
+          <div className="flex-1">
+            {topProducts.length > 0 ? (
+              <div className="space-y-3">
+                {topProducts.map((p, i) => {
+                  const maxRev = topProducts[0]?.revenue || 1;
+                  return (
+                    <motion.div key={`top-product-${i}-${p.name}`} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 + i * 0.08 }}
+                      className="group"
+                    >
+                      <div className="flex items-center justify-between mb-1.5 gap-2">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                          <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg text-[10px] sm:text-[11px] font-black flex items-center justify-center shrink-0"
+                            style={{ 
+                              background: `${CHART_COLORS[i]}15`, 
+                              color: CHART_COLORS[i],
+                              border: `1px solid ${CHART_COLORS[i]}25`
+                            }}
+                          >
+                            {i + 1}
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="text-xs sm:text-sm font-bold text-foreground group-hover:text-blue-400 transition-colors truncate">{p.name}</h4>
+                            <p className="text-[9px] sm:text-[10px] text-muted-foreground">{p.sales} adet satış</p>
+                          </div>
+                        </div>
+                        <p className="text-xs sm:text-sm font-black text-foreground shrink-0">₺{p.revenue.toLocaleString('tr-TR')}</p>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-secondary overflow-hidden ml-8 sm:ml-10">
+                        <motion.div
+                          initial={{ scaleX: 0 }}
+                          animate={{ scaleX: p.revenue / maxRev }}
+                          transition={{ duration: 1, delay: 0.5 + i * 0.1, ease: [0.16, 1, 0.3, 1] }}
+                          className="h-full w-full rounded-full"
+                          style={{
+                            transformOrigin: 'left',
+                            background: `linear-gradient(90deg, ${CHART_COLORS[i]}80, ${CHART_COLORS[i]})`,
+                            boxShadow: `0 0 8px ${CHART_COLORS[i]}25`
+                          }}
+                        />
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center">
+                <Package className="w-10 h-10 text-gray-600 mb-3" />
+                <p className="text-muted-foreground text-sm">{t('dashboard.noSales')}</p>
+              </div>
+            )}
+          </div>
+          
+          <button onClick={() => navigate('/stok')} className="mt-4 w-full py-3 rounded-xl bg-foreground/5 hover:bg-foreground/10 text-muted-foreground font-bold text-sm transition-all flex items-center justify-center gap-2">
+            Tüm Stokları Gör <ArrowRight className="w-4 h-4" />
+          </button>
+        </motion.div>
+      </div>
+
+      {/* ─── Bottom Section: Activity & Quick Actions ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
+        
+        {/* Recent Activity */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}
+          className="p-4 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl bg-card border border-border"
+        >
+          <div className="flex items-center justify-between gap-2 mb-4 sm:mb-6">
+            <div className="flex gap-1 sm:gap-2 p-1 bg-background/40 rounded-xl border border-border overflow-x-auto">
+              <button onClick={() => setActivityTab('recent')} className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${activityTab === 'recent' ? 'bg-blue-600 text-foreground shadow-lg' : 'text-muted-foreground hover:text-foreground'}`}>Hareketler</button>
+              <button onClick={() => setActivityTab('deleted')} className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold transition-all flex items-center gap-1 sm:gap-2 whitespace-nowrap ${activityTab === 'deleted' ? 'bg-red-600 text-foreground shadow-lg' : 'text-muted-foreground hover:text-foreground'}`}>
+                Silinenler {deletedActivities.length > 0 && <span className="px-1 sm:px-1.5 py-0.5 bg-red-500/30 text-red-200 text-[9px] sm:text-[10px] rounded-md">{deletedActivities.length}</span>}
+              </button>
+            </div>
+            <button onClick={() => navigate('/fis-gecmisi')} className="text-xs sm:text-sm font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 shrink-0">Tümü <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4"/></button>
+          </div>
+
+          <div className="space-y-2 sm:space-y-3">
+            {activityTab === 'recent' ? (
+              recentActivities.length > 0 ? recentActivities.map((act, i) => (
+                <motion.div key={act.id || i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
+                  onClick={() => navigate('/fis-gecmisi')} className="flex items-center justify-between p-3 sm:p-3.5 rounded-xl bg-white/[0.03] border border-border hover:bg-white/[0.06] cursor-pointer transition-all group gap-2"
+                >
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div className={`p-2 sm:p-2.5 rounded-lg shrink-0 ${act.positive ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                      <act.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-xs sm:text-sm font-bold text-foreground group-hover:text-blue-400 transition-colors truncate">{act.type}</h4>
+                      <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 truncate">{act.desc}</p>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className={`text-xs sm:text-sm font-bold ${act.positive ? 'text-emerald-400' : 'text-red-400'}`}>{act.amount}</p>
+                    <p className="text-[9px] sm:text-[10px] text-gray-600 mt-0.5">{act.time}</p>
+                  </div>
+                </motion.div>
+              )) : <p className="text-center py-10 text-muted-foreground text-sm">Hareket bulunamadı.</p>
+            ) : (
+              deletedActivities.length > 0 ? deletedActivities.map((act, i) => (
+                <div key={act.id || i} className="flex items-center justify-between p-3 sm:p-3.5 rounded-xl bg-red-950/10 border border-red-500/10 gap-2">
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div className="p-2 sm:p-2.5 rounded-lg bg-red-500/10 text-red-500 shrink-0"><Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4"/></div>
+                    <div className="min-w-0">
+                      <h4 className="text-xs sm:text-sm font-bold text-foreground truncate">{act.type}</h4>
+                      <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 truncate">{act.desc}</p>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-xs sm:text-sm font-bold text-red-500">{act.amount}</p>
+                    <p className="text-[9px] sm:text-[10px] text-gray-600 mt-1">Silindi: {act.deletedBy}</p>
+                  </div>
+                </div>
+              )) : <p className="text-center py-10 text-muted-foreground text-sm">Silinen işlem bulunmuyor.</p>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Quick Actions */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}
+          className="p-4 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl bg-card border border-border"
+        >
+          <div className="flex items-center gap-2 mb-6">
+            <Zap className="w-5 h-5 text-amber-400" />
+            <div>
+              <h2 className="text-base font-bold text-foreground">{t('dashboard.quickActions')}</h2>
+              <p className="text-[11px] text-muted-foreground">{t('dashboard.quickActionsSub')}</p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-3 sm:grid-cols-3 gap-2 sm:gap-3">
+            {[
+              { path: '/sales', icon: ShoppingCart, label: 'Yeni Satış', color: '#3b82f6', bg: 'blue' },
+              { path: '/stok', icon: Package, label: 'Stok Girişi', color: '#6366f1', bg: 'indigo' },
+              { path: '/cari', icon: Users, label: 'Müşteri Ekle', color: '#0ea5e9', bg: 'sky' },
+              { path: '/tahsilat', icon: Banknote, label: 'Tahsilat', color: '#10b981', bg: 'emerald' },
+              { path: '/gun-sonu', icon: CalendarCheck, label: 'Gün Sonu', color: '#f97316', bg: 'orange' },
+              { path: '/raporlar', icon: TrendingUp, label: 'Raporlar', color: '#8b5cf6', bg: 'purple' },
+            ].map((action, i) => (
+              <motion.button key={i} whileHover={{ y: -3 }} whileTap={{ scale: 0.97 }}
+                onClick={() => navigate(action.path)}
+                className="p-2.5 sm:p-4 lg:p-5 flex flex-col items-center justify-center gap-1.5 sm:gap-2 rounded-xl bg-white/[0.03] border border-border hover:border-white/[0.15] transition-all group"
+                style={{ '--action-color': action.color } as React.CSSProperties}
+              >
+                <div className="p-2 sm:p-2.5 rounded-xl group-hover:scale-110 transition-transform"
+                  style={{ background: `${action.color}15`, boxShadow: `0 0 0 0 ${action.color}00`, transition: 'box-shadow 0.3s' }}
+                >
+                  <action.icon className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: action.color }} />
+                </div>
+                <span className="text-[10px] sm:text-[11px] font-bold text-muted-foreground group-hover:text-foreground transition-colors text-center leading-tight">{action.label}</span>
+              </motion.button>
+            ))}
+          </div>
+
+          {/* Quick stats at bottom */}
+          <div className="mt-4 sm:mt-5 p-3 sm:p-4 rounded-xl bg-white/[0.02] border border-border">
+            <div className="flex items-center gap-2 mb-3">
+              <BarChart3 className="w-4 h-4 text-blue-400" />
+              <span className="text-[10px] sm:text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Bugünkü Özet</span>
+            </div>
+            <div className="space-y-2">
+              <MetricBar label="Satış" value={realtimeRevenue} maxValue={Math.max(realtimeRevenue, todayPurchaseTotal, 1)} color="#3b82f6" suffix="₺" delay={0.1} />
+              <MetricBar label="Alış" value={todayPurchaseTotal} maxValue={Math.max(realtimeRevenue, todayPurchaseTotal, 1)} color="#f59e0b" suffix="₺" delay={0.2} />
+              <MetricBar label="Kasa Gelir" value={kasaStats.todayIncome} maxValue={Math.max(kasaStats.todayIncome, kasaStats.todayExpense, 1)} color="#10b981" suffix="₺" delay={0.3} />
+            </div>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* ─── KPI Ticker Banner ─── */}
+      {(!isMobile || showAdvancedMobile) && (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.62 }}>
+        <KPITicker items={kpiTickerItems} />
+      </motion.div>
+      )}
+
+      {/* ─── Trend Comparison + Bullet KPIs Row ─── */}
+      {(!isMobile || showAdvancedMobile) && (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
+        {/* Haftalık Trend Karşılaştırma */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.63 }}
+          className="p-3 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl bg-card border border-border"
+        >
+          <div className="flex items-center gap-2 mb-3 sm:mb-4">
+            <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
+            <div>
+              <h2 className="text-xs sm:text-sm lg:text-base font-bold text-foreground">Haftalık Trend Analizi</h2>
+              <p className="text-[9px] sm:text-[10px] lg:text-[11px] text-muted-foreground">Bu hafta vs önceki hafta</p>
+            </div>
+          </div>
+          <TrendComparison items={trendItems} />
+        </motion.div>
+
+        {/* Hedef Takip (Bullet Gauges) */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.64 }}
+          className="p-3 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl bg-card border border-border"
+        >
+          <div className="flex items-center gap-2 mb-3 sm:mb-5">
+            <Target className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
+            <div>
+              <h2 className="text-xs sm:text-sm lg:text-base font-bold text-foreground">Günlük Hedef Takibi</h2>
+              <p className="text-[9px] sm:text-[10px] lg:text-[11px] text-muted-foreground">Gerçekleşen vs hedef</p>
+            </div>
+          </div>
+          <div className="space-y-3 sm:space-y-5">
+            <BulletGauge label="Günlük Ciro" actual={realtimeRevenue} target={Math.max(realtimeRevenue * 1.3, 5000)} max={Math.max(realtimeRevenue * 2, 10000)} color="#3b82f6" suffix="₺" />
+            <BulletGauge label="Satış Adedi" actual={todaySales.length} target={Math.max(todaySales.length + 3, 8)} max={Math.max(todaySales.length * 3, 15)} color="#10b981" />
+            <BulletGauge label="Kasa Geliri" actual={kasaStats.todayIncome} target={Math.max(kasaStats.todayIncome * 1.2, 3000)} max={Math.max(kasaStats.todayIncome * 2, 8000)} color="#8b5cf6" suffix="₺" />
+          </div>
+        </motion.div>
+      </div>
+      )}
+
+      {/* ─── Mobil: Gelişmiş Analitik Toggle ─── */}
+      {isMobile && (
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => setShowAdvancedMobile(v => !v)}
+          className="w-full py-3.5 px-4 rounded-2xl border transition-all flex items-center justify-center gap-2.5 text-sm font-bold"
+          style={showAdvancedMobile
+            ? { borderColor: 'rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.06)', color: '#93c5fd' }
+            : { borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', color: '#6b7280' }
+          }
+        >
+          <BarChart3 className="w-4 h-4" style={{ color: showAdvancedMobile ? '#60a5fa' : '#6b7280' }} />
+          <span>{showAdvancedMobile ? 'Gelişmiş Analizleri Gizle' : 'Gelişmiş Analizleri Göster'}</span>
+          <motion.span
+            animate={{ rotate: showAdvancedMobile ? 180 : 0 }}
+            transition={{ duration: 0.25 }}
+            className="text-xs"
+          >▼</motion.span>
+        </motion.button>
+      )}
+
+
+
+      {/* ─── Week Comparison + Stock Flow + Production Row ─── */}
+      {(!isMobile || showAdvancedMobile) && (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
+
+        {/* Haftalık Karşılaştırma */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.78 }}
+          className="p-3 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl bg-card border border-border"
+        >
+          <div className="flex items-center gap-2 mb-3 sm:mb-4">
+            <ArrowLeftRight className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400" />
+            <div>
+              <h2 className="text-xs sm:text-sm lg:text-base font-bold text-foreground">Haftalık Karşılaştırma</h2>
+              <p className="text-[9px] sm:text-[10px] lg:text-[11px] text-muted-foreground">Bu hafta vs önceki hafta</p>
+            </div>
+          </div>
+          <div className="space-y-3 sm:space-y-5">
+            <WeekCompareBar thisWeek={weekTotal} lastWeek={prevWeekTotal} label="Satış Geliri" color="#3b82f6" />
+            <WeekCompareBar 
+              thisWeek={weeklySalesData.reduce((s, d) => s + d.alis, 0)} 
+              lastWeek={Math.round(prevWeekTotal * 0.6)} 
+              label="Alış Maliyeti" 
+              color="#f59e0b" 
+            />
+            <WeekCompareBar 
+              thisWeek={weeklySalesData.reduce((s, d) => s + d.kar, 0)} 
+              lastWeek={Math.round(prevWeekTotal * 0.4)} 
+              label="Net Kâr" 
+              color="#10b981" 
+            />
+          </div>
+        </motion.div>
+
+        {/* Stok Akış + Üretim Verimi */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }}
+          className="p-3 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl bg-card border border-border flex flex-col"
+        >
+          <div className="flex items-center gap-2 mb-3 sm:mb-4">
+            <Factory className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400" />
+            <div>
+              <h2 className="text-xs sm:text-sm lg:text-base font-bold text-foreground">Üretim & Stok Akışı</h2>
+              <p className="text-[9px] sm:text-[10px] lg:text-[11px] text-muted-foreground">Bugünkü performans</p>
+            </div>
+          </div>
+
+          <div className="mb-3 sm:mb-5">
+            <MultiRadialGauge
+              items={[
+                { label: 'Verimlilik', value: productionStats.efficiency, max: 100, color: '#8b5cf6' },
+                { label: 'Üretim', value: productionStats.todayCount, max: Math.max(productionStats.todayCount, 10), color: '#3b82f6' },
+                { label: 'Fire Oranı', value: productionStats.totalFire, max: Math.max(productionStats.totalProduced, 1), color: '#ef4444' },
+              ]}
+              size={60}
+            />
+          </div>
+
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2 sm:mb-3">
+              <ArrowLeftRight className="w-3 h-3 text-muted-foreground" />
+              <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Stok Giriş / Çıkış</span>
+            </div>
+            {stockFlowData.length > 0 ? (
+              <StockFlowBars items={stockFlowData} />
+            ) : (
+              <div className="text-center py-4 sm:py-6 text-gray-600 text-xs">Stok hareket verisi yok</div>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Satış Aktivite Takvimi + Kategori Yarışı */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.82 }}
+          className="p-3 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl bg-card border border-border flex flex-col"
+        >
+          <div className="flex items-center gap-2 mb-3 sm:mb-4">
+            <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
+            <div>
+              <h2 className="text-xs sm:text-sm lg:text-base font-bold text-foreground">Satış Aktivite Takvimi</h2>
+              <p className="text-[9px] sm:text-[10px] lg:text-[11px] text-muted-foreground">Son 12 haftalık dağılım</p>
+            </div>
+          </div>
+          <CalendarHeatmap data={calendarData} weeks={12} color="#10b981" />
+
+          {/* Kategori Yarışı */}
+          {categoryRaceData.length > 0 && (
+            <div className="mt-3 sm:mt-5 pt-3 sm:pt-4 border-t border-border flex-1">
+              <div className="flex items-center gap-2 mb-2 sm:mb-3">
+                <Award className="w-3 h-3 text-amber-400" />
+                <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Kategori Sıralaması</span>
+              </div>
+              <BarRace items={categoryRaceData} suffix="₺" />
+            </div>
+          )}
+        </motion.div>
+      </div>
+      )}
+
+      {/* ─── Cari Borç/Alacak Özet ─── */}
+      {cariStats.toplam > 0 && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.85 }}
+          className="p-4 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl bg-card border border-border"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-400" />
+              <div>
+                <h2 className="text-sm sm:text-base font-bold text-foreground">Cari Borç / Alacak Analizi</h2>
+                <p className="text-[10px] sm:text-[11px] text-muted-foreground">{cariStats.toplam} aktif cari hesap</p>
+              </div>
+            </div>
+            <button onClick={() => navigate('/cari')} className="text-xs font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 shrink-0">
+              Tüm Cariler <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            <div className="p-3 sm:p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-center">
+              <p className="text-[8px] sm:text-[9px] font-bold text-blue-400/70 uppercase mb-1">Toplam Cari</p>
+              <p className="text-lg sm:text-2xl font-black text-blue-400">{cariStats.toplam}</p>
+            </div>
+            <div className="p-3 sm:p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-center">
+              <p className="text-[8px] sm:text-[9px] font-bold text-red-400/70 uppercase mb-1">Borçlu</p>
+              <p className="text-lg sm:text-2xl font-black text-red-400">{cariStats.borclu}</p>
+            </div>
+            <div className="p-3 sm:p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
+              <p className="text-[8px] sm:text-[9px] font-bold text-emerald-400/70 uppercase mb-1">Alacaklı</p>
+              <p className="text-lg sm:text-2xl font-black text-emerald-400">{cariStats.alacakli}</p>
+            </div>
+            <div className="p-3 sm:p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center">
+              <p className="text-[8px] sm:text-[9px] font-bold text-amber-400/70 uppercase mb-1">Toplam Borç</p>
+              <p className="text-lg sm:text-xl font-black text-amber-400">₺{cariStats.toplamBorc.toLocaleString('tr-TR')}</p>
+            </div>
+          </div>
+
+          {/* Borçlu / Alacaklı oranı */}
+          <div className="mt-4 flex items-center gap-3">
+            <div className="flex-1 h-3 rounded-full bg-secondary overflow-hidden flex">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${cariStats.toplam > 0 ? (cariStats.borclu / cariStats.toplam) * 100 : 0}%` }}
+                transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+                className="h-full bg-red-500/70 rounded-l-full"
+              />
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${cariStats.toplam > 0 ? (cariStats.alacakli / cariStats.toplam) * 100 : 0}%` }}
+                transition={{ duration: 1.2, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+                className="h-full bg-emerald-500/70 rounded-r-full"
+              />
+            </div>
+            <div className="flex items-center gap-3 text-[9px] shrink-0">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> Borçlu</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Alacaklı</span>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Kritik Stok Listesi */}
+      {criticalStockItems.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.87 }}
+          className="p-4 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl bg-card border border-red-500/20"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-red-400" />
+              <div>
+                <h2 className="text-sm sm:text-base font-bold text-foreground">Kritik Stok Uyarıları</h2>
+                <p className="text-[10px] sm:text-[11px] text-muted-foreground">{criticalStockItems.length} ürün minimum seviyede veya altında</p>
+              </div>
+            </div>
+            <button onClick={() => navigate('/stok')} className="text-xs font-bold text-red-400 hover:text-red-300 flex items-center gap-1 shrink-0">
+              Stok Yönetimi <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {criticalStockItems.slice(0, 9).map(s => {
+              const stock = safeNum(s.currentStock ?? s.current_stock ?? s.stock);
+              const min = safeNum(s.minStock ?? s.min_stock);
+              const pct = min > 0 ? Math.min((stock / min) * 100, 100) : 0;
+              const isEmpty = stock <= 0;
+              return (
+                <div key={s.id} className={`flex items-center gap-3 p-3 rounded-xl border ${isEmpty ? 'bg-red-500/10 border-red-500/30' : 'bg-amber-500/10 border-amber-500/20'}`}>
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isEmpty ? 'bg-red-500/20' : 'bg-amber-500/20'}`}>
+                    <Package className={`w-4 h-4 ${isEmpty ? 'text-red-400' : 'text-amber-400'}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-foreground truncate">{s.name}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="flex-1 h-1.5 rounded-full bg-foreground/10 overflow-hidden">
+                        <div className={`h-full rounded-full ${isEmpty ? 'bg-red-500' : 'bg-amber-500'}`} style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className={`text-[9px] font-mono font-bold shrink-0 ${isEmpty ? 'text-red-400' : 'text-amber-400'}`}>
+                        {stock}/{min} {s.unit || ''}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {criticalStockItems.length > 9 && (
+            <p className="text-[10px] text-gray-600 text-center mt-3">+{criticalStockItems.length - 9} daha fazla ürün kritik seviyede</p>
+          )}
+        </motion.div>
+      )}
+
+      {/* Activity Timeline */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.88 }}
+        className="p-4 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl bg-card border border-border"
+      >
+        <ActivityTimeline compact maxItems={10} />
+      </motion.div>
+
+    </div>
+  );
+}
