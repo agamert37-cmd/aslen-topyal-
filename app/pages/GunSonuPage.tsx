@@ -84,7 +84,6 @@ export function GunSonuPage() {
         window.dispatchEvent(new Event('storage_update'));
       }
     }).catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const rawFisler = useGlobalTableData<any>('fisler');

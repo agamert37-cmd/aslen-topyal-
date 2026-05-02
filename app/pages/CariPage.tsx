@@ -888,7 +888,6 @@ export function CariPage() {
         });
       }
     }).catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // UI State

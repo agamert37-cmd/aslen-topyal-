@@ -155,7 +155,7 @@ export function SunucuPage() {
   useEffect(() => {
     handleTestConnection();
     loadTableStatus();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auto-refresh
   useEffect(() => {

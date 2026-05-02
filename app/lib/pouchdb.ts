@@ -819,7 +819,6 @@ export async function autoSeedIfEmpty(
         .map(item => {
           // toDb dönüşümü varsa uygula (camelCase → snake_case), yoksa ham veriyi kullan
           const dbRow = toDb ? toDb(item) : (() => {
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const { _id, _rev, _deleted, ...rest } = item;
             return rest;
           })();

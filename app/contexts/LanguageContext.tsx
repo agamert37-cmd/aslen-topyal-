@@ -34,7 +34,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         setLangState(kvLang as Language);
       }
     }).catch(() => {});
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const setLang = useCallback((newLang: Language) => {
     setLangState(newLang);
