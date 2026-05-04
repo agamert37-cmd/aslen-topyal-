@@ -108,8 +108,11 @@ export function startSync(tableName: string, live: boolean = true): PouchDB.Repl
 
   const remoteUrl = config.url.replace(/\/$/, '') + '/' + dbName;
   const localDb = getDb(dbName);
+  
+  // Güçlendirme: Fetch override yerine PouchDB'nin native auth özelliğini kullanmak
+  // bağlantı stabilitesini artırır ve CORS/AbortSignal hatalarını önler.
   const remoteDb = new PouchDB(remoteUrl, {
-    fetch: makeAuthFetch(config.user, config.password),
+    auth: config.user ? { username: config.user, password: config.password } : undefined,
   });
 
   const sync = localDb.sync(remoteDb, {
@@ -117,7 +120,8 @@ export function startSync(tableName: string, live: boolean = true): PouchDB.Repl
     retry: true,
     batch_size: 50, // Mobilde ağ paketlerini daha küçük gruplar halinde gönder/al
     batches_limit: 10,
-    heartbeat: 30000, // 30 saniye boyunca bağlantıyı canlı tut
+    heartbeat: false, // timeout error'larını azaltmak için heartbeat kapatılabilir veya uzatılabilir. false yapmak timeout bazlı kopmaları engeller.
+    timeout: 60000, // 60 saniye stabilite için
   })
     .on('error', (err: any) => {
       console.error(`[PouchDB] Sync hatası — ${dbName}:`, err?.message || err);
@@ -374,12 +378,14 @@ export function startPeerSync(): void {
 
     const localDb = getDb(dbName);
     const peerDb = new PouchDB(`${baseUrl}/${dbName}`, {
-      fetch: makeAuthFetch(config.user, config.password),
+      auth: config.user ? { username: config.user, password: config.password } : undefined,
     });
 
     const sync = localDb.sync(peerDb, {
       live: true,
       retry: true,
+      heartbeat: false, // timeout'dan dolayı kopmaları önle
+      timeout: 60000,
     })
       .on('error', (err: any) => {
         console.error(`[PouchDB] Peer sync hatası — ${dbName}:`, err?.message || err);

@@ -4,7 +4,6 @@ import { Outlet, useNavigate, useLocation, Link } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 import { useEmployee } from '../contexts/EmployeeContext';
 import { NotificationPanel } from './NotificationPanel';
-import { SupabaseStatusBadge } from './SupabaseStatus';
 import { NodeStatusBadge } from './NodeStatusPanel';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import * as Tooltip from '@radix-ui/react-tooltip';
@@ -46,7 +45,13 @@ import {
   FileEdit,
   FileCheck,
   Warehouse,
-  ChevronUp
+  ChevronUp,
+  Minus,
+  Square,
+  X,
+  WifiOff,
+  CloudLightning,
+  RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ProfileEditModal } from './ProfileEditModal';
@@ -62,6 +67,94 @@ import { MobileBottomNav } from './MobileBottomNav';
 import { ScrollToTop } from './MobileHelpers';
 import { useIsMobile } from '../hooks/useMobile';
 import { CURRENT_VERSION } from '../utils/updateNotes';
+import { usePouchSyncStatus } from '../hooks/usePouchSyncStatus';
+
+const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI?.isElectron;
+
+function CustomElectronTitleBar() {
+  if (!isElectron) return null;
+
+  return (
+    <div 
+      className="flex items-center justify-between bg-[#0a0d14] border-b border-white/5 h-8 w-full z-[100] shrink-0" 
+      style={{ WebkitAppRegion: 'drag', WebkitUserSelect: 'none' } as any}
+    >
+      <div className="flex px-3 items-center gap-2">
+        <Zap className="w-3.5 h-3.5 text-blue-400" />
+        <span className="text-[11px] font-bold tracking-widest uppercase text-slate-300">Karargah Hub OS</span>
+      </div>
+      
+      <div className="flex h-full" style={{ WebkitAppRegion: 'no-drag' } as any}>
+        <button 
+          onClick={() => (window as any).electronAPI?.minimize?.()} 
+          className="h-full px-4 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+        >
+          <Minus className="w-3.5 h-3.5" />
+        </button>
+        <button 
+          onClick={() => (window as any).electronAPI?.maximize?.()} 
+          className="h-full px-4 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+        >
+          <Square className="w-3 h-3" />
+        </button>
+        <button 
+          onClick={() => (window as any).electronAPI?.close?.()} 
+          className="h-full px-4 hover:bg-red-500 text-slate-400 hover:text-white transition-colors"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SyncStatusIndicator() {
+  const { isOnline, isSyncing, totalPending, errorCount } = usePouchSyncStatus();
+
+  return (
+    <Tooltip.Root>
+      <Tooltip.Trigger asChild>
+        <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold select-none cursor-default transition-colors ${
+          !isOnline ? 'bg-red-500/10 border-red-500/20 text-red-500' :
+          errorCount > 0 ? 'bg-orange-500/10 border-orange-500/20 text-orange-500' :
+          isSyncing ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' :
+          totalPending > 0 ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' :
+          'bg-emerald-500/10 border-emerald-500/20 text-emerald-500 hidden sm:flex'
+        }`}>
+          {!isOnline ? <WifiOff className="w-3.5 h-3.5" /> : 
+           isSyncing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : 
+           <CloudLightning className="w-3.5 h-3.5" />}
+          
+          <span className="hidden md:inline">
+            {!isOnline ? 'Çevrimdışı Mod' :
+             errorCount > 0 ? 'Senkronizasyon Hatası' :
+             isSyncing ? 'Sunucuya Senkronize Ediliyor...' :
+             totalPending > 0 ? `${totalPending} Bekleyen Veri` :
+             'Bulut Güncel'}
+          </span>
+          {totalPending > 0 && !isSyncing && isOnline && (
+            <span className="ml-1 w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+          )}
+        </div>
+      </Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Content
+          className="z-50 px-3 py-2 text-sm text-white bg-gray-900 rounded shadow-xl border border-gray-800"
+          sideOffset={5}
+        >
+          {!isOnline 
+            ? 'İnternet bağlantınız yok. Yapılan değişiklikler sadece cihaza kaydedilir, bağlantı gelince sunucuyla otomatik eşitlenir.' 
+            : isSyncing 
+              ? 'Verileriniz ana sunucu (bulut) ve Karargah ile senkronize ediliyor.'
+              : totalPending > 0 
+                ? `${totalPending} adet veri sunucuya gitmek için kuyrukta bekliyor.`
+                : 'Tüm verileriniz uzak sunucuyla ve yerel ağla anlık olarak eşit.'}
+          <Tooltip.Arrow className="fill-gray-900" />
+        </Tooltip.Content>
+      </Tooltip.Portal>
+    </Tooltip.Root>
+  );
+}
 
 interface MenuItem {
   path: string;
@@ -132,7 +225,7 @@ const menuGroups: MenuGroup[] = [
       { path: '/arac', labelKey: 'nav.vehicles', icon: Truck, color: 'orange', permKey: 'personel' },
       { path: '/dosyalar', labelKey: 'nav.files', icon: FolderOpen, color: 'teal', permKey: 'ayarlar' },
       { path: '/chat', labelKey: 'nav.aiAssistant', icon: MessageSquare, color: 'violet', permKey: 'dashboard' },
-      { path: '/ops-center', labelKey: 'Operasyon Merkezi', icon: Command, color: 'blue', permKey: 'ayarlar' },
+      { path: '/ops-center', labelKey: 'Karargah', icon: Command, color: 'blue', permKey: 'ayarlar' },
       { path: '/data-audit', labelKey: 'nav.dataAudit', icon: ShieldAlert, color: 'rose', permKey: 'ayarlar' },
       { path: '/yedekler', labelKey: 'nav.backups', icon: Database, color: 'slate', permKey: 'ayarlar' },
       { path: '/guvenlik', labelKey: 'nav.security', icon: ShieldAlert, color: 'red', permKey: 'ayarlar' },
@@ -168,7 +261,7 @@ const breadcrumbKeyMap: Record<string, string> = {
   '/chat': 'breadcrumb.aiAssistant',
   '/guvenlik': 'breadcrumb.security',
   '/settings': 'breadcrumb.settings',
-  '/ops-center': 'Operasyon Merkezi',
+  '/ops-center': 'Karargah',
   '/data-audit': 'breadcrumb.dataAudit',
   '/sunucu': 'breadcrumb.server',
 };
@@ -494,15 +587,17 @@ export function MainLayout() {
 
   return (
     <Tooltip.Provider delayDuration={200}>
-      <div className="h-dvh bg-background flex relative overflow-hidden text-foreground">
-        {/* Subtle Background Ambient Glow */}
-        <div className="fixed inset-0 pointer-events-none z-0">
-          <div className="absolute top-[-15%] left-[15%] w-[40%] h-[45%] bg-blue-600/[0.04] rounded-full blur-[160px]" />
-          <div className="absolute bottom-[-10%] right-[5%] w-[35%] h-[40%] bg-indigo-600/[0.03] rounded-full blur-[160px]" />
-          <div className="absolute top-[50%] left-[60%] w-[25%] h-[30%] bg-cyan-600/[0.02] rounded-full blur-[140px]" />
-        </div>
+      <div className="h-dvh bg-background flex flex-col relative overflow-hidden text-foreground">
+        <CustomElectronTitleBar />
+        <div className="flex-1 flex min-h-0 relative">
+          {/* Subtle Background Ambient Glow */}
+          <div className="fixed inset-0 pointer-events-none z-0">
+            <div className="absolute top-[-15%] left-[15%] w-[40%] h-[45%] bg-blue-600/[0.04] rounded-full blur-[160px]" />
+            <div className="absolute bottom-[-10%] right-[5%] w-[35%] h-[40%] bg-indigo-600/[0.03] rounded-full blur-[160px]" />
+            <div className="absolute top-[50%] left-[60%] w-[25%] h-[30%] bg-cyan-600/[0.02] rounded-full blur-[140px]" />
+          </div>
 
-        {/* Mobile Sidebar Overlay */}
+          {/* Mobile Sidebar Overlay */}
         <AnimatePresence>
           {isMobileSidebarOpen && (
             <motion.div
@@ -1065,9 +1160,6 @@ export function MainLayout() {
               )}
 
               <div className="hidden sm:block flex-shrink-0">
-                <SupabaseStatusBadge />
-              </div>
-              <div className="hidden sm:block flex-shrink-0">
                 <NodeStatusBadge />
               </div>
 
@@ -1135,6 +1227,7 @@ export function MainLayout() {
             </div>
 
             <div className="flex items-center gap-1.5 sm:gap-2">
+              <SyncStatusIndicator />
               {/* Search — icon only on mobile, pill on sm+ */}
               <button
                 onClick={() => setIsCommandPaletteOpen(true)}
@@ -1254,6 +1347,7 @@ export function MainLayout() {
               </motion.div>
             </AnimatePresence>
           </main>
+        </div>
         </div>
 
         <ProfileEditModal 

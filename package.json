@@ -20,8 +20,8 @@
     }
   },
   "scripts": {
-    "dev": "vite --port 3000 --host 0.0.0.0",
-    "dev:local": "vite --port 8080 --host 0.0.0.0",
+    "dev": "tsx server.ts",
+    "start": "node server.js",
     "build": "vite build",
     "lint": "eslint .",
     "electron:dev": "cross-env NODE_ENV=development concurrently \"vite --port 8080 --host 0.0.0.0\" \"wait-on http://localhost:8080 && electron .\"",
@@ -66,8 +66,10 @@
     "embla-carousel-react": "8.6.0",
     "eslint-plugin-react": "^7.37.5",
     "events": "^3.3.0",
+    "express": "^5.2.1",
     "html2canvas": "^1.4.1",
     "html5-qrcode": "^2.3.8",
+    "http-proxy-middleware": "^3.0.5",
     "input-otp": "1.4.2",
     "jspdf": "^4.2.0",
     "jspdf-autotable": "^5.0.7",
@@ -96,6 +98,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "4.1.12",
+    "@types/express": "^5.0.6",
     "@types/node": "^25.5.0",
     "@types/pouchdb": "^6.4.2",
     "@types/react": "^19.2.14",
@@ -113,8 +116,10 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.5.0",
     "tailwindcss": "4.1.12",
+    "tsx": "^4.21.0",
     "typescript": "^6.0.2",
     "vite": "6.3.5",
+    "vite-plugin-pwa": "^1.2.0",
     "wait-on": "^9.0.5"
   },
   "pnpm": {

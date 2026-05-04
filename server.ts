@@ -1,0 +1,160 @@
+import express from "express";
+import { createServer as createViteServer } from "vite";
+import path from "path";
+import { exec } from "child_process";
+import os from "os";
+import { createProxyMiddleware } from "http-proxy-middleware";
+import { GoogleGenAI } from "@google/genai";
+
+// Sunucunun beklenmedik hatalarda çökmesini önlemek için global hata yakalayıcılar
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION: Mühim bir hata oluştu ancak sunucu ayakta tutuluyor.', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('UNHANDLED REJECTION: Beklenmeyen bir promise hatası!', reason);
+});
+
+async function startServer() {
+  const app = express();
+  const PORT = 3000;
+
+  // CouchDB Proxy - CORS hatalarını önlemek için Express üzerinden geçiş
+  const couchDbTarget = process.env.VITE_COUCHDB_URL || "http://127.0.0.1:5984";
+  app.use(
+    "/couchdb",
+    (createProxyMiddleware as any)({
+      target: couchDbTarget,
+      changeOrigin: true,
+      pathRewrite: {
+        "^/couchdb": "", // remove /couchdb path before forwarding to CouchDB
+      },
+      ws: true, // Websockets for Sync (if needed)
+      onError: (err: any, req: any, res: any) => {
+        console.error("CouchDB Proxy Error:", err.message);
+        res.writeHead(502, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "CouchDB'ye erişilemiyor", details: err.message }));
+      },
+    })
+  );
+
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+  // KARARGAH Terminal / Shell Exec Endpoint
+  app.post("/api/exec", (req, res) => {
+    const { command } = req.body;
+    if (!command) {
+      return res.status(400).json({ success: false, error: "Boş komut gönderilemez." });
+    }
+    
+    // Gelişmiş exec ayarları: 1 dakika zaman aşımı, 10MB bellek üst limiti
+    exec(command, { cwd: process.cwd(), timeout: 60000, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
+      res.json({
+        success: !error,
+        stdout: stdout ? stdout.toString() : "",
+        stderr: stderr ? stderr.toString() : "",
+        error: error ? error.message : null,
+      });
+    });
+  });
+
+  // Check version
+  app.get("/api/version", (req, res) => {
+    // get version from package.json or git log
+    exec("git log -1 --pretty=%B", { cwd: process.cwd(), timeout: 10000 }, (error, stdout) => {
+      res.json({
+        success: !error,
+        latestCommit: stdout ? stdout.toString().trim() : "Bilinmiyor",
+      });
+    });
+  });
+
+  // Execute update (pull & docker restart sim or actual)
+  app.post("/api/update", (req, res) => {
+    const { repoUrl } = req.body;
+    // Hatalarda çökmeyi engelleyen, esnek npm ve git parametreleri
+    // GIT_TERMINAL_PROMPT=0 engeller password sorup asılı kalmasını.
+    const cmd = "env GIT_TERMINAL_PROMPT=0 git pull --no-edit || echo 'Git pull failed or skipped' && npm install --no-fund --no-audit --omit=optional && npm run build"; 
+    
+    // Gelişmiş exec: 5 dakika timeout (300000ms), 50MB bellek (derleme için)
+    exec(cmd, { cwd: process.cwd(), timeout: 300000, maxBuffer: 50 * 1024 * 1024 }, (error, stdout, stderr) => {
+       res.json({
+         success: !error,
+         log: stdout ? stdout.toString() : (stderr ? stderr.toString() : ""),
+         error: error ? error.message : null
+       });
+    });
+  });
+
+  // System stats
+  app.get("/api/stats", (req, res) => {
+    res.json({
+      cpu: os.cpus()[0].model,
+      ramTotal: Math.round(os.totalmem() / 1024 / 1024 / 1024 * 100) / 100,
+      ramFree: Math.round(os.freemem() / 1024 / 1024 / 1024 * 100) / 100,
+      uptime: Math.floor(os.uptime()),
+      platform: os.platform()
+    });
+  });
+
+  // AI Chat Endpoint with Gemini
+  app.post("/api/ai/chat", async (req, res) => {
+    try {
+      const { messages, systemPrompt } = req.body;
+      const apiKey = process.env.GEMINI_API_KEY;
+
+      if (!apiKey) {
+        return res.status(500).json({ error: "Gemini API key is not configured on the server." });
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
+
+      const formattedContents = messages.map((m: any) => ({
+        role: m.role === 'user' ? 'user' : 'model',
+        parts: [{ text: m.content }]
+      }));
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: formattedContents,
+        config: {
+          systemInstruction: systemPrompt ? { role: 'system', parts: [{ text: systemPrompt }] } : undefined,
+          temperature: 0.2, // Low temp for more accurate data entry parsing
+        }
+      });
+
+      res.json({ answer: response.text });
+    } catch (error: any) {
+      console.error("Gemini API Error:", error);
+      res.status(500).json({ error: "AI Yanıt oluşturamadı.", details: error.message });
+    }
+  });
+
+  // Vite middleware for development
+  if (process.env.NODE_ENV !== "production") {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), "dist");
+    app.use(express.static(distPath));
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(distPath, "index.html"));
+    });
+  }
+
+  // Express Global Hata Yakalayıcı (Rotasyonlarda olan hataların sunucuyu çökertmemesi için)
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error("Express Error:", err);
+    res.status(500).json({ error: "Sunucu içi bir hata oluştu, ancak sunucu çalışmaya devam ediyor." });
+  });
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+startServer();

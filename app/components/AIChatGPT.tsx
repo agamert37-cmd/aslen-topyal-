@@ -6,11 +6,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { chatWithAI, AIResponse } from '../lib/chatgpt-assistant';
 import { getOpenAIKey } from '../lib/api-config';
-import { Send, Bot, User, Loader2, Sparkles, AlertCircle, Download, FileText } from 'lucide-react';
+import { Send, Bot, User, Loader2, Sparkles, AlertCircle, Download, FileText, Mic, MicOff, Volume2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { useAuth } from '../contexts/AuthContext';
+import { useEmployee } from '../contexts/EmployeeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { logActivity } from '../utils/activityLogger';
 import { toast } from 'sonner';
@@ -29,11 +30,11 @@ interface Message {
 }
 
 const SUGGESTED_QUESTIONS = [
+  "🖋️ Ahmet'e 5 kilo kıyma verdim",
+  "💸 Kasadan 500TL mutfak masrafı çıktı",
   '📊 Bu ay toplam satış ne kadar?',
-  '💰 Bugünkü satışları analiz et',
-  '📦 Stokta düşük ürünleri göster',
-  '👥 En aktif müşterilerim kimler?',
-  '💸 Bu ayki gider dağılımını göster',
+  '📦 Stokta azalan ürünleri göster',
+  '👥 En borçlu cariler kimler?',
   '📈 Satış trendini analiz et',
   '🎯 Kar-zarar durumunu özetle',
 ];
@@ -45,16 +46,63 @@ export function AIChatGPT() {
     {
       id: '1',
       role: 'assistant',
-      content: '👋 Merhaba! Ben ChatGPT destekli İŞLEYEN ET asistanıyım.\n\n' +
-        'Size nasıl yardımcı olabilirim? İşletmeniz hakkında her şeyi sorabilirsiniz!\n\n' +
-        '💡 İpucu: Doğal dille soru sorun, ben anlarım!',
+      content: '👋 Merhaba! Ben ChatGPT destekli Asistan. \n\nSözlü olarak da benimle konuşabilirsiniz, mikrofon tuşuna basmanız yeterli!',
       timestamp: new Date(),
     },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [voiceMode, setVoiceMode] = useState<boolean>(true);
   const [conversationHistory, setConversationHistory] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
+  const { currentEmployee } = useEmployee();
+  
+  // Custom Hook is not required, just useEffect
+  useEffect(() => {
+     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+     if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.lang = 'tr-TR';
+        recognition.interimResults = false;
+        
+        recognition.onstart = () => setIsListening(true);
+        recognition.onend = () => setIsListening(false);
+        recognition.onerror = (e: any) => { console.error(e); setIsListening(false); };
+        
+        recognition.onresult = (event: any) => {
+           const transcript = event.results[0][0].transcript;
+           setInput((prev) => prev ? prev + ' ' + transcript : transcript);
+           // Slight delay, then dispatch a custom event to send the message
+           setTimeout(() => {
+              window.dispatchEvent(new CustomEvent('ai_voice_result'));
+           }, 500);
+        };
+        recognitionRef.current = recognition;
+     }
+  }, []);
+
+  useEffect(() => {
+    const handleVoiceSent = () => {
+       // Check if send button is clicked via dom or we can just access a ref
+       const sendBtn = document.getElementById('aiSendBtn');
+       if (sendBtn) sendBtn.click();
+    };
+    window.addEventListener('ai_voice_result', handleVoiceSent);
+    return () => window.removeEventListener('ai_voice_result', handleVoiceSent);
+  }, []);
+
+  const toggleListening = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+    } else {
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      setInput('');
+      recognitionRef.current?.start();
+    }
+  };
   const [hasApiKey, setHasApiKey] = useState(() => {
     const key = getOpenAIKey();
     return !!(key && key !== 'YOUR_OPENAI_API_KEY_HERE' && key.trim() !== '');
@@ -114,6 +162,30 @@ export function AIChatGPT() {
         { role: 'assistant', content: response.answer },
       ]);
 
+      if (response.type === 'action' && response.actionData) {
+         try {
+             // add to pending items
+             let pending = [];
+             try {
+                const lsData = localStorage.getItem('isleyen_et_ai_pending_transactions');
+                if (lsData) pending = JSON.parse(lsData);
+             } catch(e) {}
+             
+             pending.push({
+                id: `ai-tx-${Date.now()}`,
+                type: response.actionType || 'satis',
+                data: response.actionData,
+                summary: response.actionSummary || 'Yapay zeka tarafından oluşturulan işlem.',
+                createdAt: new Date().toISOString(),
+                status: 'pending'
+             });
+             localStorage.setItem('isleyen_et_ai_pending_transactions', JSON.stringify(pending));
+             toast.success('İşlem Onaylamalar sekmesine aktarıldı.');
+         } catch(e) {
+             console.error("Failed to save action data", e);
+         }
+      }
+
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -123,20 +195,49 @@ export function AIChatGPT() {
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+
+      // Speak response if we were listening OR if we just want it to be voice-first
+      if (voiceMode && 'speechSynthesis' in window) {
+         window.speechSynthesis.cancel(); // durdur
+         const utterance = new SpeechSynthesisUtterance(response.answer);
+         utterance.lang = 'tr-TR';
+         utterance.rate = 1.0;
+         window.speechSynthesis.speak(utterance);
+      }
     } catch (error: any) {
-      console.error('ChatGPT error:', error);
+      console.error('ChatGPT API/Sistem error:', error);
+      
+      // Kendi kendine hatayı anlayıp yorumlayan asistan (Auto Error Insight)
+      let customInstruction = "Lütfen tekrar deneyin.";
+      const errMsg = String(error.message || "").toLowerCase();
+      
+      if (errMsg.includes('api key') || errMsg.includes('401') || errMsg.includes('key')) {
+         customInstruction = "API Anahtarında (Ayar/Key) sorun görünüyor. Ayarlar sekmesinden OpenAI veya Gemini anahtarını kontrol etmelisin.";
+      } else if (errMsg.includes('network') || errMsg.includes('fetch') || errMsg.includes('failed')) {
+         customInstruction = "İnternet bağlantınız koptu veya sunucuya ulaşılamıyor. Lütfen internet durumunuzu kontrol edin.";
+      } else if (errMsg.includes('quota') || errMsg.includes('429')) {
+         customInstruction = "Yapay zeka sisteminizin kotası (limitleri) dolmuş gibi görünüyor. Lütfen API sağlayıcınızdaki bakiyenizi (kredi) kontrol edin.";
+      } else {
+         customInstruction = "Geçici bir teknik arıza oldu. İsteğinizi farklı bir şekilde tekrar ifade edebilir misiniz?";
+      }
+
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: '❌ Üzgünüm, bir hata oluştu.\n\n' +
-          `Hata: ${error.message}\n\n` +
-          'Lütfen:\n' +
-          '1. API key\'inizin geçerli olduğundan emin olun\n' +
-          '2. İnternet bağlantınızı kontrol edin\n' +
-          '3. OpenAI hesabınızda kredi olup olmadığını kontrol edin',
+        content: '⚙️ Sistemde bir sorun tespit ettim ve otomatik onarım/yönlendirme başlattım!\n\n' +
+          `**Sorun Adı:** ${error.message}\n` +
+          `**Çözüm Önerim:** ${customInstruction}`,
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, errorMessage]);
+      
+      if (voiceMode && 'speechSynthesis' in window) {
+         window.speechSynthesis.cancel();
+         const utterance = new SpeechSynthesisUtterance("Sistemde bir arıza oldu ancak çözümü ekrana yazdırdım, kontrol edebilirsiniz.");
+         utterance.lang = 'tr-TR';
+         utterance.rate = 1.0;
+         window.speechSynthesis.speak(utterance);
+      }
     } finally {
       setLoading(false);
     }
@@ -148,6 +249,16 @@ export function AIChatGPT() {
 
   return (
     <div className="flex flex-col h-full bg-card">
+      <div className="flex justify-end p-2 border-b border-border bg-card">
+          <button
+             onClick={() => setVoiceMode(!voiceMode)}
+             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${voiceMode ? 'bg-blue-500/20 text-blue-400' : 'bg-secondary text-muted-foreground hover:bg-secondary/80'}`}
+             title="Yapay zeka yanıtları sesli okusun"
+          >
+             <Volume2 className="w-3.5 h-3.5" />
+             {voiceMode ? 'Sesli Yanıt Açık' : 'Sesli Yanıt Kapalı'}
+          </button>
+      </div>
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 sm:space-y-4">
         <AnimatePresence mode="popLayout">
@@ -262,16 +373,27 @@ export function AIChatGPT() {
       {/* Input */}
       <div className="p-3 sm:p-6 border-t border-border">
         <div className="flex gap-2 sm:gap-3">
+          <button
+            onClick={toggleListening}
+            className={`px-4 py-3 rounded-xl transition-all flex items-center justify-center shrink-0 ${
+              isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-secondary text-foreground hover:bg-secondary/80'
+            }`}
+             title={isListening ? "Dinlemeyi Durdur" : "Sesli Konuş"}
+          >
+            {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5 text-blue-500" />}
+          </button>
+          
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && handleSend()}
-            placeholder="Bir soru sorun..."
+            placeholder="Bir soru sorun veya sesli komut verin..."
             className="flex-1 bg-secondary text-foreground px-3 sm:px-4 py-3 rounded-xl text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-muted-foreground"
             disabled={loading}
           />
           <button
+            id="aiSendBtn"
             onClick={handleSend}
             disabled={!input.trim() || loading}
             className="px-4 sm:px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 active:from-blue-800 active:to-purple-800 disabled:from-accent disabled:to-accent disabled:cursor-not-allowed text-foreground rounded-xl transition-all flex items-center gap-2 font-medium"

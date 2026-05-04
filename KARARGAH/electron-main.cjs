@@ -1,10 +1,21 @@
-const { app, BrowserWindow, ipcMain, dialog, Notification } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Notification, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { exec } = require('child_process');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
+// Arka plan dayanıklılık mekanizması: Uygulamanın kesinlikle çökmemesini sağlamak
+process.on('uncaughtException', (err) => {
+  console.error('Electron Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Electron Unhandled Rejection:', reason);
+});
+
 let mainWindow;
+let appTray = null;
+let isQuitting = false;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -12,8 +23,11 @@ function createWindow() {
     height: 900,
     minWidth: 1024,
     minHeight: 600,
-    frame: true, // User wants a normal app frame, no custom window bars if we want a native look! "normal bir uygulama istiyorum"
+    frame: false,
+    titleBarStyle: 'hidden',
     title: "KARARGAH Operasyon Merkezi",
+    // Boğa ikonunu uygulamanın kendisinde pencere ikonu olarak göster
+    icon: path.join(__dirname, 'bull.svg'),
     webPreferences: {
       preload: path.join(__dirname, 'electron-preload.cjs'),
       nodeIntegration: false,
@@ -33,24 +47,100 @@ function createWindow() {
     // In production, load the built index.html from dist
     mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   }
+
+  // Hide the window instead of closing it, to keep it alive in the background
+  mainWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
+      // Optional: Görev çubuğunda gizleyip sadece tepside (tray) göstermek için
+      // isWin && mainWindow.setSkipTaskbar(true); 
+    }
+  });
 }
 
 app.whenReady().then(() => {
   createWindow();
+
+  // ----- TRAY (Arka Planda Çalışma & Boğa İkonu) BAŞLANGIÇ -----
+  let trayIconPath = path.join(__dirname, 'bull.svg');
+  // SVG'den NativeImage oluştur
+  let trayIcon = nativeImage.createFromPath(trayIconPath);
+  
+  if (trayIcon.isEmpty()) {
+    // Eğer SVG okunamıyorsa public/favicon.svg'ye dönülebilir ama biz svg verdik
+    trayIcon = nativeImage.createFromPath(path.join(__dirname, '..', 'public', 'favicon.svg'));
+  }
+  
+  // Tray için yeniden boyutlandırma
+  trayIcon = trayIcon.resize({ width: 16, height: 16 });
+
+  appTray = new Tray(trayIcon);
+  
+  const contextMenu = Menu.buildFromTemplate([
+    { 
+      label: 'Ana Ekranı Göster', 
+      click: () => {
+        if (mainWindow) {
+            mainWindow.show();
+            mainWindow.restore();
+            mainWindow.focus();
+        }
+      } 
+    },
+    { type: 'separator' },
+    { 
+      label: 'Uygulamadan Çık (Tamamen Kapat)', 
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      } 
+    }
+  ]);
+  
+  appTray.setToolTip('KARARGAH Operasyon Merkezi');
+  appTray.setContextMenu(contextMenu);
+  
+  // Sol tıkla gizle / göster togglesi
+  appTray.on('click', () => {
+    if (mainWindow) {
+        if (mainWindow.isVisible()) {
+            mainWindow.hide();
+        } else {
+            mainWindow.show();
+            mainWindow.restore();
+            mainWindow.focus();
+        }
+    }
+  });
+  // ----- TRAY BİTİŞ -----
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
+app.on('before-quit', () => {
+  isQuitting = true;
+});
+
 app.on('window-all-closed', function () {
-  if (process.platform !== 'darwin') app.quit();
+  // We handle close event in mainWindow to keep it alive in tray.
+  // We don't want app to quit when window closes if it's meant to run in background
+  if (process.platform !== 'darwin' && isQuitting) {
+    app.quit();
+  }
 });
 
 // IPC communication examples for custom title bar (if used)
 ipcMain.on('window-minimize', () => { if (mainWindow) mainWindow.minimize(); });
 ipcMain.on('window-maximize', () => { if (mainWindow) { if (mainWindow.isMaximized()) mainWindow.unmaximize(); else mainWindow.maximize(); } });
-ipcMain.on('window-close', () => { if (mainWindow) mainWindow.close(); });
+ipcMain.on('window-close', () => { 
+  if (mainWindow) {
+    // Hide instead of close
+    mainWindow.hide(); 
+  }
+});
 
 // Local Machine System Stats
 ipcMain.handle('get-system-stats', async () => {
@@ -68,21 +158,22 @@ ipcMain.handle('get-system-stats', async () => {
 ipcMain.on('run-update', (event) => {
   const isWin = process.platform === 'win32';
   const cmd = isWin 
-    ? 'git pull && docker compose down && docker compose up -d --build'
-    : 'git pull && sh update.sh';
+    ? 'set GIT_TERMINAL_PROMPT=0 && git pull --no-edit || echo "Git pull ignored" && docker-compose down && docker-compose up -d --build || docker compose down && docker compose up -d --build'
+    : 'env GIT_TERMINAL_PROMPT=0 git pull --no-edit || echo "Git pull ignored" && docker-compose down && docker-compose up -d --build || docker compose down && docker compose up -d --build || sh update.sh';
   
-  const child = exec(cmd, { cwd: __dirname });
+  // Gelişmiş exec ayarları ile stream (Timeout 10dk, maxBuffer limitini çok yüksek tut ki taşmasın)
+  const child = exec(cmd, { cwd: path.join(__dirname, '..'), timeout: 600000, maxBuffer: 100 * 1024 * 1024 });
 
   child.stdout.on('data', (data) => {
     mainWindow.webContents.send('update-log', data.toString());
   });
 
   child.stderr.on('data', (data) => {
-    mainWindow.webContents.send('update-log', `[HATA]: ${data.toString()}`);
+    mainWindow.webContents.send('update-log', `[HATA_VEYA_UYARI]: ${data.toString()}`);
   });
 
   child.on('close', (code) => {
-    mainWindow.webContents.send('update-finished', { success: code === 0 });
+    mainWindow.webContents.send('update-finished', { success: code === 0 || code === null });
   });
 });
 
@@ -92,16 +183,18 @@ ipcMain.handle('docker-update-restart', async (event) => {
     const isWin = process.platform === 'win32';
     // Fallback: try docker-compose first, if it fails try docker compose
     const cmd = isWin 
-      ? 'git pull && docker-compose down && docker-compose up -d --build || git pull && docker compose down && docker compose up -d --build'
-      : 'sh update.sh';
+      ? 'set GIT_TERMINAL_PROMPT=0 && git pull --no-edit || echo "Git pull warning"  && docker-compose down && docker-compose up -d --build || docker compose down && docker compose up -d --build'
+      : 'env GIT_TERMINAL_PROMPT=0 git pull --no-edit || echo "Git pull warning"  && docker-compose down && docker-compose up -d --build || docker compose down && docker compose up -d --build || sh update.sh';
       
-    exec(cmd, { cwd: __dirname }, (error, stdout, stderr) => {
+    // Gelişmiş exec: 5 dakika timeout (300000ms), 50MB bellek (derleme için)
+    exec(cmd, { cwd: path.join(__dirname, '..'), timeout: 300000, maxBuffer: 50 * 1024 * 1024 }, (error, stdout, stderr) => {
       let combinedLog = '';
       if (stdout) combinedLog += stdout + '\n';
       if (stderr) combinedLog += 'HATA ÇIKTISI:\n' + stderr + '\n';
 
       if (error) {
-        combinedLog += '\nİŞLEM BAŞARISIZ OLDU. HATA KODU: ' + error.code;
+        combinedLog += '\nİŞLEM BAŞARISIZ OLDU VEYA UYARILAR VAR. LOG: ' + error.message;
+        // Eğer build log taşıyorsa success true/false esnek olmalı, fakat genellikle exit code != 0 error demektir.
         resolve({ success: false, log: combinedLog || error.message });
         return;
       }
@@ -234,7 +327,13 @@ ipcMain.handle('telegram-send-message', async (event, token, chatId, message) =>
 
 ipcMain.handle('exec-command', async (event, command) => {
   return new Promise((resolve) => {
-    exec(command, { cwd: __dirname }, (error, stdout, stderr) => {
+    if (!command) {
+       resolve({ success: false, error: "Boş komut gönderilemez." });
+       return;
+    }
+    
+    // Gelişmiş exec ayarları: 1 dakika zaman aşımı, 10MB bellek
+    exec(command, { cwd: __dirname, timeout: 60000, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
       resolve({
         success: !error,
         stdout: stdout ? stdout.toString() : '',

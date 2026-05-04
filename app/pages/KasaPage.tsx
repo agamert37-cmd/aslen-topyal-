@@ -257,7 +257,7 @@ export function KasaPage() {
   }, [transactions, searchTerm, filterType]);
 
   return (
-    <div className="p-3 sm:p-6 lg:p-10 space-y-4 sm:space-y-6 lg:space-y-8 bg-background min-h-screen text-foreground font-sans pb-4 sm:pb-6">
+    <div className="p-4 sm:p-6 lg:p-10 space-y-4 sm:space-y-6 lg:space-y-8 bg-background min-h-screen text-foreground font-sans pb-4 sm:pb-6">
       <SyncStatusBar tableName="kasa_islemleri" />
 
       {/* ─── Gün Sonu Kapalı Uyarısı ─── */}
@@ -457,7 +457,7 @@ export function KasaPage() {
           </button>
         </div>
 
-        <div className="p-3 sm:p-6">
+        <div className="p-4 sm:p-6">
           {activeTab === 'transactions' && (
             <div className="space-y-4 sm:space-y-6">
               {/* Search & Filter */}
@@ -507,32 +507,36 @@ export function KasaPage() {
                       variants={rowItem}
                       whileHover={{ x: 3, borderColor: 'rgba(255,255,255,0.12)', transition: { duration: 0.15 } }}
                       whileTap={tap.card}
-                      className="group flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-white/5 border border-border rounded-2xl transition-colors"
+                      className={`group flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 sm:p-5 bg-white/[0.03] border border-border shadow-sm rounded-2xl transition-colors ${
+                        transaction.type === 'Gelir'
+                          ? 'hover:bg-gradient-to-r hover:from-green-500/5 hover:to-transparent'
+                          : 'hover:bg-gradient-to-r hover:from-red-500/5 hover:to-transparent'
+                      }`}
                     >
                       <div className="flex items-center gap-4 w-full sm:w-auto mb-3 sm:mb-0">
-                        <div className={`p-3 rounded-xl flex-shrink-0 ${transaction.type === 'Gelir' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                          {transaction.type === 'Gelir' ? <TrendingUp className="w-6 h-6" /> : <TrendingDown className="w-6 h-6" />}
+                        <div className={`p-3 rounded-xl flex-shrink-0 ${transaction.type === 'Gelir' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                          {transaction.type === 'Gelir' ? <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6" /> : <TrendingDown className="w-5 h-5 sm:w-6 sm:h-6" />}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 mb-1 flex-wrap">
-                            <span className={`flex-shrink-0 px-2 py-0.5 text-[10px] font-bold rounded-md border ${transaction.type === 'Gelir' ? 'border-green-500/30 text-green-400 bg-green-500/10' : 'border-red-500/30 text-red-400 bg-red-500/10'}`}>
+                          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                            <span className={`flex-shrink-0 px-2 py-0.5 text-[10px] sm:text-xs font-bold rounded-md border ${transaction.type === 'Gelir' ? 'border-green-500/30 text-green-400 bg-green-500/10' : 'border-red-500/30 text-red-400 bg-red-500/10'}`}>
                               {transaction.category}
                             </span>
-                            <span className="text-xs text-muted-foreground font-medium truncate">{transaction.date} &bull; {transaction.time}</span>
+                            <span className="text-[11px] sm:text-xs text-muted-foreground font-medium truncate">{transaction.date} &bull; {transaction.time}</span>
                           </div>
-                          <p className="text-foreground font-medium line-clamp-1">{transaction.description || 'Açıklama girilmedi'}</p>
+                          <p className="text-foreground font-bold text-sm sm:text-base leading-tight line-clamp-1">{transaction.description || 'Açıklama girilmedi'}</p>
                         </div>
                       </div>
                       
-                      <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-4 sm:gap-6 pl-[60px] sm:pl-0">
-                        <p className={`text-lg sm:text-xl font-extrabold ${transaction.type === 'Gelir' ? 'text-green-400' : 'text-red-400'}`}>
+                      <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-4 sm:gap-6 pl-[52px] sm:pl-0 mt-1 sm:mt-0">
+                        <p className={`text-lg sm:text-xl font-black tracking-tight ${transaction.type === 'Gelir' ? 'text-green-400' : 'text-red-400'}`}>
                           {transaction.type === 'Gelir' ? '+' : '-'}₺{transaction.amount.toLocaleString('tr-TR')}
                         </p>
                         <button
                           onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(transaction.id); }}
-                          className="p-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-colors opacity-100 sm:opacity-0 group-hover:opacity-100"
+                          className="p-2 sm:p-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-colors sm:opacity-0 group-hover:opacity-100 shadow-sm"
                         >
-                          <Trash2 className="w-5 h-5" />
+                          <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
                         </button>
                       </div>
                     </motion.div>
@@ -600,7 +604,9 @@ export function KasaPage() {
       <Dialog.Root open={isModalOpen} onOpenChange={setIsModalOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50" />
-          <Dialog.Content aria-describedby={undefined} className="fixed inset-2 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 bg-card border border-border rounded-2xl sm:rounded-3xl p-4 sm:p-8 sm:w-[95vw] sm:max-w-lg z-50 shadow-2xl overflow-y-auto overscroll-contain" style={{maxHeight: 'calc(100dvh - 1rem)'}}>
+          <Dialog.Content aria-describedby={undefined} className="fixed inset-x-0 bottom-0 sm:inset-auto  sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 bg-card border border-border rounded-t-[2rem] sm:rounded-3xl p-4 sm:p-8 sm:w-[95vw] sm:max-w-lg z-50 shadow-[0_-5px_40px_rgba(0,0,0,0.3)] sm:shadow-2xl overflow-y-auto overscroll-contain pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6" style={{maxHeight: 'calc(100dvh - 1rem)'}}>
+          {/* Grabber for Mobile */}
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-secondary rounded-full sm:hidden" />
             <div className="flex justify-between items-center mb-6">
               <Dialog.Title className={`text-2xl font-bold flex items-center gap-3 ${modalType === 'Gelir' ? 'text-green-400' : 'text-red-400'}`}>
                 {modalType === 'Gelir' ? <TrendingUp className="w-6 h-6" /> : <TrendingDown className="w-6 h-6" />}
@@ -700,7 +706,9 @@ export function KasaPage() {
       <Dialog.Root open={isPosModalOpen} onOpenChange={setIsPosModalOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50" />
-          <Dialog.Content aria-describedby={undefined} className="fixed inset-2 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 bg-card border border-border rounded-2xl sm:rounded-3xl p-4 sm:p-8 sm:w-[95vw] sm:max-w-lg z-50 shadow-2xl overflow-y-auto overscroll-contain" style={{maxHeight: 'calc(100dvh - 1rem)'}}>
+          <Dialog.Content aria-describedby={undefined} className="fixed inset-x-0 bottom-0 sm:inset-auto  sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 bg-card border border-border rounded-t-[2rem] sm:rounded-3xl p-4 sm:p-8 sm:w-[95vw] sm:max-w-lg z-50 shadow-[0_-5px_40px_rgba(0,0,0,0.3)] sm:shadow-2xl overflow-y-auto overscroll-contain pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6" style={{maxHeight: 'calc(100dvh - 1rem)'}}>
+          {/* Grabber for Mobile */}
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-secondary rounded-full sm:hidden" />
             <div className="flex justify-between items-center mb-6">
               <Dialog.Title className="text-2xl font-bold text-purple-400 flex items-center gap-3">
                 <CreditCard className="w-6 h-6" /> POS Cihazı Ekle

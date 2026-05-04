@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Settings, Building2, Phone, MapPin, FileText, Hash, Monitor, Upload, Loader2, RefreshCw, Trash2, Plus, Save, Palette } from 'lucide-react';
+import { getOpenAIKey, saveOpenAIKey, getSystemRepairKey, saveSystemRepairKey } from '../lib/api-config';
+import { Settings, Building2, Phone, MapPin, FileText, Hash, Monitor, Upload, Loader2, RefreshCw, Trash2, Plus, Save, Palette, Bell, KeySquare } from 'lucide-react';
+
 import { getFromStorage, setInStorage, StorageKey } from '../utils/storage';
 import { toast } from 'sonner';
 import { motion } from 'motion/react';
 import { staggerContainer, gridCard } from '../utils/animations';
-import { SERVER_BASE_URL as serverBase, publicAnonKey } from '../lib/supabase-config';
 import { useAuth } from '../contexts/AuthContext';
 import { useEmployee } from '../contexts/EmployeeContext';
 import { logActivity } from '../utils/activityLogger';
@@ -36,6 +37,22 @@ export function getCompanyInfo(): CompanyInfo {
   return DEFAULT_COMPANY_INFO;
 }
 
+export interface NotificationSettings {
+  enabled: boolean;
+  frequency: 'instant' | 'hourly' | 'daily';
+}
+
+export const DEFAULT_NOTIFICATIONS: NotificationSettings = {
+  enabled: true,
+  frequency: 'instant',
+};
+
+export function getNotificationSettings(): NotificationSettings {
+  const settings = getFromStorage<any>(StorageKey.SYSTEM_SETTINGS);
+  if (settings?.notifications) return { ...DEFAULT_NOTIFICATIONS, ...settings.notifications };
+  return DEFAULT_NOTIFICATIONS;
+}
+
 export function SettingsPage() {
   const { user } = useAuth();
   const { currentEmployee } = useEmployee();
@@ -43,6 +60,9 @@ export function SettingsPage() {
   const { theme, setTheme } = useTheme();
 
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo>(() => getCompanyInfo());
+  const [notifications, setNotifications] = useState<NotificationSettings>(() => getNotificationSettings());
+  const [openAiKey, setOpenAiKey] = useState(() => getOpenAIKey());
+  const [systemAIKey, setSystemAIKey] = useState(() => getSystemRepairKey());
 
   const handleSaveCompanyInfo = () => {
     if (!canEdit) { 
@@ -51,20 +71,23 @@ export function SettingsPage() {
       return; 
     }
     const existingSettings = getFromStorage<any>(StorageKey.SYSTEM_SETTINGS) || {};
-    const updatedSettings = { ...existingSettings, companyInfo };
+    const updatedSettings = { ...existingSettings, companyInfo, notifications };
     setInStorage(StorageKey.SYSTEM_SETTINGS, updatedSettings);
     kvSet('system_settings', updatedSettings).catch(() => toast.warning('Çapraz cihaz senkronizasyonu başarısız.'));
-    logActivity('settings_change', 'Şirket bilgileri güncellendi', { employeeName: user?.name, page: 'Ayarlar' });
-    toast.success('Şirket bilgileri kaydedildi!');
+    saveOpenAIKey(openAiKey);
+    saveSystemRepairKey(systemAIKey);
+    logActivity('settings_change', 'Şirket / Sistem ayarları güncellendi', { employeeName: user?.name, page: 'Ayarlar' });
+    toast.success('Ayarlar başarıyla kaydedildi!');
   };
 
   useEffect(() => {
     const localSettings = getFromStorage<any>(StorageKey.SYSTEM_SETTINGS);
-    if (!localSettings?.companyInfo) {
+    if (!localSettings?.companyInfo || !localSettings?.notifications) {
       kvGet<any>('system_settings').then(remote => {
         if (remote) {
           setInStorage(StorageKey.SYSTEM_SETTINGS, remote);
           if (remote.companyInfo) setCompanyInfo({ ...remote.companyInfo });
+          if (remote.notifications) setNotifications({ ...remote.notifications });
         }
       }).catch(() => {});
     }
@@ -101,6 +124,50 @@ export function SettingsPage() {
             <div><label className={labelCls}>Vergi Dairesi</label><div className="relative"><FileText className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"/><input type="text" value={companyInfo.taxOffice} onChange={e => setCompanyInfo(p => ({...p, taxOffice: e.target.value}))} className={`${inputClass} pl-11`} /></div></div>
           </div>
           <button onClick={handleSaveCompanyInfo} className="mt-6 w-full py-4 bg-blue-600 hover:bg-blue-500 text-foreground rounded-xl font-bold transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2"><Save className="w-5 h-5"/> Kaydet</button>
+        </motion.div>
+
+        {/* GÖRÜNÜM / TEMA AYARLARI */}
+        <motion.div variants={gridCard} className="p-4 sm:p-8 rounded-2xl sm:rounded-3xl bg-card border border-border lg:col-span-2 shadow-lg mt-6">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20"><KeySquare className="w-6 h-6 text-indigo-400"/></div>
+            <div>
+              <h2 className="text-xl font-bold">Yapay Zeka API Anahtarları (Tokens)</h2>
+              <p className="text-xs text-muted-foreground">İki farklı asistan için ayrı ayrı şifreli (cihaza özgü) anahtarlar girebilirsiniz.</p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 place-items-start">
+            <div className="flex flex-col gap-2 w-full">
+              <label className={labelCls}>Asistan AI Anahtarı (ERP/Müşteri Asistanı)</label>
+              <input 
+                type="password" 
+                placeholder="sk-..." 
+                value={openAiKey} 
+                onChange={e => setOpenAiKey(e.target.value)} 
+                className={inputClass} 
+              />
+              <p className="text-xs text-muted-foreground ml-1">Bu token, güncel işlem ve fiş okuma için kullanılır.</p>
+            </div>
+            
+            <div className="flex flex-col gap-2 w-full">
+              <label className={labelCls}>Sistem Analiz & Onarım AI Anahtarı</label>
+              <input 
+                type="password" 
+                placeholder="sk-... / AIzaSy..." 
+                value={systemAIKey} 
+                onChange={e => setSystemAIKey(e.target.value)} 
+                className={inputClass} 
+              />
+              <p className="text-xs text-muted-foreground ml-1">Bu token, sistemi onarmak ve hatalara müdahale edebilmek için "Geliştirici" kipinde kullanılır.</p>
+              
+              <button 
+                onClick={() => window.location.href = '#/sistem-onarim'}
+                className="mt-2 text-xs font-bold uppercase tracking-wider text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 px-3 py-2 rounded-lg transition-colors border border-indigo-500/20 text-center w-full"
+              >
+                Geliştirici Terminalini Aç
+              </button>
+            </div>
+          </div>
         </motion.div>
 
         {/* GÖRÜNÜM / TEMA AYARLARI */}
@@ -144,6 +211,74 @@ export function SettingsPage() {
             </button>
           </div>
         </motion.div>
+        {/* SİSTEM BİLDİRİMLERİ (WINDOWS/DESKTOP) */}
+        <motion.div variants={gridCard} className="p-4 sm:p-8 rounded-2xl sm:rounded-3xl bg-card border border-border lg:col-span-2 shadow-lg mt-6">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="w-12 h-12 rounded-2xl bg-orange-500/10 flex items-center justify-center border border-orange-500/20"><Bell className="w-6 h-6 text-orange-400"/></div>
+            <div>
+              <h2 className="text-xl font-bold">Sistem (Masaüstü) Bildirimleri</h2>
+              <p className="text-xs text-muted-foreground">Windows uyumlu native arka plan bildirimleri ayarları</p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 place-items-start">
+            <div className="flex flex-col gap-2 w-full">
+              <label className={labelCls}>Bildirim Durumu</label>
+              <button
+                onClick={() => setNotifications(prev => ({ ...prev, enabled: !prev.enabled }))}
+                className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
+                  notifications.enabled 
+                    ? 'border-orange-500 bg-orange-500/10 ring-1 ring-orange-500/50' 
+                    : 'border-border bg-background hover:border-orange-500/50'
+                }`}
+              >
+                <span className="font-bold">{notifications.enabled ? 'Bildirimler Açık' : 'Bildirimler Kapalı'}</span>
+                <div className={`w-10 h-5 rounded-full relative transition-colors ${notifications.enabled ? 'bg-orange-500' : 'bg-muted'}`}>
+                  <div className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white transition-transform ${notifications.enabled ? 'translate-x-5' : 'translate-x-1'}`} />
+                </div>
+              </button>
+            </div>
+            
+            <div className="flex flex-col gap-2 w-full">
+              <label className={labelCls}>Bildirim Sıklığı</label>
+              <select 
+                value={notifications.frequency} 
+                onChange={e => setNotifications(prev => ({ ...prev, frequency: e.target.value as any }))}
+                className={`${inputClass} appearance-none cursor-pointer mb-2`}
+                disabled={!notifications.enabled}
+                style={{ opacity: notifications.enabled ? 1 : 0.5 }}
+              >
+                <option value="instant">Anında (Olay anında)</option>
+                <option value="hourly">Saatlik Özet (Sadece aciller anında)</option>
+                <option value="daily">Günlük Özet</option>
+              </select>
+              <button 
+                onClick={() => {
+                  if (window.electronAPI && window.electronAPI.showNotification) {
+                    window.electronAPI.showNotification('Sistem Bildirimi TEST', 'KARARGAH bildirimleri başlatıldı.');
+                  } else if ('Notification' in window) {
+                    Notification.requestPermission().then(perm => {
+                       if(perm === 'granted') new Notification('Sistem Bildirimi TEST', { body: 'Web bildirimleri aktif.' });
+                    });
+                  } else {
+                    toast.info('Tarayıcınız bildirimleri desteklemiyor.');
+                  }
+                }}
+                className="bg-orange-500/10 text-orange-400 border border-orange-500/20 py-2 rounded-xl text-xs font-bold hover:bg-orange-500/20 transition-colors w-full uppercase"
+              >
+                Bildirim Sistemini Test Et
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 flex gap-3 text-xs text-muted-foreground bg-muted/30 p-3 rounded-lg border border-border">
+            <Monitor className="w-4 h-4 flex-shrink-0" />
+            <p>
+              Masaüstü uygulaması olarak çalıştırıldığında (Windows bildirimleri), uygulama arka planda olsa bile kritik güncellemeleri size işletim sisteminiz üzerinden haber verir. 
+            </p>
+          </div>
+        </motion.div>
+
       </motion.div>
 
     </div>

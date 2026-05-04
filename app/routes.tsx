@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, Outlet } from "react-router";
+import { createBrowserRouter, createHashRouter, Navigate, Outlet } from "react-router";
 import { Suspense, lazy } from "react";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { MainLayout } from "./components/MainLayout";
@@ -8,6 +8,8 @@ import { EmployeeProvider } from "./contexts/EmployeeContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { SyncProvider } from "./contexts/SyncContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
+
+import { PublicSitePage } from "./pages/PublicSitePage";
 
 // NOT: AuthProvider artık App.tsx'te (AppLockScreen erişimi için) tanımlanıyor.
 // RootProviders içindeki AuthProvider kaldırıldı — App.tsx'teki Provider tüm ağacı kapsar.
@@ -39,6 +41,7 @@ const FisHistoryPage   = lazy(() => import("./pages/FisHistoryPage").then(m => (
 const SettingsPage     = lazy(() => import("./pages/SettingsPage").then(m => ({ default: m.SettingsPage })));
 const YedeklerPage     = lazy(() => import("./pages/YedeklerPage").then(m => ({ default: m.YedeklerPage })));
 const SecurityPage     = lazy(() => import("./pages/SecurityPage").then(m => ({ default: m.SecurityPage })));
+
 const FaturaPage       = lazy(() => import("./pages/FaturaPage").then(m => ({ default: m.FaturaPage })));
 const OpsCenterPage  = lazy(() => import("./pages/ops/OpsCenterPage").then(m => ({ default: m.OpsCenterPage })));
 const DataAuditPage  = lazy(() => import("./pages/DataAuditPage").then(m => ({ default: m.DataAuditPage })));
@@ -101,7 +104,12 @@ function RootProviders() {
 
 const P = (el: React.ReactElement) => <ProtectedRoute element={el} />;
 
-export const router = createBrowserRouter([
+const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI?.isElectron;
+const AppRouter = isElectron ? createHashRouter : createBrowserRouter;
+// Eğer Electron içindeysek (Masaüstü uygulaması/Karargah) varsayılan olarak Ops Center'a git.
+const defaultRoute = isElectron ? "/ops-center" : "/dashboard";
+
+export const router = AppRouter([
   {
     element: <RootProviders />,
     errorElement: <RootErrorBoundary />,
@@ -111,10 +119,14 @@ export const router = createBrowserRouter([
         element: <LoginPage />,
       },
       {
+        path: "/site",
+        element: <PublicSitePage />,
+      },
+      {
         path: "/",
         Component: MainLayout,
         children: [
-          { index: true, element: P(<Navigate to="/dashboard" replace />) },
+          { index: true, element: P(<Navigate to={defaultRoute} replace />) },
           { path: "dashboard",         element: P(<DashboardPage />) },
           { path: "sales",             element: P(<Lazy><SalesPage /></Lazy>) },
           { path: "tahsilat",          element: P(<Lazy><TahsilatPage /></Lazy>) },
@@ -140,13 +152,16 @@ export const router = createBrowserRouter([
           { path: "guvenlik",          element: P(<Lazy><SecurityPage /></Lazy>) },
           { path: "faturalar",         element: P(<Lazy><FaturaPage /></Lazy>) },
           { path: "guncelleme-notlari",element: P(<Lazy><UpdateNotesPage /></Lazy>) },
-          { path: "ops-center",        element: P(<Lazy><OpsCenterPage /></Lazy>) },
           { path: "data-audit",        element: P(<Lazy><DataAuditPage /></Lazy>) },
         ],
       },
       {
+        path: "/ops-center",
+        element: P(<Lazy><OpsCenterPage /></Lazy>),
+      },
+      {
         path: "*",
-        element: <Navigate to="/dashboard" replace />,
+        element: <Navigate to={defaultRoute} replace />,
       },
     ],
   },

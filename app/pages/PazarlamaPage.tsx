@@ -194,7 +194,7 @@ const DEFAULT_CONTENT: PazarlamaContent = {
   },
 };
 
-type TabKey = 'dashboard' | 'haberler' | 'urunler' | 'firma' | 'giris' | 'ayarlar' | 'analytics';
+type TabKey = 'dashboard' | 'haberler' | 'urunler' | 'firma' | 'giris' | 'ayarlar' | 'analytics' | 'talepler' | 'fiyatListesi';
 
 // ─── Content Templates ──────────────────────────────────────────
 const ANNOUNCEMENT_TEMPLATES = [
@@ -344,6 +344,202 @@ function VitrinAnalyticsTab() {
             })}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Iletisim Talepleri Tab ──────────────────────────────────────
+function IletisimTalepleriTab() {
+  const [talepler, setTalepler] = useState<any[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    import('../lib/pouchdb').then(({ getDb }) => {
+      const db = getDb('iletisim_talepleri');
+      db.allDocs({ include_docs: true }).then(res => {
+        setTalepler(res.rows.map(r => r.doc));
+      }).catch(e => console.error(e));
+    });
+  }, [refreshKey]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-foreground">İletişim Talepleri</h2>
+          <p className="text-xs text-muted-foreground">Genel siteden gelen "Beni Arayın" ve "İletişim" talepleri</p>
+        </div>
+        <button onClick={() => setRefreshKey(k => k + 1)} className="px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs transition-all shadow-lg shadow-orange-600/30">
+          Yenile
+        </button>
+      </div>
+
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
+        {talepler.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground">Henüz iletişim talebi bulunmuyor.</div>
+        ) : (
+          <table className="w-full text-left text-sm">
+            <thead className="bg-muted/50 text-muted-foreground text-xs uppercase">
+              <tr>
+                <th className="px-4 py-3">Tarih</th>
+                <th className="px-4 py-3">İsim / Firma</th>
+                <th className="px-4 py-3">Telefon</th>
+                <th className="px-4 py-3">Durum</th>
+                <th className="px-4 py-3">İşlem</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {talepler.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((t, i) => (
+                <tr key={i} className="hover:bg-white/5 transition-colors">
+                  <td className="px-4 py-3 whitespace-nowrap text-xs">{new Date(t.createdAt).toLocaleString('tr-TR')}</td>
+                  <td className="px-4 py-3 font-semibold">{t.name}</td>
+                  <td className="px-4 py-3 font-mono text-blue-400">{t.phone}</td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${t.status === 'tamamlandi' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-orange-500/20 text-orange-400'}`}>
+                      {t.status === 'tamamlandi' ? 'Okundu/Arama Yapıldı' : 'Bekliyor'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {t.status !== 'tamamlandi' ? (
+                      <button 
+                        onClick={() => {
+                          import('../lib/pouchdb').then(({ getDb }) => {
+                            const db = getDb('iletisim_talepleri');
+                            db.put({ ...t, status: 'tamamlandi' }).then(() => setRefreshKey(k => k + 1));
+                          });
+                        }}
+                        className="text-[10px] bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded"
+                      >
+                        Tamamlandı İşaretle
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => {
+                          if (!confirm('Talebi silmek istediğinize emin misiniz?')) return;
+                          import('../lib/pouchdb').then(({ getDb }) => {
+                            const db = getDb('iletisim_talepleri');
+                            db.remove(t._id, t._rev).then(() => setRefreshKey(k => k + 1));
+                          });
+                        }}
+                        className="text-[10px] text-red-400 hover:text-red-300 transition-colors"
+                      >
+                        Sil
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Fiyat Listesi Tab ─────────────────────────────────────────
+function FiyatListesiTab() {
+  const [cariler, setCariler] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  
+  const [selectedCari, setSelectedCari] = useState<string>('');
+  const [customTitle, setCustomTitle] = useState('');
+  const [markupPercent, setMarkupPercent] = useState<number>(0);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  useEffect(() => {
+    setCariler(getFromStorage<any[]>(StorageKey.CARI_DATA) || []);
+    setProducts(getFromStorage<any[]>(StorageKey.STOK_DATA) || []);
+  }, []);
+
+  const handleGenerate = async () => {
+    if (!selectedCari) {
+      toast.error('Lütfen bir cari (müşteri) seçin.');
+      return;
+    }
+    const cariName = cariler.find(c => c.id === selectedCari)?.companyName || 'Müşteri';
+    
+    if (products.length === 0) {
+      toast.error('Sistemde hiç ürün bulunmuyor.');
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const { generateFiyatListesiPDF } = await import('../utils/fiyatListesiPdf');
+      const plist = products.map(p => ({
+        name: p.name,
+        _basePrice: p.sellPrice || p.avgCost || 0
+      }));
+      await generateFiyatListesiPDF(cariName, plist, markupPercent, customTitle);
+      toast.success('Fiyat listesi PDF oluşturuldu.');
+    } catch (err: any) {
+      console.error(err);
+      toast.error('PDF oluşturulurken hata: ' + err.message);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-bold text-foreground">Özel Fiyat Listesi Oluştur</h2>
+        <p className="text-xs text-muted-foreground">Müşteriye özel, ortalama/güncel fiyatların üzerine kâr marjı eklenmiş bir pdf liste hazırlayın.</p>
+      </div>
+
+      <div className="bg-card border border-border p-5 rounded-2xl max-w-2xl space-y-5">
+        <div>
+          <label className="block text-sm font-medium text-foreground/80 mb-2">Müşteri Seçin</label>
+          <select 
+            value={selectedCari} 
+            onChange={(e) => setSelectedCari(e.target.value)}
+            className="w-full px-3 py-2 border border-border rounded-xl bg-background text-sm"
+          >
+            <option value="">Seçiniz...</option>
+            {cariler.filter(c => c.type !== 'toptanci').map(c => (
+              <option key={c.id} value={c.id}>{c.companyName}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-foreground/80 mb-2">Özel Liste Başlığı (Opsiyonel)</label>
+          <input 
+            type="text" 
+            value={customTitle} 
+            onChange={(e) => setCustomTitle(e.target.value)}
+            placeholder="Örn: Kasap Ahmet Özel Fiyat Listesi"
+            className="w-full px-3 py-2 border border-border rounded-xl bg-background text-sm" 
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-foreground/80 mb-2">Fiyat Eklentisi (Kâr Marjı %)</label>
+          <div className="flex gap-2 items-center">
+            <input 
+              type="number" 
+              value={markupPercent} 
+              onChange={(e) => setMarkupPercent(Number(e.target.value))}
+              placeholder="0"
+              className="w-32 px-3 py-2 border border-border rounded-xl bg-background text-sm" 
+            />
+            <span className="text-sm text-muted-foreground">%</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-1">Sistemdeki ürün fiyatının üzerine eklenecek % artış.</p>
+        </div>
+
+        <div className="pt-4 border-t border-border">
+          <button 
+            onClick={handleGenerate}
+            disabled={isGenerating}
+            className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            <FileImage className="w-5 h-5" />
+            {isGenerating ? 'Oluşturuluyor...' : 'PDF İndir'}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1000,6 +1196,8 @@ export function PazarlamaPage() {
     { key: 'urunler', label: 'Ürünler', icon: ShoppingBag, badge: content.products.length, color: 'purple' },
     { key: 'firma', label: 'Firma', icon: Building2, color: 'emerald' },
     { key: 'analytics', label: 'Vitrin Analitiği', icon: BarChart3, color: 'cyan' },
+    { key: 'talepler', label: 'İletişim Talepleri', icon: Megaphone, color: 'orange' },
+    { key: 'fiyatListesi', label: 'Özel Fiyat Listesi', icon: FileImage, color: 'emerald' },
   ];
 
   return (
@@ -1599,6 +1797,16 @@ export function PazarlamaPage() {
               {/* ─── VİTRİN ANALİTİĞİ ───────────────────────────────── */}
               {activeTab === 'analytics' && (
                 <VitrinAnalyticsTab />
+              )}
+
+              {/* ─── TALEPLER ───────────────────────────────────────── */}
+              {activeTab === 'talepler' && (
+                <IletisimTalepleriTab />
+              )}
+
+              {/* ─── ÖZEL FİYAT LİSTESİ ───────────────────────────────────────── */}
+              {activeTab === 'fiyatListesi' && (
+                <FiyatListesiTab />
               )}
 
             </motion.div>

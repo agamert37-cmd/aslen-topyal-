@@ -214,7 +214,8 @@ export function CeklerPage() {
   });
 
   const cekler = useMemo(() => {
-    const data = syncedCekler && syncedCekler.length > 0 ? syncedCekler : getFromStorage<CekData[]>(StorageKey.CEKLER_DATA) || [];
+    const fromStorage = getFromStorage<CekData[]>(StorageKey.CEKLER_DATA);
+    const data = Array.isArray(syncedCekler) && syncedCekler.length > 0 ? syncedCekler : (Array.isArray(fromStorage) ? fromStorage : []);
     return data.map(c => ({ ...c, direction: c.direction || 'alinan' }));
   }, [syncedCekler]);
 
@@ -262,13 +263,13 @@ export function CeklerPage() {
   const [newCekPhotoBack, setNewCekPhotoBack] = useState<string | null>(null);
 
   // Yöne göre ayır
-  const alinanCekler = useMemo(() => cekler.filter(c => c.direction === 'alinan'), [cekler]);
-  const verilenCekler = useMemo(() => cekler.filter(c => c.direction === 'verilen'), [cekler]);
+  const alinanCekler = useMemo(() => (cekler || []).filter(c => c.direction === 'alinan'), [cekler]);
+  const verilenCekler = useMemo(() => (cekler || []).filter(c => c.direction === 'verilen'), [cekler]);
   const activeCekler = activeTab === 'alinan' ? alinanCekler : verilenCekler;
 
   // Filtrele ve sırala
   const filteredCekler = useMemo(() => {
-    let result = [...activeCekler];
+    let result = [...(activeCekler || [])];
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -599,7 +600,7 @@ export function CeklerPage() {
   // ═══════════════════════════════════════════════════════════════
 
   return (
-    <div className="p-2 sm:p-6 lg:p-8 space-y-3 bg-background min-h-screen text-foreground font-sans pb-32 sm:pb-8">
+    <div className="px-4 py-6 sm:p-6 lg:p-8 space-y-3 bg-background min-h-screen text-foreground font-sans pb-32 sm:pb-8">
       {/* 📱 HEADER - Ultra Compact on Mobile */}
       <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl -mx-2 px-2 pb-3 pt-1 border-b border-white/5 sm:static sm:bg-transparent sm:backdrop-blur-none sm:mx-0 sm:px-0 sm:border-0 sm:pb-0">
         <div className="flex items-center justify-between gap-2 px-1">
@@ -1012,7 +1013,7 @@ export function CeklerPage() {
                     <motion.div key={cek.id}
                       initial={{ opacity: 0, y: 15 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className={`group relative border rounded-[32px] overflow-hidden transition-all duration-500 ${cardBg} ${cardBorder} ${glowColor} ${
+                      className={`group relative border rounded-3xl sm:rounded-[32px] overflow-hidden transition-all duration-500 ${cardBg} ${cardBorder} ${glowColor} ${
                         isExpanded ? 'ring-2 ring-accent/50 scale-[1.01] z-10' : 'hover:bg-white/[0.08] active:scale-[0.98]'
                       }`}
                       {...(isDueToday || isOverdue ? animationProps : {})}
@@ -1030,7 +1031,7 @@ export function CeklerPage() {
                             setSelectedCek(isExpanded ? null : cek);
                           }
                         }}
-                        className="w-full text-left p-5 sm:p-6 pl-6 sm:pl-8"
+                        className="w-full text-left p-6 sm:p-8"
                       >
                         <div className="flex justify-between items-start gap-4">
                           <div className="flex-1 min-w-0">

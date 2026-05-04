@@ -70,7 +70,8 @@ export function LoginPage() {
       setHasBiometric(false);
       return;
     }
-    const personnelData = getFromStorage<any[]>(StorageKey.PERSONEL_DATA) || [];
+    let personnelData = getFromStorage<any[]>(StorageKey.PERSONEL_DATA) || [];
+    if (!Array.isArray(personnelData)) personnelData = [];
     const emp = personnelData.find(p => (p.username || '').toLowerCase() === username.toLowerCase() || (p.name || '').toLowerCase() === username.toLowerCase());
     setHasBiometric(!!(emp && emp.webauthnId));
   }, [username]);
@@ -152,9 +153,9 @@ export function LoginPage() {
       return;
     }
     
-    const personnelData = getFromStorage<any[]>(StorageKey.PERSONEL_DATA) || [];
+    let personnelData = getFromStorage<any[]>(StorageKey.PERSONEL_DATA) || [];
+    if (!Array.isArray(personnelData)) personnelData = [];
     const emp = personnelData.find(p => (p.username || '').toLowerCase() === username.toLowerCase() || (p.name || '').toLowerCase() === username.toLowerCase());
-    
     if (!emp || !emp.webauthnId) {
       toast.error('Bu kullanıcı için tanımlı biyometrik veri bulunamadı.');
       return;
@@ -359,23 +360,23 @@ export function LoginPage() {
                 {/* Tab Contents */}
                 <motion.div key={portalTab} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }} className="flex-1">
                   {portalTab === 'urunler' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 auto-rows-fr">
                       {products.length === 0 && <p className="text-gray-500 col-span-full text-center py-10 w-full">Henüz yayınlanan ürün bulunmuyor.</p>}
                       {products.map((p: any) => (
-                        <div key={p.id} className="bg-[#111522] rounded-2xl border border-gray-800 overflow-hidden hover:border-cyan-500/30 transition-all duration-300 group shadow-lg flex flex-col">
-                          <div className="h-48 bg-[#0a0d14] relative overflow-hidden flex-shrink-0">
+                        <div key={p.id} className="bg-[#111522] rounded-2xl border border-gray-800 overflow-hidden hover:border-cyan-500/30 transition-all duration-300 group shadow-lg flex flex-col min-h-[350px]">
+                          <div className="h-48 min-h-[12rem] bg-[#0a0d14] relative overflow-hidden flex-shrink-0">
                             {p.imageUrl ? <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" /> : <div className="w-full h-full flex items-center justify-center text-gray-700 bg-gray-900/50"><ShoppingBag className="w-12 h-12" /></div>}
                             {p.badge && <div className="absolute top-3 left-3 bg-gradient-to-r from-orange-500 to-red-500 text-white text-[10px] font-black px-2 py-1 rounded-md uppercase shadow-lg">{p.badge}</div>}
                           </div>
                           <div className="p-5 flex-1 flex flex-col">
-                            <h3 className="font-bold text-lg text-white mb-1 group-hover:text-cyan-400 transition-colors">{p.name}</h3>
-                            <p className="text-gray-400 text-xs leading-relaxed line-clamp-2 mb-4 flex-1">{p.description}</p>
+                            <h3 className="font-bold text-lg text-white mb-2 group-hover:text-cyan-400 transition-colors">{p.name}</h3>
+                            <p className="text-gray-400 text-xs leading-relaxed line-clamp-3 mb-4 flex-1">{p.description}</p>
                             <div className="mt-auto flex items-end justify-between border-t border-gray-800/50 pt-4">
                               <div>
                                 <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-0.5">Ortalama Fiyat</p>
                                 <p className="text-cyan-400 font-black text-xl">{p.price} ₺</p>
                               </div>
-                              <button onClick={()=>setPortalTab('iletisim')} className="px-3 py-2 bg-blue-600/20 text-blue-400 rounded-xl text-xs font-bold hover:bg-blue-600/40 transition-colors border border-blue-500/20 flex items-center gap-1.5">
+                              <button onClick={()=>setPortalTab('iletisim')} className="px-3 py-2 bg-blue-600/20 text-blue-400 rounded-xl text-xs font-bold hover:bg-blue-600/40 transition-colors border border-blue-500/20 flex items-center gap-1.5 shrink-0">
                                 Sipariş <PhoneCall className="w-3 h-3"/>
                               </button>
                             </div>

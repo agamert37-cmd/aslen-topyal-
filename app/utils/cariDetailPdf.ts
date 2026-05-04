@@ -62,10 +62,7 @@ const C = {
   summaryBdr: [190, 195, 210] as [number, number, number],
 };
 
-// ═══════════════════════════════════════════════════
-// ANA FONKSİYON
-// ═══════════════════════════════════════════════════
-export const generateCariDetailPDF = (cari: any, transactions: any[], startDate?: string, endDate?: string) => {
+export const generateCariDetailPDF = async (cari: any, transactions: any[], startDate?: string, endDate?: string) => {
   const doc = new jsPDF();
   const pw = doc.internal.pageSize.width;
   const ph = doc.internal.pageSize.height;
@@ -75,6 +72,26 @@ export const generateCariDetailPDF = (cari: any, transactions: any[], startDate?
   const now = new Date();
   const timestamp = `${now.toLocaleDateString('tr-TR')} ${now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
 
+  // Resmi yükleme yardımcı fonksiyonu
+  const loadLogoBase64 = async (url: string) => {
+    return new Promise<string | null>((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL('image/png'));
+        } catch(e) { resolve(null); }
+      };
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
+  };
+
   // Sayfa arka planı
   const fillPage = () => {
     doc.setFillColor(...C.pageBg);
@@ -82,9 +99,7 @@ export const generateCariDetailPDF = (cari: any, transactions: any[], startDate?
   };
   fillPage();
 
-  // ════════��══════════════════════════════════
-  // 1) İŞLEMLERİ DÜZLE — her fiş, ürün satırlarına açılsın
-  // ═══════════════════════════════════════════
+  // 1) İŞLEMLERİ DÜZLE
   interface ProductRow {
     fisDate: Date;
     fisId: string;
@@ -95,6 +110,7 @@ export const generateCariDetailPDF = (cari: any, transactions: any[], startDate?
     unit: string;
     unitPrice: number;
     totalPrice: number;
+    hasInvoice?: boolean;
   }
 
   interface PaymentRow {
@@ -107,7 +123,6 @@ export const generateCariDetailPDF = (cari: any, transactions: any[], startDate?
   const productRows: ProductRow[] = [];
   const paymentRows: PaymentRow[] = [];
 
-  // Fişleri tarihe göre sırala
   const sorted = [...transactions].sort((a, b) => {
     const da = a.createdAt || a.date || '';
     const db = b.createdAt || b.date || '';
@@ -125,10 +140,11 @@ export const generateCariDetailPDF = (cari: any, transactions: any[], startDate?
     const employee = fis.employeeName || '';
     const isSale = fis.mode === 'satis' || fis.mode === 'sale';
     const isAlis = fis.mode === 'alis';
+    const hasInvoice = !!fis.invoiceId;
     const items = fis.items || [];
 
     items.forEach((item: any) => {
-      const nm = s(item.productName || item.name || 'Urun');
+      const nm = s(item.productName || item.name || 'Urun') + (hasInvoice ? ' (Fatura)' : '');
       const q = Math.abs(item.quantity || 0);
       const u = s(item.unit || 'KG');
       const up = Math.abs(item.unitPrice || item.price || 0);
@@ -153,10 +169,10 @@ export const generateCariDetailPDF = (cari: any, transactions: any[], startDate?
         unit: u,
         unitPrice: up,
         totalPrice: tp,
+        hasInvoice
       });
     });
 
-    // Ödeme/tahsilat
     const pa = fis.payment?.amount || 0;
     const pm = fis.payment?.method || 'veresiye';
     if (pa > 0 && pm !== 'veresiye') {
@@ -166,37 +182,27 @@ export const generateCariDetailPDF = (cari: any, transactions: any[], startDate?
     }
   });
 
-  // ═══════════════════════════════════════════
-  // 2) LACİVERT HEADER BAR — daha belirgin, şirket adı ile
-  // ═══════════════════════════════════════════
+  // 2) LACİVERT HEADER BAR
   doc.setFillColor(...C.headerBar);
   doc.rect(0, 0, pw, 22, 'F');
 
-  // Header içinde firma adı
   doc.setFontSize(16); doc.setTextColor(...C.white); doc.setFont('helvetica', 'bold');
-  doc.text(s(co.name), M + 2, 10);
+  doc.text('CARI HESAP EKSTRESI', M + 2, 10);
 
-  // Header sağ: belge türü
   doc.setFontSize(11); doc.setTextColor(180, 200, 255); doc.setFont('helvetica', 'bold');
-  doc.text('CARI HESAP EKSTRESI', pw - M - 2, 10, { align: 'right' });
+  doc.text(s(co.name), pw - M - 2, 10, { align: 'right' });
 
-  // Alt satır: slogan veya iletişim
   const headerSubtext: string[] = [];
   if (co.phone) headerSubtext.push(`Tel: ${s(co.phone)}`);
   if (co.email) headerSubtext.push(s(co.email));
   if (co.taxNo) headerSubtext.push(`VKN: ${s(co.taxNo)}`);
+  doc.setFontSize(7); doc.setTextColor(160, 175, 210); doc.setFont('helvetica', 'normal');
+  doc.text(timestamp, M + 2, 17);
   if (headerSubtext.length > 0) {
-    doc.setFontSize(7); doc.setTextColor(160, 175, 210); doc.setFont('helvetica', 'normal');
-    doc.text(headerSubtext.join('  |  '), M + 2, 17);
+    doc.text(headerSubtext.join('  |  '), pw - M - 2, 17, { align: 'right' });
   }
 
-  // Tarih bilgisi sağ alt
-  doc.setFontSize(7); doc.setTextColor(160, 175, 210); doc.setFont('helvetica', 'normal');
-  doc.text(timestamp, pw - M - 2, 17, { align: 'right' });
-
-  // ═══════════════════════════════════════════
   // 3) CARİ / MÜŞTERİ BİLGİ KARTI
-  // ═══════════════════════════════════════════
   let y = 28;
 
   const label = (t: string, x: number, yy: number) => {
@@ -208,47 +214,63 @@ export const generateCariDetailPDF = (cari: any, transactions: any[], startDate?
     doc.text(s(t || '-'), x, yy);
   };
 
-  // Beyaz kart çerçeve
   doc.setFillColor(...C.cardBg);
   doc.setDrawColor(...C.cardBorder);
   doc.setLineWidth(0.4);
-  doc.roundedRect(M, y, W, 34, 2, 2, 'FD');
+  doc.roundedRect(M, y, W, 40, 2, 2, 'FD');
 
-  // Mavi accent sol kenar
   doc.setFillColor(...C.sectionAccent);
-  doc.rect(M, y, 3, 34, 'F');
+  doc.rect(M, y, 3, 40, 'F');
 
   const lx = M + 8;
   let ly = y + 8;
 
   // Sol kolon: Müşteri bilgileri
   doc.setFontSize(10); doc.setTextColor(...C.textDark); doc.setFont('helvetica', 'bold');
-  doc.text(s(cari.companyName || 'Cari'), lx, ly);
-  ly += 7;
-  label('Yetkili:', lx, ly);       value(cari.contactPerson, lx + 22, ly);
-  label('Telefon:', lx, ly + 6);   value(cari.phone, lx + 22, ly + 6);
-  label('Vergi No:', lx, ly + 12); value(cari.taxNumber, lx + 22, ly + 12);
+  doc.text('MUSTERI BİLGİLERİ', lx, ly);
+  doc.setFontSize(9); doc.setTextColor(...C.sectionAccent);
+  doc.text(s(cari.companyName || 'Cari'), lx, ly + 6);
+  
+  label('Yetkili:', lx, ly + 12);       value(cari.contactPerson, lx + 22, ly + 12);
+  label('Telefon:', lx, ly + 18);   value(cari.phone, lx + 22, ly + 18);
+  label('V. Dairesi:', lx, ly + 24); value(cari.taxOffice, lx + 22, ly + 24);
+  label('Vergi No:', lx, ly + 30); value(cari.taxNumber, lx + 22, ly + 30);
 
-  // Sağ kolon
+  // Sağ kolon: Şirket Logo & Bilgileri
   const rx = pw / 2 + 10;
+  
+  // Şirket ayarlarına kaydedilmiş bir logo URLsi varsa yükle
+  const setts = getFromStorage<any>(StorageKey.SYSTEM_SETTINGS) || {};
+  let currentY = y + 8;
+  if (setts.companyInfo?.logo) {
+      const l64 = await loadLogoBase64(setts.companyInfo.logo);
+      if (l64) {
+          doc.addImage(l64, 'PNG', rx, y + 4, 30, 15);
+          currentY = y + 25;
+      }
+  } else {
+      doc.setFontSize(10); doc.setTextColor(...C.textDark); doc.setFont('helvetica', 'bold');
+      doc.text(s(co.name), rx, currentY);
+      currentY += 6;
+  }
 
   if (startDate && endDate) {
-    label('Donem:', rx, y + 8);  value(`${startDate} - ${endDate}`, rx + 22, y + 8, false, C.blueColor);
+    label('Donem:', rx, currentY);  value(`${startDate} - ${endDate}`, rx + 16, currentY, false, C.blueColor);
+    currentY += 6;
   }
-  label('Rapor No:', rx, y + 15);  value(`CRD-${Date.now().toString().substring(5)}`, rx + 22, y + 15, true);
-  label('V. Dairesi:', rx, y + 22); value(cari.taxOffice, rx + 22, y + 22);
+  label('Rapor No:', rx, currentY);  value(`CRD-${Date.now().toString().substring(5)}`, rx + 16, currentY, true);
 
   // Bakiye — sağ alt köşede belirgin
   const bakiye = cari.balance || 0;
   const bakiyeColor = bakiye > 0 ? C.tahsilatClr : bakiye < 0 ? C.greenColor : C.textDark;
   doc.setFontSize(8); doc.setTextColor(...C.labelColor); doc.setFont('helvetica', 'normal');
-  doc.text('Bakiye:', rx, y + 29);
+  doc.text('Bakiye:', pw - M - 40, y + 31);
   doc.setFontSize(12); doc.setTextColor(...bakiyeColor); doc.setFont('helvetica', 'bold');
-  doc.text(`${fmt(Math.abs(bakiye))} TL`, rx + 22, y + 30);
+  doc.text(`${fmt(Math.abs(bakiye))} TL`, pw - M - 20, y + 32);
   doc.setFontSize(7);
-  doc.text(bakiye > 0 ? '(BORCLU)' : bakiye < 0 ? '(ALACAKLI)' : '', rx + 55, y + 30);
+  doc.text(bakiye > 0 ? '(BORCLU)' : bakiye < 0 ? '(ALACAKLI)' : '', pw - M - 20, y + 36);
 
-  y += 40;
+  y += 46;
 
   // ═══════════════════════════════════════════
   // 4) ÜRÜN DETAYLARI TABLOSU
@@ -268,7 +290,7 @@ export const generateCariDetailPDF = (cari: any, transactions: any[], startDate?
   // Tablo verisi
   const tableBody = productRows.map((row, i) => [
     String(i + 1),
-    row.productName,
+    row.hasInvoice ? `(FATURALI) ${row.productName}` : row.productName,
     row.type,
     fmt(row.quantity),
     row.unit,
@@ -604,7 +626,7 @@ export const generateSingleFisPDF = async (
   // Sağ: Fiş türü badge
   const isSatis = fis.mode === 'satis' || fis.mode === 'sale';
   const isAlis = fis.mode === 'alis';
-  const modeLabel = isSatis ? 'SATIS FISI' : isAlis ? 'ALIS FISI' : 'GIDER FISI';
+  const modeLabel = `${fis.hasInvoice ? '(FATURALI) ' : ''}${isSatis ? 'SATIS FISI' : isAlis ? 'ALIS FISI' : 'GIDER FISI'}`;
   const modeColor = isSatis ? C.greenColor : isAlis ? C.blueColor : C.tahsilatClr;
 
   doc.setFontSize(12); doc.setTextColor(...modeColor); doc.setFont('helvetica', 'bold');

@@ -742,8 +742,11 @@ export function CariDetailPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <p className="font-bold text-foreground text-sm font-mono">{(fis.id?.split('-')[0] || 'ID').toUpperCase()}</p>
-                        {fis.invoice?.status === 'kesildi' && (
-                          <span className="w-5 h-5 rounded-full bg-blue-500 text-foreground text-[10px] font-black flex items-center justify-center shadow-lg shadow-blue-500/30" title="Fatura Kesildi">F</span>
+                        {(fis.invoice?.status === 'kesildi' || fis.hasInvoice || fis.invoiceInfo?.hasInvoice) && (
+                          <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-[10px] font-black uppercase flex items-center justify-center shadow-sm" title="Fatura Kesildi">Fatura K.</span>
+                        )}
+                        {fis.invoiceType === 'genel' && fis.invoiceName && (
+                          <span className="text-[10px] text-muted-foreground font-mono italic px-1 bg-white/5 rounded">({fis.invoiceName})</span>
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5">{new Date(fis.date).toLocaleString('tr-TR')} • {fis.items?.length || 0} Kalem</p>
@@ -771,7 +774,9 @@ export function CariDetailPage() {
 
       {/* ─── Modals ─── */}
       <Dialog.Root open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <Dialog.Portal><Dialog.Overlay className="fixed inset-0 bg-black/80 z-50"/><Dialog.Content aria-describedby={undefined} className="fixed inset-2 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 bg-card p-4 sm:p-8 rounded-2xl sm:rounded-3xl border border-border sm:w-[95vw] sm:max-w-2xl z-50 shadow-2xl overflow-y-auto overscroll-contain" style={{maxHeight:'calc(100dvh - 1rem)'}}>
+        <Dialog.Portal><Dialog.Overlay className="fixed inset-0 bg-black/80 z-50"/><Dialog.Content aria-describedby={undefined} className="fixed inset-x-0 bottom-0 sm:inset-auto  sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 bg-card p-4 sm:p-8 rounded-t-[2rem] sm:rounded-3xl border border-border sm:w-[95vw] sm:max-w-2xl z-50 shadow-[0_-5px_40px_rgba(0,0,0,0.3)] sm:shadow-2xl overflow-y-auto overscroll-contain pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6" style={{maxHeight:'calc(100dvh - 1rem)'}}>
+          {/* Grabber for Mobile */}
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-secondary rounded-full sm:hidden" />
           <Dialog.Title className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Müşteri Düzenle</Dialog.Title>
           <div className="grid grid-cols-2 gap-4 mb-4">
             {[
@@ -815,7 +820,9 @@ export function CariDetailPage() {
 
       {/* Ekstre Detay Modal */}
       <Dialog.Root open={isOrderDetailOpen} onOpenChange={setIsOrderDetailOpen}>
-        <Dialog.Portal><Dialog.Overlay className="fixed inset-0 bg-black/80 z-50"/><Dialog.Content aria-describedby={undefined} className="fixed inset-2 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 bg-card p-4 sm:p-8 rounded-2xl sm:rounded-3xl border border-border sm:w-[95vw] sm:max-w-lg z-50 shadow-2xl overflow-y-auto overscroll-contain" style={{maxHeight:'calc(100dvh - 1rem)'}}>
+        <Dialog.Portal><Dialog.Overlay className="fixed inset-0 bg-black/80 z-50"/><Dialog.Content aria-describedby={undefined} className="fixed inset-x-0 bottom-0 sm:inset-auto  sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 bg-card p-4 sm:p-8 rounded-t-[2rem] sm:rounded-3xl border border-border sm:w-[95vw] sm:max-w-lg z-50 shadow-[0_-5px_40px_rgba(0,0,0,0.3)] sm:shadow-2xl overflow-y-auto overscroll-contain pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6" style={{maxHeight:'calc(100dvh - 1rem)'}}>
+          {/* Grabber for Mobile */}
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-secondary rounded-full sm:hidden" />
           {selectedExtract && (
             <>
               <h2 className="text-2xl font-bold text-foreground mb-2">{selectedExtract.date} Hareketleri</h2>
@@ -860,7 +867,9 @@ export function CariDetailPage() {
 
       {/* Fiş İnceleme Modal */}
       <Dialog.Root open={isFisDetailOpen} onOpenChange={setIsFisDetailOpen}>
-        <Dialog.Portal><Dialog.Overlay className="fixed inset-0 bg-black/80 z-50"/><Dialog.Content aria-describedby={undefined} className="fixed inset-2 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 bg-card p-0 rounded-2xl sm:rounded-3xl border border-border sm:w-[95vw] sm:max-w-2xl z-50 shadow-2xl overflow-hidden flex flex-col" style={{maxHeight:'calc(100dvh - 1rem)'}}>
+        <Dialog.Portal><Dialog.Overlay className="fixed inset-0 bg-black/80 z-50"/><Dialog.Content aria-describedby={undefined} className="fixed inset-x-0 bottom-0 sm:inset-auto  sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 bg-card p-0 rounded-t-[2rem] sm:rounded-3xl border border-border sm:w-[95vw] sm:max-w-2xl z-50 shadow-[0_-5px_40px_rgba(0,0,0,0.3)] sm:shadow-2xl overflow-hidden flex flex-col pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6" style={{maxHeight:'calc(100dvh - 1rem)'}}>
+          {/* Grabber for Mobile */}
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-secondary rounded-full sm:hidden" />
           {selectedFis && (() => {
             const isAlis = selectedFis.mode === 'alis';
             return (
@@ -1167,7 +1176,9 @@ export function CariDetailPage() {
 
       {/* Not Ekleme Modal */}
       <Dialog.Root open={isNoteModalOpen} onOpenChange={setIsNoteModalOpen}>
-        <Dialog.Portal><Dialog.Overlay className="fixed inset-0 bg-black/80 z-50" /><Dialog.Content aria-describedby={undefined} className="fixed inset-2 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 bg-card p-6 sm:p-8 rounded-2xl sm:rounded-3xl border border-border sm:w-[95vw] sm:max-w-lg z-50 shadow-2xl overflow-y-auto overscroll-contain" style={{maxHeight:'calc(100dvh - 1rem)'}}>
+        <Dialog.Portal><Dialog.Overlay className="fixed inset-0 bg-black/80 z-50" /><Dialog.Content aria-describedby={undefined} className="fixed inset-x-0 bottom-0 sm:inset-auto  sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 bg-card p-6 sm:p-8 rounded-t-[2rem] sm:rounded-3xl border border-border sm:w-[95vw] sm:max-w-lg z-50 shadow-[0_-5px_40px_rgba(0,0,0,0.3)] sm:shadow-2xl overflow-y-auto overscroll-contain pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6" style={{maxHeight:'calc(100dvh - 1rem)'}}>
+          {/* Grabber for Mobile */}
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-secondary rounded-full sm:hidden" />
           <Dialog.Title className="text-2xl font-bold mb-6 flex items-center gap-3">
             <StickyNote className="w-6 h-6 text-amber-400" /> Yeni Not Ekle
           </Dialog.Title>
@@ -1234,7 +1245,9 @@ export function CariDetailPage() {
 
       {/* Not Görüntüleme Modal */}
       <Dialog.Root open={isNoteViewOpen} onOpenChange={setIsNoteViewOpen}>
-        <Dialog.Portal><Dialog.Overlay className="fixed inset-0 bg-black/80 z-50" /><Dialog.Content aria-describedby={undefined} className="fixed inset-2 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 bg-card p-0 rounded-2xl sm:rounded-3xl border border-border sm:w-[95vw] sm:max-w-lg z-50 shadow-2xl overflow-hidden flex flex-col" style={{maxHeight:'calc(100dvh - 1rem)'}}>
+        <Dialog.Portal><Dialog.Overlay className="fixed inset-0 bg-black/80 z-50" /><Dialog.Content aria-describedby={undefined} className="fixed inset-x-0 bottom-0 sm:inset-auto  sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 bg-card p-0 rounded-t-[2rem] sm:rounded-3xl border border-border sm:w-[95vw] sm:max-w-lg z-50 shadow-[0_-5px_40px_rgba(0,0,0,0.3)] sm:shadow-2xl overflow-hidden flex flex-col pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6" style={{maxHeight:'calc(100dvh - 1rem)'}}>
+          {/* Grabber for Mobile */}
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-secondary rounded-full sm:hidden" />
           {noteViewItem && (() => {
             const pConfig = priorityConfig[noteViewItem.priority];
             const PIcon = pConfig.icon;

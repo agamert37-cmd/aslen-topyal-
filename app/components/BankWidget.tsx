@@ -126,7 +126,7 @@ export function BankWidget({ canEdit = true }: { canEdit?: boolean }) {
                   {POPULAR_BANKS.filter(n => !banks.find(b => b.name === n)).map(n => (
                     <button
                       key={n}
-                      onClick={() => addBank(n)}
+                      onClick={() => addBank(n, 'banka')}
                       className="px-2 py-1 rounded-lg bg-white/5 hover:bg-blue-500/15 border border-white/8 hover:border-blue-500/30 text-[11px] sm:text-xs text-muted-foreground hover:text-blue-400 transition-all"
                     >
                       {n}

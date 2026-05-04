@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Package, Truck, Warehouse, Plus, Trash2, X, Activity, User, ArrowRightLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTableSync } from '../hooks/useTableSync';
 import { getFromStorage, setInStorage } from '../utils/storage';
 import { Product, productFromDb, productToDb, IcebergCage, StockMovement } from './StokPage';
+import { useModuleBus } from '../hooks/useModuleBus';
 
 function GlassCard({ children, className = '', hover = false, ...props }: React.HTMLAttributes<HTMLDivElement> & { hover?: boolean }) {
   return (
@@ -15,7 +16,9 @@ function GlassCard({ children, className = '', hover = false, ...props }: React.
 }
 
 export function IcebergPage() {
-  const { data: products } = useTableSync<Product>({
+  const { on, emit } = useModuleBus();
+
+  const { data: products, refresh: refreshProducts } = useTableSync<Product>({
     tableName: 'urunler',
     storageKey: 'stok_data',
     initialData: [],
@@ -27,6 +30,15 @@ export function IcebergPage() {
     tableName: 'kasa_islemleri',
     storageKey: 'kasa_data',
   });
+
+  useEffect(() => {
+    const unsub = on('system:data_refreshed', () => {
+      refreshProducts();
+      setIcebergCages(getFromStorage<IcebergCage[]>('iceberg_cages_data') || []);
+      setTransporters(getFromStorage<{id: string, name: string}[]>('transporters_data') || []);
+    });
+    return () => unsub();
+  }, [refreshProducts]);
 
   const safeProducts = useMemo(() =>
     (products || []).filter(p => (p.name || '').trim().length > 0).map(p => {
@@ -46,6 +58,13 @@ export function IcebergPage() {
   const saveIcebergCages = (updated: IcebergCage[]) => {
     setIcebergCages(updated);
     setInStorage('iceberg_cages_data', updated);
+    emit('system:data_refreshed', { source: 'IcebergPage' });
+  };
+
+  const saveTransporters = (updated: {id: string, name: string}[]) => {
+    setTransporters(updated);
+    setInStorage('transporters_data', updated);
+    emit('system:data_refreshed', { source: 'IcebergPage' });
   };
   
   const [showAddCage, setShowAddCage] = useState(false);
@@ -84,7 +103,7 @@ export function IcebergPage() {
 
   const handleAddTransporter = () => {
     if (newTransporterName.trim()) {
-      setTransporters([...transporters, { id: crypto.randomUUID(), name: newTransporterName }]);
+      saveTransporters([...transporters, { id: crypto.randomUUID(), name: newTransporterName }]);
       setShowAddTransporter(false);
       setNewTransporterName('');
     }
@@ -291,7 +310,7 @@ export function IcebergPage() {
               <div key={t.id} className="flex items-center gap-1.5 px-2.5 py-1 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-xs group">
                 <span className="text-indigo-200">{t.name}</span>
                 <button 
-                  onClick={() => setTransporters(transporters.filter(tr => tr.id !== t.id))}
+                  onClick={() => saveTransporters(transporters.filter(tr => tr.id !== t.id))}
                   className="p-0.5 hover:bg-red-500/30 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <X className="w-3 h-3 text-red-400" />

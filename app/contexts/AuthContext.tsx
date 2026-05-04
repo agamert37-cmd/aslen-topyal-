@@ -211,6 +211,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (username: string, password: string, biometricBypass: boolean = false): Promise<boolean> => {
     let storedPersonnel = getFromStorage<any[]>(StorageKey.PERSONEL_DATA) || [];
+    if (!Array.isArray(storedPersonnel)) storedPersonnel = [];
 
     // ── Mobil / Yeni Cihaz: Yerel veri yoksa PouchDB'den çek ─────
     // localStorage henüz senkronize edilmemişse (yeni cihaz / ilk açılış)

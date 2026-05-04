@@ -89,14 +89,6 @@ export function stopRealtimeSync(): void { /* no-op */ }
 export function getSyncState() {
   return { pendingCount: 0, isSyncing: false, lastSyncAt: Date.now(), isOnline: navigator.onLine, lastError: null };
 }
-
-// Eski re-export'lar — bazı sayfalar bunları kullanıyor olabilir
-export async function fetchFromSupabase(): Promise<any> { return null; }
-export async function saveToSupabase(): Promise<void> {}
-export async function insertToSupabase(): Promise<void> {}
-export async function updateInSupabase(): Promise<void> {}
-export async function deleteFromSupabase(): Promise<void> {}
-export function subscribeToTable(): any { return { unsubscribe: () => {} }; }
 export async function createSystemBackup(): Promise<any> { return null; }
 export async function getSystemBackups(): Promise<any[]> { return []; }
 export async function restoreSystemBackup(): Promise<boolean> { return false; }

@@ -47,6 +47,8 @@ interface Fis {
   payment?: any;
   date: string;
   photo?: string;
+  editedAt?: string;
+  editedBy?: string;
 }
 
 // ───────── Animated Counter ─────────
@@ -213,6 +215,8 @@ export function FisHistoryPage() {
   const [editCategory, setEditCategory] = useState('');
   const [editAmount, setEditAmount] = useState(0);
   const [editPaymentAmount, setEditPaymentAmount] = useState(0);
+  const [editPaymentMethod, setEditPaymentMethod] = useState('');
+  const [editDate, setEditDate] = useState('');
 
   // Stok listesi (urun ekleme icin)
   const stokList = useGlobalTableData<any>('urunler');
@@ -482,6 +486,8 @@ export function FisHistoryPage() {
     setEditCategory(fis.category || '');
     setEditAmount(fis.amount || 0);
     setEditPaymentAmount(fis.payment?.amount || 0);
+    setEditPaymentMethod(fis.payment?.method || '');
+    setEditDate(fis.date.split('T')[0] || ''); // Keep only date portion for input[type="date"]
     setEditItems(fis.items ? fis.items.map((item: any, idx: number) => ({
       ...item,
       _editId: item.id || `item-${idx}-${Date.now()}`
@@ -679,8 +685,11 @@ export function FisHistoryPage() {
         total: newTotal,
       } : {}),
       ...(selectedFis.payment ? {
-        payment: { ...selectedFis.payment, amount: editPaymentAmount }
+        payment: { ...selectedFis.payment, amount: editPaymentAmount, method: editPaymentMethod }
       } : {}),
+      date: editDate ? new Date(editDate).toISOString() : selectedFis.date,
+      editedAt: new Date().toISOString(),
+      editedBy: currentEmployee?.name || user?.name || 'Sistem',
     };
 
     // BUG FIX [AJAN-2]: useTableSync üzerinden güncelle — setInStorage bypass kaldırıldı
@@ -2193,6 +2202,17 @@ export function FisHistoryPage() {
 
               {selectedFis && (
                 <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+                  {/* Tarih Editing */}
+                  <div>
+                    <label className="block text-sm font-medium text-foreground/80 mb-2">Tarih</label>
+                    <input
+                      type="date"
+                      value={editDate}
+                      onChange={e => setEditDate(e.target.value)}
+                      className="w-full px-4 py-3 bg-secondary/60 border border-border/50 rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all"
+                    />
+                  </div>
+
                   {/* Gider - Kategori & Tutar */}
                   {selectedFis.mode === 'gider' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2242,9 +2262,9 @@ export function FisHistoryPage() {
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: 'auto' }}
                             exit={{ opacity: 0, height: 0 }}
-                            className="overflow-hidden mb-4"
+                            className="overflow-hidden"
                           >
-                            <div className="p-4 rounded-xl border border-emerald-600/20 bg-emerald-600/5">
+                            <div className="p-4 rounded-xl border border-emerald-600/20 bg-emerald-600/5 mb-4">
                               <div className="relative mb-3">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/70" />
                                 <input
@@ -2393,16 +2413,31 @@ export function FisHistoryPage() {
                     </div>
                   )}
 
-                  {/* Odeme Tutari */}
+                  {/* Odeme Tutari ve Yöntemi */}
                   {selectedFis.payment && (
-                    <div>
-                      <label className="block text-sm font-medium text-foreground/80 mb-2">Odenen Tutar (₺)</label>
-                      <input
-                        type="number"
-                        value={editPaymentAmount}
-                        onChange={e => setEditPaymentAmount(Number(e.target.value))}
-                        className="w-full px-4 py-3 bg-secondary/60 border border-border/50 rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all"
-                      />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-foreground/80 mb-2">Odenen Tutar (₺)</label>
+                        <input
+                          type="number"
+                          value={editPaymentAmount}
+                          onChange={e => setEditPaymentAmount(Number(e.target.value))}
+                          className="w-full px-4 py-3 bg-secondary/60 border border-border/50 rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-foreground/80 mb-2">Ödeme Yöntemi</label>
+                        <select
+                          value={editPaymentMethod}
+                          onChange={e => setEditPaymentMethod(e.target.value)}
+                          className="w-full px-4 py-3 bg-secondary/60 border border-border/50 rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all"
+                        >
+                          <option value="nakit">Nakit</option>
+                          <option value="kredi-karti">Kredi Kartı</option>
+                          <option value="havale">Havale/EFT</option>
+                          <option value="cek">Çek</option>
+                        </select>
+                      </div>
                     </div>
                   )}
 
@@ -2731,6 +2766,19 @@ export function FisHistoryPage() {
                     <div className="p-4 rounded-xl bg-amber-600/10 border border-amber-600/20">
                       <p className="text-amber-400 text-sm font-medium">Odeme yapilmamis (Veresiye)</p>
                       <p className="text-amber-400/60 text-xs mt-1">Toplam tutar cari bakiyeye eklenmistir</p>
+                    </div>
+                  )}
+
+                  {/* Düzenlenmiş Bilgisi */}
+                  {selectedFis.editedAt && (
+                    <div className="p-4 rounded-xl bg-blue-600/10 border border-blue-600/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                       <div>
+                         <p className="text-blue-400 text-sm font-medium flex items-center gap-2">
+                           <Edit2 className="w-4 h-4" />
+                           {selectedFis.editedBy || 'Bilinmeyen Kullanıcı'} tarafından düzenlendi
+                         </p>
+                         <p className="text-blue-400/60 text-xs mt-1">Son Düzenleme: {new Date(selectedFis.editedAt).toLocaleString('tr-TR')}</p>
+                       </div>
                     </div>
                   )}
 

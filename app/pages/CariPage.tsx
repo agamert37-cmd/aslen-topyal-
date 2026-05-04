@@ -228,9 +228,11 @@ const RegionManagerModal: React.FC<{
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60]" />
         <Dialog.Content
-          className="fixed inset-2 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 rounded-2xl border border-border/40 sm:w-[95vw] sm:max-w-lg shadow-2xl z-[60] modal-glass overflow-y-auto overscroll-contain" style={{maxHeight:'calc(100dvh - 1rem)'}}
+          className="fixed inset-x-0 bottom-0 sm:inset-auto  sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 rounded-t-[2rem] sm:rounded-3xl border border-border/40 sm:w-[95vw] sm:max-w-lg shadow-[0_-5px_40px_rgba(0,0,0,0.3)] sm:shadow-2xl z-[60] modal-glass overflow-y-auto overscroll-contain pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6" style={{maxHeight:'calc(100dvh - 1rem)'}}
           aria-describedby={undefined}
         >
+          {/* Grabber for Mobile */}
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-secondary rounded-full sm:hidden" />
           <div className="flex items-center justify-between p-6 border-b border-border">
             <Dialog.Title className="text-xl font-bold text-foreground flex items-center gap-2">
               <Globe className="w-5 h-5 text-blue-400" />
@@ -406,7 +408,7 @@ const CategoryManagerModal: React.FC<{
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.92, y: 30 }}
             transition={{ type: 'spring', damping: 28, stiffness: 350 }}
-            className="fixed inset-2 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[95vw] sm:max-w-lg overflow-y-auto z-[60] rounded-3xl border border-border shadow-[0_32px_100px_-20px_rgba(0,0,0,0.7),0_0_60px_-10px_rgba(59,130,246,0.15)]"
+            className="fixed inset-x-0 bottom-0 sm:inset-auto  sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[95vw] sm:max-w-lg overflow-y-auto z-[60] rounded-3xl border border-border shadow-[0_32px_100px_-20px_rgba(0,0,0,0.7),0_0_60px_-10px_rgba(59,130,246,0.15)] pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6"
             style={{ background: 'linear-gradient(145deg, rgba(12,18,32,0.97), rgba(6,9,15,0.98))', backdropFilter: 'blur(40px) saturate(180%)', maxHeight: 'calc(100dvh - 1rem)' }}
           >
             <div className="h-1 w-full bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 rounded-t-3xl" />
@@ -651,59 +653,70 @@ const CariCard = React.memo(React.forwardRef(({
   onDelete: (id: string, name: string) => void;
   regionColor: (n: string) => string;
   t: (k: string) => string;
-}, ref: React.Ref<HTMLDivElement>) => (
-  <SwipeToDelete onDelete={() => onDelete(cari.id, cari.companyName)} className="rounded-xl overflow-hidden">
-    <motion.div
-      ref={ref}
-      variants={tableRow}
-      exit={{ opacity: 0, x: 12, transition: { duration: 0.18 } }}
-      onClick={(e) => { e.stopPropagation(); onNavigate(cari.id); }}
-      className="card-premium rounded-xl p-4 sm:p-5 flex flex-col gap-3 cursor-pointer active:scale-[0.98] transition-transform shadow-sm hover:shadow-md"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0 flex flex-col gap-1">
-          {/* Fiyat - Kocaman */}
-          <div className="flex items-center gap-2">
-            <span className={`text-2xl sm:text-3xl font-black tracking-tight leading-none ${cari.balance > 0 ? 'text-emerald-500' : cari.balance < 0 ? 'text-rose-500' : 'text-foreground/40'}`}>
-              {cari.balance > 0 ? '+' : ''}₺{Math.abs(cari.balance).toLocaleString()}
-            </span>
-          </div>
+}, ref: React.Ref<HTMLDivElement>) => {
+  const isNeg = cari.balance < 0;
+  const isPos = cari.balance > 0;
+  
+  return (
+    <SwipeToDelete onDelete={() => onDelete(cari.id, cari.companyName)} className="rounded-xl overflow-hidden mb-2 focus:outline-none">
+      <motion.div
+        ref={ref}
+        variants={tableRow}
+        exit={{ opacity: 0, x: 12, transition: { duration: 0.18 } }}
+        onClick={(e) => { e.stopPropagation(); onNavigate(cari.id); }}
+        className={`rounded-xl border transition-colors overflow-hidden ${
+          isPos ? 'bg-emerald-500/5 border-emerald-500/10 hover:border-emerald-500/25 relative' : 
+          isNeg ? 'bg-rose-500/5 border-rose-500/10 hover:border-rose-500/25 relative' : 
+          'bg-secondary/40 border-border/40 hover:border-border'
+        } p-3 flex flex-row items-center gap-3 cursor-pointer active:scale-[0.98] focus:outline-none`}
+      >
+        {isPos && <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500/50" />}
+        {isNeg && <div className="absolute left-0 top-0 bottom-0 w-1 bg-rose-500/50" />}
 
-          <div className="flex items-center gap-2 mt-1 truncate">
-            <p className="text-foreground font-bold text-base truncate">{cari.companyName}</p>
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
+          <div className="flex items-center gap-1.5 truncate">
+            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cari.type === 'Müşteri' ? 'bg-blue-400' : 'bg-purple-400'}`} />
+            <p className="text-sm font-bold text-foreground truncate">{cari.companyName}</p>
             <DataIssueBadge issues={validateCariItem(cari).issues} />
           </div>
 
-          <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground mt-0.5">
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${cari.type === 'Müşteri' ? 'bg-blue-500/10 text-blue-400' : 'bg-purple-500/10 text-purple-400'}`}>
-              {cari.type}
-            </span>
+          <div className="flex items-center gap-2 mt-1.5 truncate max-w-full text-[11px]">
             {cari.region && (
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-1 shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: regionColor(cari.region) }} />
-                {cari.region}
+                <span className="text-muted-foreground">{cari.region}</span>
               </span>
             )}
-            {cari.phone && <span className="opacity-70 truncate max-w-[120px]">{cari.phone}</span>}
+            {cari.phone && (
+              <>
+                {cari.region && <span className="text-gray-600 shrink-0">·</span>}
+                <span className="text-muted-foreground truncate opacity-80">{cari.phone}</span>
+              </>
+            )}
           </div>
         </div>
 
-        <div className="flex flex-col items-end gap-2.5 shrink-0 self-stretch justify-between py-1">
-          <button
-            onClick={(e) => { e.stopPropagation(); onDetail(cari); }}
-            className="p-2 -mr-2 -mt-2 hover:bg-secondary rounded-full transition-colors group/edit"
-            title="Detay Görüntüle / Düzenle"
-          >
-            <Edit2 className="w-4 h-4 text-muted-foreground group-hover/edit:text-foreground hover:scale-110 transition-transform" />
-          </button>
-          <span className="text-[10px] text-muted-foreground font-medium px-2 py-1 bg-secondary/50 rounded-lg whitespace-nowrap">
-            {cari.transactions} {t('cari.transaction')}
+        <div className="flex flex-col items-end gap-1.5 shrink-0">
+          <span className={`text-base font-black tracking-tight ${isPos ? 'text-emerald-500' : isNeg ? 'text-rose-500' : 'text-foreground/40'}`}>
+            {isPos ? '+' : ''}₺{Math.abs(cari.balance).toLocaleString('tr-TR')}
           </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-muted-foreground font-medium px-2 py-0.5 bg-background/50 rounded-md">
+              {cari.transactions} {t('cari.transaction')}
+            </span>
+            <button
+              onClick={(e) => { e.stopPropagation(); onDetail(cari); }}
+              className="p-1 -mr-1 hover:bg-black/10 rounded-full transition-colors group/edit"
+              title="Düzenle"
+            >
+              <Edit2 className="w-3.5 h-3.5 text-muted-foreground group-hover/edit:text-foreground" />
+            </button>
+          </div>
         </div>
-      </div>
-    </motion.div>
-  </SwipeToDelete>
-)));
+      </motion.div>
+    </SwipeToDelete>
+  );
+}));
 CariCard.displayName = 'CariCard';
 
 // ─── Memoized Cari Row Component (Desktop Table) ─────────────
@@ -899,6 +912,13 @@ export function CariPage() {
   const [selectedRegion, setSelectedRegion] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [visibleMobileCount, setVisibleMobileCount] = useState(20);
+  const [visibleDesktopCount, setVisibleDesktopCount] = useState(50);
+
+  useEffect(() => {
+    setVisibleMobileCount(20);
+    setVisibleDesktopCount(50);
+  }, [debouncedSearchTerm, selectedRegion, selectedCategory, selectedTab]);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -1143,21 +1163,21 @@ export function CariPage() {
       </div>
 
       {/* Tabs — Müşteri / Toptancı */}
-      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+      <div className="flex gap-2 w-full pb-1">
         {(['Müşteri', 'Toptancı'] as const).map(tab => {
           const count = cariList.filter(c => c.type === tab).length;
           return (
             <button
               key={tab}
               onClick={() => { setSelectedTab(tab); setSelectedCategory(''); setSelectedRegion(''); sessionStorage.setItem('mert4_filter_cari_type', tab); }}
-              className={`px-6 py-2.5 rounded-xl font-medium text-sm transition-all ${
+              className={`flex-1 sm:flex-none justify-center px-2 sm:px-6 py-2.5 rounded-xl font-medium text-sm transition-all flex items-center sm:gap-2 ${
                 selectedTab === tab
                   ? 'bg-blue-600 text-foreground shadow-lg shadow-blue-600/30'
                   : 'bg-secondary text-muted-foreground hover:bg-secondary hover:text-foreground'
               }`}
             >
               {tab === 'Müşteri' ? t('cari.customers') : t('cari.suppliers')}
-              <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${selectedTab === tab ? 'bg-white/20' : 'bg-secondary'}`}>
+              <span className={`ml-1.5 sm:ml-0 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold ${selectedTab === tab ? 'bg-white/20' : 'bg-background/50'}`}>
                 {count}
               </span>
             </button>
@@ -1166,7 +1186,7 @@ export function CariPage() {
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6">
+      <div className="grid grid-cols-3 gap-2 sm:gap-6">
         {[
           { label: t('cari.totalAccounts'), value: typeList.length, color: 'blue', icon: Users },
           { label: t('cari.creditor'), value: positiveCount, color: 'green', icon: TrendingUp },
@@ -1185,17 +1205,17 @@ export function CariPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.1 }}
-              className={`stat-card-v2 p-5 group ${c.border}`}
+              className={`stat-card-v2 p-3 sm:p-5 flex flex-col justify-between group ${c.border}`}
               style={{ '--stat-accent': c.accent, '--stat-glow': c.glow, '--stat-glow-hover': c.glowHover } as React.CSSProperties}
             >
               <div className="stat-bg-glow" />
-              <div className="flex items-center gap-3 relative z-10 mb-3">
-                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${c.iconBg} flex items-center justify-center flex-shrink-0`}>
-                  <Icon className={`w-5 h-5 ${c.text}`} />
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1.5 sm:gap-3 relative z-10 mb-2 sm:mb-3">
+                <div className={`w-7 h-7 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-br ${c.iconBg} flex items-center justify-center flex-shrink-0`}>
+                  <Icon className={`w-3.5 h-3.5 sm:w-5 sm:h-5 ${c.text}`} />
                 </div>
-                <p className="text-[11px] text-muted-foreground/70 uppercase tracking-wider font-bold">{s.label}</p>
+                <p className="text-[9px] sm:text-[11px] text-muted-foreground/70 uppercase tracking-wider font-bold leading-tight truncate w-full">{s.label}</p>
               </div>
-              <p className={`text-2xl sm:text-3xl font-bold ${c.text} relative z-10 tech-number ml-1`}>{s.value}</p>
+              <p className={`text-lg sm:text-3xl font-bold ${c.text} relative z-10 tech-number ml-0.5 sm:ml-1`}>{s.value}</p>
             </motion.div>
           );
         })}
@@ -1322,15 +1342,16 @@ export function CariPage() {
 
       {/* Grid / List */}
       {!isMobile && viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          <AnimatePresence>
-            {filteredCari.slice(0, isMobile ? 12 : 50).map((cari, index) => (
-              <motion.div
-                key={cari.id}
-                layout={!isMobile}
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
+        <div className="flex flex-col gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            <AnimatePresence>
+              {filteredCari.slice(0, visibleDesktopCount).map((cari, index) => (
+                <motion.div
+                  key={cari.id}
+                  layout={!isMobile}
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
                 transition={{ delay: isMobile ? 0 : index * 0.05, duration: 0.3 }}
                 className="card-premium rounded-2xl p-5 hover:border-blue-500/30 transition-all duration-300 cursor-pointer group hover:shadow-[0_8px_30px_rgb(59,130,246,0.12)]"
                 onClick={() => { setSelectedCari(cari); setIsDetailModalOpen(true); }}
@@ -1440,10 +1461,21 @@ export function CariPage() {
               </motion.div>
             ))}
           </AnimatePresence>
+          </div>
+          {filteredCari.length > visibleDesktopCount && (
+            <motion.button
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              onClick={() => setVisibleDesktopCount(prev => prev + 50)}
+              className="w-full mt-2 py-3 bg-secondary/80 hover:bg-secondary border border-border/50 rounded-xl text-sm font-bold text-foreground/80 transition-colors"
+            >
+              Daha Fazla Göster ({filteredCari.length - visibleDesktopCount})
+            </motion.button>
+          )}
         </div>
       ) : (
         /* List View */
-        <>
+        <div className="flex flex-col gap-5">
           {/* Masaüstü: HTML tablo */}
           <div className="hidden sm:block card-premium rounded-2xl overflow-hidden">
             <table className="w-full">
@@ -1464,7 +1496,7 @@ export function CariPage() {
                 animate="animate"
               >
                 <AnimatePresence>
-                  {filteredCari.slice(0, 40).map((cari) => (
+                  {filteredCari.slice(0, visibleDesktopCount).map((cari) => (
                     <CariRow
                       key={cari.id}
                       cari={cari}
@@ -1479,6 +1511,18 @@ export function CariPage() {
                 </AnimatePresence>
               </motion.tbody>
             </table>
+            {filteredCari.length > visibleDesktopCount && (
+              <div className="p-2 border-t border-border">
+                <motion.button
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  onClick={() => setVisibleDesktopCount(prev => prev + 50)}
+                  className="w-full py-2.5 bg-secondary hover:bg-secondary/80 text-sm font-bold text-foreground/80 transition-colors rounded-xl"
+                >
+                  Daha Fazla Göster ({filteredCari.length - visibleDesktopCount})
+                </motion.button>
+              </div>
+            )}
             {filteredCari.length === 0 && (
               <div className="text-center py-16 text-muted-foreground">
                 <Filter className="w-8 h-8 mx-auto mb-3 opacity-40" />
@@ -1490,7 +1534,7 @@ export function CariPage() {
           {/* Mobil: kart listesi */}
           <div className="sm:hidden space-y-2">
             <AnimatePresence>
-              {filteredCari.slice(0, 30).map((cari) => (
+              {filteredCari.slice(0, visibleMobileCount).map((cari) => (
                 <CariCard
                   key={cari.id}
                   cari={cari}
@@ -1502,6 +1546,16 @@ export function CariPage() {
                 />
               ))}
             </AnimatePresence>
+            {filteredCari.length > visibleMobileCount && (
+              <motion.button
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                onClick={() => setVisibleMobileCount(prev => prev + 20)}
+                className="w-full mt-4 py-3 bg-secondary/80 hover:bg-secondary border border-border/50 rounded-xl text-sm font-bold text-foreground/80 transition-colors"
+              >
+                Daha Fazla Göster ({filteredCari.length - visibleMobileCount})
+              </motion.button>
+            )}
             {filteredCari.length === 0 && (
               <div className="text-center py-16 text-muted-foreground">
                 <Filter className="w-8 h-8 mx-auto mb-3 opacity-40" />
@@ -1509,7 +1563,7 @@ export function CariPage() {
               </div>
             )}
           </div>
-        </>
+        </div>
       )}
 
       {/* ─── Add Cari Modal — Premium Wizard ─────────────────────────────── */}
@@ -1532,7 +1586,7 @@ export function CariPage() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.92, y: 30 }}
               transition={{ type: 'spring', damping: 28, stiffness: 350 }}
-              className="fixed inset-2 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[95vw] sm:max-w-2xl overflow-y-auto z-50 rounded-3xl border border-border shadow-[0_32px_100px_-20px_rgba(0,0,0,0.7),0_0_60px_-10px_rgba(59,130,246,0.15)]"
+              className="fixed inset-x-0 bottom-0 sm:inset-auto  sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[95vw] sm:max-w-2xl overflow-y-auto z-50 rounded-3xl border border-border shadow-[0_32px_100px_-20px_rgba(0,0,0,0.7),0_0_60px_-10px_rgba(59,130,246,0.15)] pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6"
               style={{ background: 'linear-gradient(145deg, rgba(12,18,32,0.97), rgba(6,9,15,0.98))', backdropFilter: 'blur(40px) saturate(180%)', maxHeight: 'calc(100dvh - 1rem)' }}
             >
               {/* ── Decorative top gradient bar ── */}
@@ -2225,9 +2279,11 @@ export function CariPage() {
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50" />
           <Dialog.Content
-            className="fixed inset-2 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 card-premium border border-border/50 rounded-2xl sm:w-[95vw] sm:max-w-2xl overflow-y-auto z-50 shadow-2xl" style={{maxHeight:'calc(100dvh - 1rem)'}}
+            className="fixed inset-x-0 bottom-0 sm:inset-auto  sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 card-premium border border-border/50 rounded-t-[2rem] sm:rounded-3xl sm:w-[95vw] sm:max-w-2xl overflow-y-auto z-50 shadow-[0_-5px_40px_rgba(0,0,0,0.3)] sm:shadow-2xl pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6" style={{maxHeight:'calc(100dvh - 1rem)'}}
             aria-describedby={undefined}
           >
+          {/* Grabber for Mobile */}
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-secondary rounded-full sm:hidden" />
             {selectedCari && (
               <>
                 <div className="flex items-center justify-between p-6 border-b border-border">

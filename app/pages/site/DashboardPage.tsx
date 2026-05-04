@@ -886,6 +886,29 @@ export function DashboardPage() {
         ))}
       </motion.div>
 
+      {/* ─── Mobil: Gelişmiş Analitik Toggle ─── */}
+      {isMobile && (
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => setShowAdvancedMobile(v => !v)}
+          className="w-full mb-4 py-3.5 px-4 rounded-2xl border transition-all flex items-center justify-center gap-2.5 text-sm font-bold"
+          style={showAdvancedMobile
+            ? { borderColor: 'rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.06)', color: '#93c5fd' }
+            : { borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', color: '#6b7280' }
+          }
+        >
+          <BarChart3 className="w-4 h-4" style={{ color: showAdvancedMobile ? '#60a5fa' : '#6b7280' }} />
+          <span>{showAdvancedMobile ? 'Gelişmiş Analizleri Gizle' : 'Gelişmiş Analizleri Göster'}</span>
+          <motion.span
+            animate={{ rotate: showAdvancedMobile ? 180 : 0 }}
+            transition={{ duration: 0.25 }}
+            className="text-xs"
+          >▼</motion.span>
+        </motion.button>
+      )}
+
+      {(!isMobile || showAdvancedMobile) && (
+      <>
       {/* ─── Main Chart Section ─── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
         
@@ -1284,6 +1307,9 @@ export function DashboardPage() {
         </motion.div>
       </div>
 
+      </>
+      )}
+
       {/* ─── Bottom Section: Activity & Quick Actions ─── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
         
@@ -1437,26 +1463,7 @@ export function DashboardPage() {
       </div>
       )}
 
-      {/* ─── Mobil: Gelişmiş Analitik Toggle ─── */}
-      {isMobile && (
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          onClick={() => setShowAdvancedMobile(v => !v)}
-          className="w-full py-3.5 px-4 rounded-2xl border transition-all flex items-center justify-center gap-2.5 text-sm font-bold"
-          style={showAdvancedMobile
-            ? { borderColor: 'rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.06)', color: '#93c5fd' }
-            : { borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', color: '#6b7280' }
-          }
-        >
-          <BarChart3 className="w-4 h-4" style={{ color: showAdvancedMobile ? '#60a5fa' : '#6b7280' }} />
-          <span>{showAdvancedMobile ? 'Gelişmiş Analizleri Gizle' : 'Gelişmiş Analizleri Göster'}</span>
-          <motion.span
-            animate={{ rotate: showAdvancedMobile ? 180 : 0 }}
-            transition={{ duration: 0.25 }}
-            className="text-xs"
-          >▼</motion.span>
-        </motion.button>
-      )}
+
 
 
 

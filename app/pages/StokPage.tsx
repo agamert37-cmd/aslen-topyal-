@@ -385,10 +385,6 @@ const ProductCard = React.memo(React.forwardRef(({
       exit={{ opacity: 0, y: -8, transition: { duration: 0.18 } }}
       whileHover={{ y: -1, transition: { duration: 0.15 } }}
     >
-      <SwipeToDelete
-        disabled={!canDelete}
-        onDelete={() => onDelete(product.id, product.name)}
-      >
         <div
           className={`rounded-2xl border transition-colors overflow-hidden ${isMobile ? '' : 'backdrop-blur-md'} ${
             isNeg ? 'bg-gradient-to-br from-red-500/10 via-card to-card border-red-500/25 hover:border-red-500/40' : isCrit ? 'bg-gradient-to-br from-amber-500/8 via-card to-card border-amber-500/20 hover:border-amber-500/35' : 'card-premium hover:border-blue-500/30'
@@ -397,36 +393,41 @@ const ProductCard = React.memo(React.forwardRef(({
           {/* Main Row */}
         <div className="p-3 sm:p-5 flex flex-col lg:flex-row gap-3 sm:gap-5 items-start lg:items-center justify-between">
           {/* Left Info */}
-          <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="flex items-start sm:items-center gap-2 sm:gap-3 flex-1 w-full min-w-0">
             <button
               onClick={() => onToggleExp(product.id)}
-              className="p-1.5 sm:p-2 hover:bg-white/10 rounded-xl transition-colors shrink-0"
+              className="mt-1 sm:mt-0 p-1.5 sm:p-2 hover:bg-white/10 rounded-xl transition-colors shrink-0"
             >
               <motion.div animate={{ rotate: isExp ? 90 : 0 }} transition={{ duration: 0.2 }}>
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
               </motion.div>
             </button>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <h3 className="text-sm sm:text-base font-bold text-foreground truncate">{product.name}</h3>
-                <DataIssueBadge issues={integrity.issues} />
-                <StockStatus current={product.currentStock} min={product.minStock} />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 mb-1.5">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[15px] sm:text-base font-bold text-foreground truncate pr-2">{product.name}</h3>
+                  <div className="sm:hidden shrink-0"><StockStatus current={product.currentStock} min={product.minStock} /></div>
+                </div>
+                <div className="hidden sm:flex items-center gap-1.5 shrink-0">
+                  <DataIssueBadge issues={integrity.issues} />
+                  <StockStatus current={product.currentStock} min={product.minStock} />
+                </div>
               </div>
               <div className="flex gap-1.5 flex-wrap">
-                <span className="px-2 py-0.5 bg-white/5 border border-border rounded-lg text-[10px] text-muted-foreground font-medium flex items-center gap-1"><Tag className="w-2.5 h-2.5" />{product.category}</span>
-                <span className="px-2 py-0.5 bg-white/5 border border-border rounded-lg text-[10px] text-muted-foreground font-medium flex items-center gap-1"><Scale className="w-2.5 h-2.5" />{product.unit}</span>
-                <span className="px-2 py-0.5 bg-white/5 border border-border rounded-lg text-[10px] text-muted-foreground font-medium flex items-center gap-1"><History className="w-2.5 h-2.5" />{product.movements.length}</span>
+                <span className="px-1.5 sm:px-2 py-0.5 bg-white/5 border border-border rounded-md sm:rounded-lg text-[9px] sm:text-[10px] text-muted-foreground font-medium flex items-center gap-1"><Tag className="w-2.5 h-2.5" />{product.category}</span>
+                <span className="px-1.5 sm:px-2 py-0.5 bg-white/5 border border-border rounded-md sm:rounded-lg text-[9px] sm:text-[10px] text-muted-foreground font-medium flex items-center gap-1"><Scale className="w-2.5 h-2.5" />{product.unit}</span>
+                <span className="px-1.5 sm:px-2 py-0.5 bg-white/5 border border-border rounded-md sm:rounded-lg text-[9px] sm:text-[10px] text-muted-foreground font-medium flex items-center gap-1"><History className="w-2.5 h-2.5" />{product.movements.length}</span>
               </div>
             </div>
           </div>
 
           {/* Stats */}
-          <div className="flex flex-wrap sm:flex-nowrap items-stretch gap-2 w-full lg:w-auto mt-2 lg:mt-0">
-            <div className="flex-1 sm:w-28 p-2 rounded-xl bg-secondary/40 border border-border text-center flex flex-col justify-center min-w-[30%]">
-              <p className="text-[9px] font-bold text-gray-600 uppercase mb-0.5">Stok</p>
+          <div className="grid grid-cols-[1.5fr_1fr_1fr] sm:flex items-stretch gap-1.5 sm:gap-2 w-full lg:w-auto mt-2 lg:mt-0">
+            <div className="p-2 sm:p-2.5 rounded-xl bg-secondary/40 border border-border text-center flex flex-col justify-center min-w-[30%]">
+              <p className="text-[9px] sm:text-[10px] font-bold text-gray-600 uppercase mb-0.5">Stok</p>
               <div className="flex flex-col gap-0.5">
-                <p className={`text-sm sm:text-base font-black leading-none ${isNeg ? 'text-red-400' : isCrit ? 'text-orange-400' : 'text-emerald-400'}`}>
-                  {formatStock(product.currentStock, product.unit)} <span className="text-[9px] font-normal">{getUnitLabel(product.unit)}</span>
+                <p className={`text-xs sm:text-sm lg:text-base font-black leading-none ${isNeg ? 'text-red-400' : isCrit ? 'text-orange-400' : 'text-emerald-400'}`}>
+                  {formatStock(product.currentStock, product.unit)} <span className="text-[8px] sm:text-[9px] font-normal">{getUnitLabel(product.unit)}</span>
                 </p>
                 {(() => {
                   const icStock = product.icebergStock || 0;
@@ -441,9 +442,9 @@ const ProductCard = React.memo(React.forwardRef(({
 
                     return (
                       <div className="mt-1 flex flex-col gap-0.5">
-                        <p className="text-[9px] text-cyan-400 font-bold border-t border-cyan-500/20 pt-1">İceberg:{formatStock(icStock, product.unit)}</p>
+                        <p className="text-[8px] sm:text-[9px] text-cyan-400 font-bold border-t border-cyan-500/20 pt-1">İceberg:{formatStock(icStock, product.unit)}</p>
                         {cageTexts.length > 0 && (
-                          <p className="text-[8px] text-cyan-500/80 leading-tight">({cageTexts.join(', ')})</p>
+                          <p className="text-[7px] sm:text-[8px] text-cyan-500/80 leading-tight">({cageTexts.join(', ')})</p>
                         )}
                       </div>
                     );
@@ -452,25 +453,26 @@ const ProductCard = React.memo(React.forwardRef(({
                 })()}
               </div>
             </div>
-            <div className="flex-1 sm:w-24 p-2 rounded-xl bg-secondary/40 border border-border text-center flex flex-col justify-center min-w-[28%]">
-              <p className="text-[9px] font-bold text-gray-600 uppercase mb-0.5">Maliyet</p>
-              <p className="text-sm font-bold text-foreground truncate">{avgCost > 0 ? formatAmount(avgCost) : '-'}</p>
+            <div className="p-2 sm:p-2.5 rounded-xl bg-secondary/40 border border-border text-center flex flex-col justify-center flex-1">
+              <p className="text-[9px] sm:text-[10px] font-bold text-gray-600 uppercase mb-0.5">Maliyet</p>
+              <p className="text-xs sm:text-sm font-bold text-foreground truncate">{avgCost > 0 ? formatAmount(avgCost) : '-'}</p>
             </div>
             {(!isMobile || (avgSell > 0)) && (
-              <div className="flex-1 sm:w-24 p-2 rounded-xl bg-secondary/40 border border-border text-center flex flex-col justify-center min-w-[28%]">
-                <p className="text-[9px] font-bold text-gray-600 uppercase mb-0.5">Satis</p>
-                <p className="text-sm font-bold text-blue-400 truncate">{avgSell > 0 ? formatAmount(avgSell) : '-'}</p>
+              <div className="p-2 sm:p-2.5 rounded-xl bg-secondary/40 border border-border text-center flex flex-col justify-center flex-1">
+                <p className="text-[9px] sm:text-[10px] font-bold text-gray-600 uppercase mb-0.5">Satış</p>
+                <p className="text-xs sm:text-sm font-bold text-blue-400 truncate">{avgSell > 0 ? formatAmount(avgSell) : '-'}</p>
               </div>
             )}
-            <div className="w-full sm:w-auto flex gap-1.5 items-center justify-center mt-1 sm:mt-0">
-              <button onClick={() => onAddMovement(product)} className="flex-1 sm:flex-initial px-3 py-2 bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 font-bold text-[10px] sm:text-xs rounded-xl transition-colors border border-indigo-500/15 flex items-center justify-center gap-1">
-                <RefreshCcw className="w-3.5 h-3.5" />
-              </button>
-              {canEdit && (
-                <button onClick={() => onEdit(product)} className="flex-1 sm:flex-initial p-2 bg-white/5 hover:bg-white/10 text-muted-foreground rounded-xl transition-colors flex items-center justify-center"><Edit className="w-3.5 h-3.5" /></button>
-              )}
-              <button onClick={() => onShowLogs(product.id)} className="flex-1 sm:flex-initial p-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400/70 rounded-xl transition-colors flex items-center justify-center"><Clock className="w-3.5 h-3.5" /></button>
-            </div>
+          </div>
+          
+          <div className="flex w-full gap-2 lg:w-auto mt-2 lg:mt-0 opacity-90">
+            <button onClick={() => onAddMovement(product)} className="flex-1 lg:flex-none px-4 py-2 bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 font-bold text-xs rounded-xl transition-colors border border-indigo-500/15 flex items-center justify-center gap-1.5 focus:scale-95">
+              <RefreshCcw className="w-3.5 h-3.5" /> <span className="lg:hidden">Hareket Ekle</span>
+            </button>
+            {canEdit && (
+              <button onClick={() => onEdit(product)} className="px-4 lg:px-2.5 py-2 bg-white/5 hover:bg-white/10 text-muted-foreground rounded-xl transition-colors flex items-center justify-center focus:scale-95"><Edit className="w-3.5 h-3.5" /></button>
+            )}
+            <button onClick={() => onShowLogs(product.id)} className="px-4 lg:px-2.5 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400/70 rounded-xl transition-colors flex items-center justify-center focus:scale-95"><Clock className="w-3.5 h-3.5" /></button>
           </div>
         </div>
 
@@ -480,30 +482,35 @@ const ProductCard = React.memo(React.forwardRef(({
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="border-t border-border bg-secondary/30">
               <div className="p-3 sm:p-5">
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5"><Clock className="w-3 h-3" />Son Hareketler</h4>
+                  <h4 className="text-[10px] sm:text-[11px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5"><Clock className="w-3 h-3" />Son Hareketler</h4>
                 </div>
                 {product.movements.length === 0 ? (
-                  <p className="text-gray-600 text-[11px] py-4 text-center">Hareket bulunamadi.</p>
+                  <p className="text-gray-600 text-[11px] py-4 text-center">Hareket bulunamadı.</p>
                 ) : (
-                  <div className="space-y-1 max-h-[300px] overflow-y-auto scrollbar-hide">
+                  <div className="space-y-1.5 max-h-[250px] sm:max-h-[350px] overflow-y-auto scrollbar-hide pr-1">
                     {product.movements.slice(0, 10).map((m: any, i: number) => (
-                      <div key={m.id || i} className="flex justify-between items-center gap-2 p-2 rounded-xl bg-white/[0.02] border border-border">
-                        <div className="flex items-center gap-2">
-                          <MovementBadge type={m.type} />
-                          <div>
-                            <p className="text-foreground font-semibold text-[11px] truncate max-w-[120px]">{m.partyName}</p>
-                            <p className="text-[9px] text-gray-600">{formatDate(m.date).split(' ')[0]}</p>
+                      <div key={m.id || i} className="flex justify-between items-center gap-2 p-2 sm:p-2.5 rounded-xl bg-white/[0.03] border border-border hover:bg-white/[0.05] transition-colors">
+                        <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                          <div className="shrink-0 hidden sm:block">
+                            <MovementBadge type={m.type} />
+                          </div>
+                          <div className="min-w-0 flex flex-col">
+                            <div className="flex items-center gap-1">
+                              <span className="sm:hidden"><MovementBadge type={m.type} /></span>
+                              <p className="text-foreground font-semibold text-[11px] sm:text-xs truncate">{m.partyName}</p>
+                            </div>
+                            <p className="text-[9px] sm:text-[10px] text-gray-500 mt-0.5">{formatDate(m.date).split(' ')[0]} {formatDate(m.date).split(' ')[1]}</p>
                           </div>
                         </div>
-                        <div className="flex gap-3 text-right items-center">
-                          <p className={`text-[11px] font-bold ${['ALIS', 'MUSTERI_IADE', 'URETIM_GIRIS'].includes(m.type) ? 'text-emerald-400' : 'text-red-400'}`}>
+                        <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 text-right items-end sm:items-center shrink-0">
+                          <p className={`text-[12px] sm:text-[13px] font-black ${['ALIS', 'MUSTERI_IADE', 'URETIM_GIRIS'].includes(m.type) ? 'text-emerald-400' : 'text-red-400'}`}>
                             {['ALIS', 'MUSTERI_IADE', 'URETIM_GIRIS'].includes(m.type) ? '+' : '-'}{m.quantity}
                           </p>
-                          <p className="text-[11px] font-bold text-foreground w-14">{formatAmount(m.totalAmount)}</p>
-                          <div className="flex items-center gap-1">
-                            <button onClick={() => onEditMovement(product, m)} className="p-1 text-blue-500/40 hover:text-blue-500 transition-colors"><Edit className="w-3 h-3" /></button>
+                          <p className="text-[9px] sm:text-[11px] font-bold text-muted-foreground w-auto sm:w-16 truncate">{formatAmount(m.totalAmount)}</p>
+                          <div className="flex items-center gap-1 sm:ml-2">
+                            <button onClick={() => onEditMovement(product, m)} className="p-1.5 sm:p-2 text-blue-500/40 hover:text-blue-400 bg-blue-500/5 hover:bg-blue-500/20 rounded-lg transition-all focus:scale-95"><Edit className="w-3 h-3 sm:w-3.5 sm:h-3.5" /></button>
                             {canDelete && (
-                              <button onClick={() => onDeleteMovement(product.id, m.id)} className="p-1 text-red-500/40 hover:text-red-500 transition-colors"><X className="w-3 h-3" /></button>
+                              <button onClick={() => onDeleteMovement(product.id, m.id)} className="p-1.5 sm:p-2 text-red-500/40 hover:text-red-400 bg-red-500/5 hover:bg-red-500/20 rounded-lg transition-all focus:scale-95"><X className="w-3 h-3 sm:w-3.5 sm:h-3.5" /></button>
                             )}
                           </div>
                         </div>
@@ -516,7 +523,6 @@ const ProductCard = React.memo(React.forwardRef(({
           )}
         </AnimatePresence>
         </div>
-      </SwipeToDelete>
     </motion.div>
   );
 }));
@@ -574,12 +580,16 @@ export function StokPage() {
     // Sistem verisi yenilendiginde stok yenile
     const unsub3 = on('system:data_refreshed', () => {
       refreshProducts();
+      setIcebergCages(getFromStorage<IcebergCage[]>('iceberg_cages_data') || []);
+      setTransporters(getFromStorage<{id: string, name: string}[]>('transporters_data') || []);
     });
 
     // Backup restore sonrasi yenile
     const unsub4 = on('system:backup_restored', () => {
       console.log('[StokPage] Backup restore algılandi, stok yenileniyor');
       refreshProducts();
+      setIcebergCages(getFromStorage<IcebergCage[]>('iceberg_cages_data') || []);
+      setTransporters(getFromStorage<{id: string, name: string}[]>('transporters_data') || []);
     });
 
     // Fatura eklendi/iptal edildi — stok etkisi olabilir
@@ -754,7 +764,7 @@ export function StokPage() {
   // ─── Stock Alert System (after safeProducts is defined) ──────────────
   const prevAlertRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (!safeProducts.length) return;
+    if (!(safeProducts?.length || 0)) return;
     const newAlerts = new Set<string>();
     safeProducts.forEach(p => {
       if (p.currentStock < 0) {
@@ -867,11 +877,13 @@ export function StokPage() {
   const saveIcebergCages = (updated: IcebergCage[]) => {
     setIcebergCages(updated);
     setInStorage('iceberg_cages_data', updated);
+    emit('system:data_refreshed', { source: 'StokPage' });
   };
   
   const saveTransporters = (updated: {id: string, name: string}[]) => {
     setTransporters(updated);
     setInStorage('transporters_data', updated);
+    emit('system:data_refreshed', { source: 'StokPage' });
   };
 
   const partyInputRef = useRef<HTMLInputElement>(null);
@@ -899,7 +911,7 @@ export function StokPage() {
     const isTumuTr = selectedTrKoduFilter === 'Tumu';
     const isTumuWh = selectedWholesalerFilter === 'Tumu';
 
-    let list = safeProducts.filter(p => {
+    let list = (safeProducts || []).filter(p => {
       // Priority 1: Simple property filters (Fastest)
       if (!isTumuCat && p.category !== selectedCategoryFilter) return false;
       
@@ -927,7 +939,7 @@ export function StokPage() {
       return false;
     });
 
-    list.sort((a, b) => {
+    (list || []).sort((a, b) => {
       let cmp = 0;
       switch (sortKey) {
         case 'name': cmp = a.name.localeCompare(b.name, 'tr'); break;
@@ -938,7 +950,7 @@ export function StokPage() {
       return sortDir === 'asc' ? cmp : -cmp;
     });
 
-    return list;
+    return list || [];
   }, [safeProducts, debouncedSearchTerm, selectedCategoryFilter, selectedTrKoduFilter, selectedWholesalerFilter, sortKey, sortDir]);
 
   const formatAmount = (val: number) => `₺${(val || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -1106,7 +1118,7 @@ export function StokPage() {
     if (!sec.checkRate('delete')) return;
     if (confirm(`"${productName}" urununu silmek istediginize emin misiniz?`)) {
       // Silinen ürünü arşive kaydet
-      const product = products.find(p => p.id === productId);
+      const product = safeProducts.find(p => p.id === productId);
       if (product) {
         const archivedEntry = {
           ...product,
@@ -1284,30 +1296,30 @@ export function StokPage() {
 
   // ─── Stats ──────────────────────────────────────────────
   const stats = useMemo(() => {
-    const critical = safeProducts.filter(p => p.currentStock >= 0 && p.currentStock <= p.minStock);
-    const negative = safeProducts.filter(p => p.currentStock < 0);
-    const totalValue = safeProducts.reduce((sum, p) => p.currentStock > 0 ? sum + ((p.avgCost || 0) * p.currentStock) : sum, 0);
-    const totalMovements = safeProducts.reduce((sum, p) => sum + p.movements.length, 0);
-    const categoryBreakdown = safeProducts.reduce((acc, p) => {
+    const critical = safeProducts?.filter(p => p.currentStock >= 0 && p.currentStock <= p.minStock);
+    const negative = safeProducts?.filter(p => p.currentStock < 0);
+    const totalValue = safeProducts?.reduce((sum, p) => p.currentStock > 0 ? sum + ((p.avgCost || 0) * p.currentStock) : sum, 0);
+    const totalMovements = safeProducts?.reduce((sum, p) => sum + p.movements.length, 0);
+    const categoryBreakdown = safeProducts?.reduce((acc, p) => {
       acc[p.category] = (acc[p.category] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
     const recentMovements = safeProducts
-      .flatMap(p => p.movements.map(m => ({ ...m, productName: p.name, productUnit: p.unit })))
+      .flatMap(p => (p.movements || []).map(m => ({ ...m, productName: p.name, productUnit: p.unit })))
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 20);
 
     // KDV özet verileri
-    const allMovements = safeProducts.flatMap(p => p.movements);
+    const allMovements = safeProducts.flatMap(p => p.movements || []);
     const kdvSummary = {
       alisKdv: allMovements.filter(m => ['ALIS', 'FATURA_ALIS'].includes(m.type)).reduce((s, m) => s + (m.kdvAmount || 0), 0),
       satisKdv: allMovements.filter(m => ['SATIS', 'FATURA_SATIS'].includes(m.type)).reduce((s, m) => s + (m.kdvAmount || 0), 0),
       faturaMovements: allMovements.filter(m => m.type.startsWith('FATURA_')).length,
     };
     // Fatura Stoku kategorisi
-    const faturaStokuCount = safeProducts.filter(p => p.category === 'Fatura Stoku').length;
+    const faturaStokuCount = safeProducts?.filter(p => p.category === 'Fatura Stoku').length;
 
-    return { total: safeProducts.length, critical, negative, totalValue, totalMovements, categoryBreakdown, recentMovements, kdvSummary, faturaStokuCount };
+    return { total: (safeProducts?.length || 0), critical, negative, totalValue, totalMovements, categoryBreakdown, recentMovements, kdvSummary, faturaStokuCount };
   }, [safeProducts]);
 
   // ─── Category Mgmt ─────────────────────────────────────
@@ -1338,7 +1350,7 @@ export function StokPage() {
     setInStorage(StorageKey.STOK_CATEGORIES, updated);
     kvSet('stok_categories', updated).catch(e => console.error('[Stok] kategori kv sync:', e));
     // Update products with batch
-    const affectedProducts = safeProducts.filter(p => p.category === oldName);
+    const affectedProducts = safeProducts?.filter(p => p.category === oldName);
     if (affectedProducts.length > 0) {
       const batchUpdates = affectedProducts.map(p => ({
         id: p.id,
@@ -1358,7 +1370,7 @@ export function StokPage() {
     if (!canDelete) { sec.logUnauthorized('stok_category_delete', 'Kategori silme yetkisi yok'); return; }
     if (!sec.checkRate('delete')) return;
     const name = categories[idx];
-    const productsInCat = safeProducts.filter(p => p.category === name).length;
+    const productsInCat = safeProducts?.filter(p => p.category === name).length;
     if (productsInCat > 0) {
       toast.error(`"${name}" kategorisinde ${productsInCat} urun var. Once urunleri tasiyiniz.`);
       return;
@@ -1388,7 +1400,7 @@ export function StokPage() {
   };
 
   return (
-    <div className="p-3 sm:p-6 lg:p-10 space-y-4 sm:space-y-6 lg:space-y-8 bg-background min-h-screen text-foreground font-sans pb-4 sm:pb-6">
+    <div className="p-3 sm:p-6 lg:p-10 space-y-3 sm:space-y-6 lg:space-y-8 bg-background min-h-screen text-foreground font-sans pb-[calc(6rem+env(safe-area-inset-bottom,0px))] lg:pb-10">
       <SyncStatusBar tableName="urunler" />
 
       {/* Module Health Banner */}
@@ -1532,10 +1544,10 @@ export function StokPage() {
                 <Camera className="w-4 h-4" />
               </button>
             </div>
-            <div className="flex gap-2 flex-wrap items-center">
+            <div className="grid grid-cols-2 sm:flex gap-2 items-center">
               <select
                 value={selectedCategoryFilter} onChange={e => { setSelectedCategoryFilter(e.target.value); sessionStorage.setItem('mert4_filter_stok_cat', e.target.value); }}
-                className="px-3 py-2.5 bg-secondary/50 border border-border rounded-xl text-sm text-foreground focus:border-blue-500/50 transition-all outline-none"
+                className="px-3 py-2.5 bg-secondary/50 border border-border rounded-xl text-sm text-foreground focus:border-blue-500/50 transition-all outline-none w-full sm:w-auto"
               >
                 <option value="Tumu">Tum Kategoriler</option>
                 {categories.map(c => <option key={c} value={c}>{c}</option>)}
@@ -1546,7 +1558,7 @@ export function StokPage() {
                 <select
                   value={selectedTrKoduFilter}
                   onChange={(e) => setSelectedTrKoduFilter(e.target.value)}
-                  className="px-3 py-2.5 bg-emerald-500/5 border border-emerald-500/20 rounded-xl text-sm text-emerald-400 focus:border-emerald-500/50 transition-all outline-none"
+                  className="px-3 py-2.5 bg-emerald-500/5 border border-emerald-500/20 rounded-xl text-sm text-emerald-400 focus:border-emerald-500/50 transition-all outline-none w-full sm:w-auto"
                 >
                   <option value="Tumu">TR Kodu</option>
                   {filterOptions.trKodlari.map(tr => <option key={tr} value={tr}>{tr}</option>)}
@@ -1558,19 +1570,19 @@ export function StokPage() {
                 <select
                   value={selectedWholesalerFilter}
                   onChange={(e) => setSelectedWholesalerFilter(e.target.value)}
-                  className="px-3 py-2.5 bg-indigo-500/5 border border-indigo-500/20 rounded-xl text-sm text-indigo-300 focus:border-indigo-500/50 transition-all outline-none"
+                  className="px-3 py-2.5 bg-indigo-500/5 border border-indigo-500/20 rounded-xl text-sm text-indigo-300 focus:border-indigo-500/50 transition-all outline-none w-full sm:w-auto"
                 >
                   <option value="Tumu">Tedarikçi</option>
                   {filterOptions.toptancilar.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               )}
 
-              <div className="flex bg-secondary/50 rounded-xl border border-border overflow-hidden">
+              <div className="col-span-2 sm:col-span-1 flex bg-secondary/50 rounded-xl border border-border overflow-hidden w-full sm:w-auto">
                 {([['name', 'Ad'], ['stock', 'Stok'], ['cost', 'Maliyet']] as [SortKey, string][]).map(([key, label]) => (
                   <button
                     key={key}
                     onClick={() => toggleSort(key)}
-                    className={`px-3 py-2 text-[10px] sm:text-xs font-bold transition-all ${sortKey === key ? 'bg-blue-500/15 text-blue-400' : 'text-muted-foreground hover:text-muted-foreground'}`}
+                    className={`flex-1 sm:flex-none px-3 py-2.5 sm:py-2 text-[11px] sm:text-xs font-bold transition-all ${sortKey === key ? 'bg-blue-500/15 text-blue-400' : 'text-muted-foreground hover:text-muted-foreground'}`}
                   >
                     {label} {sortKey === key && (sortDir === 'asc' ? '↑' : '↓')}
                   </button>
@@ -1759,7 +1771,7 @@ export function StokPage() {
             {/* Category List */}
             <div className="space-y-2">
               {categories.map((cat, idx) => {
-                const count = safeProducts.filter(p => p.category === cat).length;
+                const count = safeProducts?.filter(p => p.category === cat).length;
                 const isEditing = editingCatIdx === idx;
                 return (
                   <motion.div
@@ -2119,7 +2131,9 @@ export function StokPage() {
 
       {/* Add Product Modal */}
       <Dialog.Root open={isAddModalOpen} onOpenChange={(open) => { setIsAddModalOpen(open); if (!open) { setAddFormCategory(categories[0] || 'Dana'); setAddFormUnit('KG'); } }}>
-        <Dialog.Portal><Dialog.Overlay className={`fixed inset-0 bg-black/80 ${isMobile ? '' : 'backdrop-blur-md'} z-50`} /><Dialog.Content aria-describedby={undefined} className="fixed inset-2 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 modal-glass p-5 sm:p-7 rounded-2xl sm:rounded-3xl border border-border sm:w-[95vw] sm:max-w-md z-50 shadow-2xl overflow-y-auto overscroll-contain" style={{maxHeight:'calc(100dvh - 1rem)'}}>
+        <Dialog.Portal><Dialog.Overlay className={`fixed inset-0 bg-black/80 ${isMobile ? '' : 'backdrop-blur-md'} z-50`} /><Dialog.Content aria-describedby={undefined} className="fixed inset-x-0 bottom-0 sm:inset-auto  sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 modal-glass p-5 sm:p-7 rounded-t-[2rem] sm:rounded-3xl border border-border sm:w-[95vw] sm:max-w-md z-50 shadow-[0_-5px_40px_rgba(0,0,0,0.3)] sm:shadow-2xl overflow-visible pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6" style={{maxHeight:'calc(100dvh - 1rem)'}}>
+          {/* Grabber for Mobile */}
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-secondary rounded-full sm:hidden" />
           <div className="flex justify-between items-center mb-6">
             <Dialog.Title className="text-lg sm:text-xl font-black text-foreground flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-blue-500/15 flex items-center justify-center"><Package className="w-4 h-4 text-blue-400" /></div>
@@ -2135,11 +2149,19 @@ export function StokPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 ml-1">Kategori</label>
-                <CustomSelect value={addFormCategory} onChange={setAddFormCategory} options={categories.map(c => ({ value: c, label: c }))} placeholder="Kategori Sec" name="category" />
+                <select value={addFormCategory} onChange={e => setAddFormCategory(e.target.value)} required className="w-full p-3 bg-secondary/60 border border-border rounded-xl text-foreground outline-none focus:border-blue-500/50 text-sm transition-all">
+                  <option value="" disabled>Kategori Sec</option>
+                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
               </div>
               <div>
                 <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 ml-1">Birim</label>
-                <CustomSelect value={addFormUnit} onChange={setAddFormUnit} options={[{ value: 'KG', label: 'KG' }, { value: 'Adet', label: 'Adet' }, { value: 'Koli', label: 'Koli' }]} placeholder="Birim Sec" name="unit" />
+                <select value={addFormUnit} onChange={e => setAddFormUnit(e.target.value)} required className="w-full p-3 bg-secondary/60 border border-border rounded-xl text-foreground outline-none focus:border-blue-500/50 text-sm transition-all">
+                  <option value="" disabled>Birim Sec</option>
+                  <option value="KG">KG</option>
+                  <option value="Adet">Adet</option>
+                  <option value="Koli">Koli</option>
+                </select>
               </div>
             </div>
             <div>
@@ -2153,7 +2175,9 @@ export function StokPage() {
 
       {/* Add Movement Modal */}
       <Dialog.Root open={isAddMovementModalOpen} onOpenChange={(open) => { setIsAddMovementModalOpen(open); if (!open) { setPartySearch(''); setPartyTrKodu(''); setSelectedCariId(null); setMovementTypeForFilter('ALIS'); } }}>
-        <Dialog.Portal><Dialog.Overlay className={`fixed inset-0 bg-black/80 ${isMobile ? '' : 'backdrop-blur-md'} z-50`} /><Dialog.Content aria-describedby={undefined} className="fixed inset-2 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 modal-glass p-5 sm:p-7 rounded-2xl sm:rounded-3xl border border-border sm:w-[95vw] sm:max-w-md z-50 shadow-2xl overflow-y-auto overscroll-contain" style={{maxHeight:'calc(100dvh - 1rem)'}}>
+        <Dialog.Portal><Dialog.Overlay className={`fixed inset-0 bg-black/80 ${isMobile ? '' : 'backdrop-blur-md'} z-50`} /><Dialog.Content aria-describedby={undefined} className="fixed inset-x-0 bottom-0 sm:inset-auto  sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 modal-glass p-5 sm:p-7 rounded-t-[2rem] sm:rounded-3xl border border-border sm:w-[95vw] sm:max-w-md z-50 shadow-[0_-5px_40px_rgba(0,0,0,0.3)] sm:shadow-2xl overflow-y-auto overscroll-contain pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6" style={{maxHeight:'calc(100dvh - 1rem)'}}>
+          {/* Grabber for Mobile */}
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-secondary rounded-full sm:hidden" />
           <div className="flex justify-between items-center mb-6">
             <Dialog.Title className="text-lg sm:text-xl font-black text-foreground flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-indigo-500/15 flex items-center justify-center"><RefreshCcw className="w-4 h-4 text-indigo-400" /></div>
@@ -2354,7 +2378,9 @@ export function StokPage() {
 
       {/* Edit Product Modal */}
       <Dialog.Root open={isEditModalOpen} onOpenChange={(open) => { setIsEditModalOpen(open); if (open && selectedProduct) { setEditFormCategory(selectedProduct.category); setEditFormUnit(selectedProduct.unit); } }}>
-        <Dialog.Portal><Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-md z-50" /><Dialog.Content aria-describedby={undefined} className="fixed inset-2 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 modal-glass p-5 sm:p-7 rounded-2xl sm:rounded-3xl border border-border sm:w-[95vw] sm:max-w-md z-50 shadow-2xl overflow-y-auto overscroll-contain" style={{maxHeight:'calc(100dvh - 1rem)'}}>
+        <Dialog.Portal><Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-md z-50" /><Dialog.Content aria-describedby={undefined} className="fixed inset-x-0 bottom-0 sm:inset-auto  sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 modal-glass p-5 sm:p-7 rounded-t-[2rem] sm:rounded-3xl border border-border sm:w-[95vw] sm:max-w-md z-50 shadow-[0_-5px_40px_rgba(0,0,0,0.3)] sm:shadow-2xl overflow-y-auto overscroll-contain pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6" style={{maxHeight:'calc(100dvh - 1rem)'}}>
+          {/* Grabber for Mobile */}
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-secondary rounded-full sm:hidden" />
           <div className="flex justify-between items-center mb-6">
             <Dialog.Title className="text-lg sm:text-xl font-black text-foreground flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-blue-500/15 flex items-center justify-center"><Edit className="w-4 h-4 text-blue-400" /></div>
@@ -2395,7 +2421,23 @@ export function StokPage() {
                   className="w-full p-3 bg-violet-500/5 border border-violet-500/20 rounded-xl text-foreground outline-none focus:border-violet-500/50 text-sm transition-all" 
                 />
               </div>
-              <button type="submit" className="w-full py-3 mt-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-foreground font-bold rounded-xl transition-all active:scale-[0.98] shadow-lg shadow-blue-600/20">Guncelle</button>
+              <div className="flex gap-3 mt-4 pt-2 border-t border-border/50">
+                {canDelete && (
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      if (selectedProduct) {
+                        handleDeleteProductClick(selectedProduct.id, selectedProduct.name);
+                        setIsEditModalOpen(false);
+                      }
+                    }}
+                    className="flex-shrink-0 px-4 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold rounded-xl transition-all active:scale-[0.98] border border-red-500/20"
+                  >
+                    Ürünü Sil
+                  </button>
+                )}
+                <button type="submit" className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-foreground font-bold rounded-xl transition-all active:scale-[0.98] shadow-lg shadow-blue-600/20">Guncelle</button>
+              </div>
             </form>
           )}
         </Dialog.Content></Dialog.Portal>

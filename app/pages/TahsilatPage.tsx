@@ -11,7 +11,7 @@ import { getFromStorage, setInStorage, StorageKey } from '../utils/storage';
 import { useTableSync } from '../hooks/useTableSync';
 import { useDebounce } from '../hooks/useDebounce';
 import { cariToDb, cariFromDb } from './CariPage';
-import { saveCek, type CekData } from './CeklerPage';
+import { type CekData } from './CeklerPage';
 import {
   Wallet,
   CreditCard,
@@ -173,9 +173,17 @@ export function TahsilatPage() {
     const centPerInstallment = Math.floor(centTotal / installmentCount);
     const lastInstallmentCents = centTotal - centPerInstallment * (installmentCount - 1);
     const plan: InstallmentPlan[] = [];
+    
     for (let i = 0; i < installmentCount; i++) {
       const date = new Date();
+      const startDay = date.getDate();
       date.setMonth(date.getMonth() + i + 1);
+      
+      // Ay sonu taşmalarını engelle (örn: 31 Ocak -> 31 Şubat (3 Mart) olmasın, 28/29 Şubat olsun)
+      if (date.getDate() !== startDay) {
+          date.setDate(0); 
+      }
+
       plan.push({
         no: i + 1,
         date: date.toISOString().split('T')[0],
@@ -914,6 +922,24 @@ export function TahsilatPage() {
                   {paymentType === 'cek' && checkDate && <Row label={t('collection.dueDate')} value={new Date(checkDate).toLocaleDateString('tr-TR')} />}
                   {paymentType === 'eft' && eftReferenceNo && <Row label={t('collection.referenceNo')} value={eftReferenceNo} />}
                   {paymentType === 'taksit' && <Row label={t('collection.installmentCount')} value={`${installmentPlan.length} ${t('collection.installment')}`} />}
+                  
+                  <div className="my-2 border-t border-border/50 pt-2 grid grid-cols-2 gap-4">
+                    <div className="flex flex-col">
+                       <span className="text-xs text-muted-foreground uppercase">Eski Bakiye</span>
+                       <span className={`text-sm font-bold ${selectedCustomer.balance > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                         {selectedCustomer.balance > 0 ? 'Borç: ' : 'Alacak: '}
+                         ₺{Math.abs(selectedCustomer.balance).toLocaleString('tr-TR')}
+                       </span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                       <span className="text-xs text-muted-foreground uppercase">Yeni Bakiye</span>
+                       <span className={`text-sm font-bold ${selectedCustomer.balance - (paymentType === 'taksit' ? installmentPlan.reduce((s, i) => s + i.amount, 0) : parseFloat(amount || '0')) > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                         {selectedCustomer.balance - (paymentType === 'taksit' ? installmentPlan.reduce((s, i) => s + i.amount, 0) : parseFloat(amount || '0')) > 0 ? 'Borç: ' : 'Alacak: '}
+                         ₺{Math.abs(selectedCustomer.balance - (paymentType === 'taksit' ? installmentPlan.reduce((s, i) => s + i.amount, 0) : parseFloat(amount || '0'))).toLocaleString('tr-TR')}
+                       </span>
+                    </div>
+                  </div>
+
                   <Row label={t('collection.performedBy')} value={currentEmployee?.name || '-'} />
                 </div>
 

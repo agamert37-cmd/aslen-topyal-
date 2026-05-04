@@ -4,7 +4,7 @@ import {
   Building2, User, Calendar, Receipt, CheckCircle2, XCircle, Camera,
   Package, ArrowUpRight, ArrowDownRight, Percent, AlertTriangle,
   ChevronDown, Hash, Phone, MapPin, FileCheck, Sparkles, Image as ImageIcon,
-  Store, Truck, ToggleLeft, ToggleRight, MessageCircle,
+  Store, Truck, ToggleLeft, ToggleRight, MessageCircle, Settings,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { staggerContainer, rowItem, hover, tap } from '../utils/animations';
@@ -204,6 +204,12 @@ export function FaturaPage() {
   const debouncedCariSearchTerm = useDebounce(cariSearchTerm, 300);
   const [cariPickerTab, setCariPickerTab] = useState<'toptanci' | 'ozel'>('toptanci');
   const [activePageTab, setActivePageTab] = useState<'faturalar' | 'kdvRaporu' | 'stokEtki'>('faturalar');
+
+  const [isInvoiceNamesModalOpen, setIsInvoiceNamesModalOpen] = useState(false);
+  const [invoiceNamesList, setInvoiceNamesList] = useState<{id: string, name: string}[]>(() => {
+     return getFromStorage<{id: string, name: string}[]>('invoice_names_data') || [];
+  });
+  const [newInvoiceName, setNewInvoiceName] = useState('');
 
   // ─── useTableSync ENTEGRASYONU ──────────────────────────────────────
   const { data: syncFaturalar, addItem: addFaturaSync, updateItem: updateFaturaSync, deleteItem: deleteFaturaSync } = useTableSync<any>({
@@ -778,26 +784,99 @@ export function FaturaPage() {
       )}
 
       {/* ─── Tabs ─── */}
-      <div className="flex gap-1 p-1 rounded-2xl bg-white/[0.03] border border-border">
-        {([
-          { key: 'faturalar' as const, label: t('fatura.tab.invoices'), icon: FileText },
-          { key: 'kdvRaporu' as const, label: t('fatura.tab.kdvReport'), icon: Percent },
-          { key: 'stokEtki' as const, label: t('fatura.tab.stockImpact'), icon: Package },
-        ]).map(tab => (
+      <div className="flex flex-col sm:flex-row justify-between mb-4 gap-4">
+        <div className="flex gap-1 p-1 rounded-2xl bg-white/[0.03] border border-border">
+          {([
+            { key: 'faturalar' as const, label: t('fatura.tab.invoices'), icon: FileText },
+            { key: 'kdvRaporu' as const, label: t('fatura.tab.kdvReport'), icon: Percent },
+            { key: 'stokEtki' as const, label: t('fatura.tab.stockImpact'), icon: Package },
+          ]).map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActivePageTab(tab.key)}
+              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                activePageTab === tab.key
+                  ? 'bg-white/10 text-foreground shadow-lg'
+                  : 'text-muted-foreground hover:text-muted-foreground hover:bg-white/[0.03]'
+              }`}
+            >
+              <tab.icon className="w-3.5 h-3.5" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center justify-end">
           <button
-            key={tab.key}
-            onClick={() => setActivePageTab(tab.key)}
-            className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
-              activePageTab === tab.key
-                ? 'bg-white/10 text-foreground shadow-lg'
-                : 'text-muted-foreground hover:text-muted-foreground hover:bg-white/[0.03]'
-            }`}
+            onClick={() => setIsInvoiceNamesModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 rounded-xl text-sm font-bold transition-colors"
           >
-            <tab.icon className="w-3.5 h-3.5" />
-            {tab.label}
+            <Settings className="w-4 h-4" /> Genel Fatura İsimleri
           </button>
-        ))}
+        </div>
       </div>
+
+      {/* Invoice Names Modal */}
+      <Dialog.Root open={isInvoiceNamesModalOpen} onOpenChange={setIsInvoiceNamesModalOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-md z-50" />
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-card border border-border rounded-3xl z-50 overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="p-4 sm:p-6 pb-4 border-b border-white/10 flex items-center justify-between sticky top-0 bg-card/90 backdrop-blur-md z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
+                  <Settings className="w-5 h-5 text-indigo-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-foreground tracking-tight">Genel Fatura İsimleri</h2>
+                  <p className="text-xs text-muted-foreground text-opacity-80">Satış fişlerinde kullanılacak genel ürün isimleri</p>
+                </div>
+              </div>
+              <Dialog.Close asChild>
+                <button className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </Dialog.Close>
+            </div>
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-4">
+               <div className="flex gap-2">
+                 <input 
+                    type="text"
+                    value={newInvoiceName}
+                    onChange={e => setNewInvoiceName(e.target.value)}
+                    placeholder="Örn: Sakatat, Ambalaj Malzemesi..."
+                    className="flex-1 px-4 py-3 bg-background border border-border rounded-xl focus:border-indigo-500/50 outline-none text-sm"
+                 />
+                 <button onClick={() => {
+                    if(!newInvoiceName.trim()) return;
+                    const newList = [...invoiceNamesList, { id: 'invname-'+Date.now(), name: newInvoiceName.trim() }];
+                    setInvoiceNamesList(newList);
+                    setInStorage('invoice_names_data', newList);
+                    setNewInvoiceName('');
+                    toast.success('İsim eklendi');
+                 }} className="px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl flex items-center gap-2">
+                   <Plus className="w-4 h-4" /> Ekle
+                 </button>
+               </div>
+               <div className="space-y-2 mt-4">
+                 {invoiceNamesList.map(item => (
+                   <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-border">
+                     <span className="text-sm font-medium">{item.name}</span>
+                     <button onClick={() => {
+                        const newList = invoiceNamesList.filter(x => x.id !== item.id);
+                        setInvoiceNamesList(newList);
+                        setInStorage('invoice_names_data', newList);
+                     }} className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg">
+                       <Trash2 className="w-4 h-4" />
+                     </button>
+                   </div>
+                 ))}
+                 {invoiceNamesList.length === 0 && (
+                   <div className="text-center py-6 text-muted-foreground text-sm">Henüz eklenmiş isim yok</div>
+                 )}
+               </div>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
 
       {/* ═══════ TAB: Faturalar ═══════ */}
       {activePageTab === 'faturalar' && (<>
@@ -1085,7 +1164,9 @@ export function FaturaPage() {
       <Dialog.Root open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50" />
-          <Dialog.Content className="fixed inset-2 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[95vw] sm:max-w-2xl bg-[#0a0a0f] border border-border rounded-3xl z-50 flex flex-col overflow-hidden shadow-2xl" style={{maxHeight: 'calc(100dvh - 1rem)'}}>
+          <Dialog.Content className="fixed inset-x-0 bottom-0 sm:inset-auto  sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[95vw] sm:max-w-2xl bg-[#0a0a0f] border border-border rounded-3xl z-50 flex flex-col overflow-hidden shadow-[0_-5px_40px_rgba(0,0,0,0.3)] sm:shadow-2xl pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6" style={{maxHeight: 'calc(100dvh - 1rem)'}}>
+          {/* Grabber for Mobile */}
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-secondary rounded-full sm:hidden" />
             <div className="p-6 border-b border-border flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-black text-foreground flex items-center gap-2">
@@ -1344,7 +1425,9 @@ export function FaturaPage() {
       <Dialog.Root open={isDetailOpen} onOpenChange={setIsDetailOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50" />
-          <Dialog.Content className="fixed inset-2 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[95vw] sm:max-w-xl bg-[#0a0a0f] border border-border rounded-3xl z-50 flex flex-col overflow-hidden shadow-2xl" style={{maxHeight: 'calc(100dvh - 1rem)'}}>
+          <Dialog.Content className="fixed inset-x-0 bottom-0 sm:inset-auto  sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[95vw] sm:max-w-xl bg-[#0a0a0f] border border-border rounded-3xl z-50 flex flex-col overflow-hidden shadow-[0_-5px_40px_rgba(0,0,0,0.3)] sm:shadow-2xl pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6" style={{maxHeight: 'calc(100dvh - 1rem)'}}>
+          {/* Grabber for Mobile */}
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-secondary rounded-full sm:hidden" />
             {selectedFatura && (
               <>
                 <div className={`p-6 border-b border-border ${selectedFatura.status === 'iptal' ? 'bg-red-500/5' : selectedFatura.type === 'alis' ? 'bg-orange-500/5' : 'bg-emerald-500/5'}`}>
@@ -1527,7 +1610,9 @@ export function FaturaPage() {
       <Dialog.Root open={isFaturaStokModalOpen} onOpenChange={setIsFaturaStokModalOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50" />
-          <Dialog.Content className="fixed inset-2 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[95vw] sm:max-w-lg bg-[#0a0a0f] border border-border rounded-3xl z-50 flex flex-col overflow-hidden shadow-2xl" style={{maxHeight: 'calc(100dvh - 1rem)'}}>
+          <Dialog.Content className="fixed inset-x-0 bottom-0 sm:inset-auto  sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[95vw] sm:max-w-lg bg-[#0a0a0f] border border-border rounded-3xl z-50 flex flex-col overflow-hidden shadow-[0_-5px_40px_rgba(0,0,0,0.3)] sm:shadow-2xl pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6" style={{maxHeight: 'calc(100dvh - 1rem)'}}>
+          {/* Grabber for Mobile */}
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-secondary rounded-full sm:hidden" />
             <div className="p-6 border-b border-border">
               <h2 className="text-lg font-black text-foreground flex items-center gap-2">
                 <Package className="w-5 h-5 text-amber-400" /> Fatura Stok Kalemleri

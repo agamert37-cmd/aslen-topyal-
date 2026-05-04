@@ -2,9 +2,10 @@ import { defineConfig } from 'vite'
 import path from 'path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
+import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  base: './', // CRITICAL for electron built index.html loading assets natively
+  base: './', // CRITICAL for electron built index.html loading assets natively // DO NOT CHANGE THIS OR IT WILL BREAK LOCAL ELECTRON ROUTES
   server: {
     port: 3000,
     host: '0.0.0.0',
@@ -15,6 +16,35 @@ export default defineConfig({
     // Tailwind is not being actively used – do not remove them
     react(),
     tailwindcss(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      injectRegister: 'auto',
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        maximumFileSizeToCacheInBytes: 15 * 1024 * 1024,
+      },
+      manifest: {
+        name: 'İşleyen Et Karargah',
+        short_name: 'İşleyenEt',
+        description: 'Karargah PWA and Offline System',
+        theme_color: '#000000',
+        background_color: '#000000',
+        display: 'standalone',
+        orientation: 'portrait',
+        icons: [
+          {
+            src: 'pwa-192x192.svg',
+            sizes: '192x192',
+            type: 'image/svg+xml'
+          },
+          {
+            src: 'pwa-512x512.svg',
+            sizes: '512x512',
+            type: 'image/svg+xml'
+          }
+        ]
+      }
+    })
   ],
   resolve: {
     alias: {

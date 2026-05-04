@@ -15,22 +15,23 @@ export interface CouchDbConfig {
  * Varsayılan CouchDB bağlantı noktasını belirle.
  *
  * Öncelik sırası:
- *   1. VITE_COUCHDB_URL env değişkeni (build-time veya .env.local)
- *   2. Tarayıcı origin + '/couchdb' — nginx reverse proxy yolu (Docker)
- *      http://<sunucu>/couchdb  →  nginx  →  http://couchdb:5984
- *      • CORS sorunu olmaz (aynı origin)
- *      • Herhangi bir cihazdan bağlanılabilir (hardcoded localhost değil)
- *      • Docker servis adı (couchdb) ile doğrudan iletişim kurulur
- *   3. Fallback: http://localhost:5984 (doğrudan geliştirme ortamı)
+ *   1. Tarayıcı origin + '/couchdb' — proxy yolu (CORS sorunlarını kökten çözer)
+ *   2. VITE_COUCHDB_URL env değişkeni (build-time veya .env.local) (Eğer ki doğrudan URL isteniyorsa)
+ *   3. Fallback: http://127.0.0.1:5984 (doğrudan ortam)
  */
 function _defaultCouchUrl(): string {
+  // ÖNCELİK: Eğer ki tarayıcı içinde çalışıyorsa, daima kendi reverse proxy (/couchdb) rotasını kullan.
+  // Bu daima CORS hatalarını engeller! Node (Electron) vb ise VITE_... ortamını alır
+  if (typeof window !== 'undefined' && window.location && window.location.origin) {
+    if ((import.meta as any).env?.VITE_DO_NOT_PROXY_COUCH !== 'true') {
+      return window.location.origin + '/couchdb';
+    }
+  }
+
   const envUrl = (import.meta as any).env?.VITE_COUCHDB_URL;
   if (envUrl) return envUrl;
-  // Tarayıcıda çalışıyorsa nginx proxy yolunu kullan (Docker deployment için)
-  if (typeof window !== 'undefined') {
-    return window.location.origin + '/couchdb';
-  }
-  return 'http://localhost:5984';
+  
+  return 'http://127.0.0.1:5984';
 }
 
 const DEFAULT_CONFIG: CouchDbConfig = {
@@ -122,6 +123,7 @@ export const TABLE_NAMES = [
   'search_history',      // Kullanıcıların arama trendleri
   'favorite_items',      // Hızlı erişim için işaretlenen kayıtlar
   'performance_metrics', // Uygulama çalışma/hız istatistikleri
+  'iletisim_talepleri',  // Siteden gelen müşteri talepleri
 ] as const;
 
 export type TableName = typeof TABLE_NAMES[number];

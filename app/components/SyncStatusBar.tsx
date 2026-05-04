@@ -78,7 +78,7 @@ export function SyncStatusBar({ tableName }: SyncStatusBarProps) {
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center gap-2 px-3 py-1.5 bg-white/[0.03] border border-white/8 rounded-xl text-xs text-foreground/40 mb-4"
+        className="flex items-center gap-2 px-3 py-1.5 bg-white/[0.03] border border-white/8 rounded-xl text-xs text-foreground/40 mb-2 sm:mb-4"
       >
         <Loader2 className="w-3 h-3 animate-spin" />
         <span>Veritabanı kontrol ediliyor...</span>
@@ -125,7 +125,7 @@ export function SyncStatusBar({ tableName }: SyncStatusBarProps) {
   const tablesWithData = globalTables.filter(t => t.docCount > 0).length;
 
   return (
-    <div className="mb-4">
+    <div className="mb-2 sm:mb-4">
       {/* ── Ana bar ───────────────────────────────────────────── */}
       <motion.div
         layout
@@ -134,7 +134,7 @@ export function SyncStatusBar({ tableName }: SyncStatusBarProps) {
         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
         onClick={() => setIsExpanded(v => !v)}
         className={`
-          relative flex items-center gap-3 px-4 py-2.5 rounded-2xl border cursor-pointer
+          relative flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-1.5 sm:py-2.5 rounded-xl sm:rounded-2xl border cursor-pointer
           overflow-hidden select-none transition-colors duration-300
           ${isConnected
             ? 'bg-emerald-950/30 border-emerald-800/30 hover:border-emerald-700/50 hover:bg-emerald-950/40'
@@ -152,7 +152,7 @@ export function SyncStatusBar({ tableName }: SyncStatusBarProps) {
         />
 
         {/* Bağlantı göstergesi */}
-        <div className="relative flex items-center gap-2 flex-shrink-0">
+        <div className="relative flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
           {/* Nabız animasyonu */}
           {isConnected && !isChecking && (
             <span className="absolute -inset-1.5">
@@ -163,23 +163,23 @@ export function SyncStatusBar({ tableName }: SyncStatusBarProps) {
               />
             </span>
           )}
-          <div className={`relative w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 ${
+          <div className={`relative w-5 h-5 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 ${
             isConnected ? 'bg-emerald-500/15' : 'bg-red-500/15'
           }`}>
             {isChecking ? (
-              <RefreshCw className="w-3.5 h-3.5 text-foreground/50 animate-spin" />
+              <RefreshCw className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-foreground/50 animate-spin" />
             ) : isConnected ? (
-              <Zap className="w-3.5 h-3.5 text-emerald-400" />
+              <Zap className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-emerald-400" />
             ) : (
-              <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
+              <AlertTriangle className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-red-400" />
             )}
           </div>
         </div>
 
         {/* Durum metni */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-xs font-semibold ${isConnected ? 'text-emerald-300' : 'text-red-300'}`}>
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+            <span className={`text-[10px] sm:text-xs font-semibold ${isConnected ? 'text-emerald-300' : 'text-red-300'}`}>
               {isChecking ? 'Kontrol ediliyor...' : isConnected ? 'Bulut Bağlı' : 'Bağlantı Yok'}
             </span>
             {isConnected && (
@@ -187,9 +187,9 @@ export function SyncStatusBar({ tableName }: SyncStatusBarProps) {
                 key={totalRecords}
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="text-[10px] text-foreground/30 font-mono"
+                className="text-[9px] sm:text-[10px] text-foreground/30 font-mono"
               >
-                {totalRecords} kayıt · {tablesWithData}/{tables.length} tablo
+                {totalRecords} kayıt <span className="hidden sm:inline">· {tablesWithData}/{tables.length} tablo</span>
               </motion.span>
             )}
             {latencyMs && isConnected && (
@@ -238,18 +238,18 @@ export function SyncStatusBar({ tableName }: SyncStatusBarProps) {
               className={`rounded-full transition-all duration-300 ${
                 t.table === tableName
                   ? t.rowCount > 0
-                    ? 'w-2.5 h-2.5 bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]'
-                    : 'w-2.5 h-2.5 bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.8)]'
+                    ? 'w-2 h-2 sm:w-2.5 sm:h-2.5 bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]'
+                    : 'w-2 h-2 sm:w-2.5 sm:h-2.5 bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.8)]'
                   : t.rowCount > 0
-                  ? 'w-1.5 h-1.5 bg-emerald-600/80'
-                  : 'w-1.5 h-1.5 bg-white/10'
+                  ? 'w-1 h-1 sm:w-1.5 sm:h-1.5 bg-emerald-600/80'
+                  : 'w-1 h-1 sm:w-1.5 sm:h-1.5 bg-white/10'
               }`}
             />
           ))}
         </div>
 
         {/* Sağ: butonlar */}
-        <div className="flex items-center gap-1.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
           {/* Senkronize Et butonu */}
           {tableName && isConnected && (
             <motion.button
@@ -257,13 +257,13 @@ export function SyncStatusBar({ tableName }: SyncStatusBarProps) {
               disabled={isSyncing}
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              className={`flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-semibold transition-all ${
                 isSyncing
                   ? 'bg-blue-800/40 text-blue-400 cursor-wait'
                   : 'bg-blue-600/80 hover:bg-blue-500 text-foreground shadow-sm shadow-blue-500/20'
               }`}
             >
-              <Upload className={`w-3 h-3 ${isSyncing ? 'animate-bounce' : ''}`} />
+              <Upload className={`w-2.5 h-2.5 sm:w-3 sm:h-3 ${isSyncing ? 'animate-bounce' : ''}`} />
               <span className="hidden sm:inline">
                 {isSyncing ? (syncProgress || 'Senkronize...') : 'Senkronize Et'}
               </span>
@@ -275,15 +275,15 @@ export function SyncStatusBar({ tableName }: SyncStatusBarProps) {
             onClick={() => recheckTables()}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
-            className="p-1.5 hover:bg-white/8 rounded-lg transition-colors"
+            className="p-1 sm:p-1.5 hover:bg-white/8 rounded-md sm:rounded-lg transition-colors"
             title="Yenile"
           >
-            <RefreshCw className={`w-3 h-3 text-foreground/30 ${isChecking ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-2.5 h-2.5 sm:w-3 sm:h-3 text-foreground/30 ${isChecking ? 'animate-spin' : ''}`} />
           </motion.button>
 
           {/* Son kontrol zamanı */}
           {lastChecked && (
-            <span className="text-[10px] text-foreground/20 font-mono hidden md:inline">
+            <span className="text-[9px] sm:text-[10px] text-foreground/20 font-mono hidden md:inline">
               {lastChecked.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
             </span>
           )}
@@ -292,8 +292,9 @@ export function SyncStatusBar({ tableName }: SyncStatusBarProps) {
           <motion.div
             animate={{ rotate: isExpanded ? 180 : 0 }}
             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+            className="ml-0.5 sm:ml-1"
           >
-            <ChevronDown className="w-3.5 h-3.5 text-foreground/25" />
+            <ChevronDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-foreground/25" />
           </motion.div>
         </div>
       </motion.div>
@@ -309,31 +310,31 @@ export function SyncStatusBar({ tableName }: SyncStatusBarProps) {
             transition={{ type: 'spring', stiffness: 350, damping: 30 }}
             className="overflow-hidden"
           >
-            <div className="mt-2 rounded-2xl border border-white/8 bg-[#0d1117] overflow-hidden">
+            <div className="mt-1 sm:mt-2 rounded-xl sm:rounded-2xl border border-white/8 bg-[#0d1117] overflow-hidden">
               {/* Başlık şeridi */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-white/[0.02]">
-                <div className="flex items-center gap-2">
-                  <Activity className="w-3.5 h-3.5 text-foreground/40" />
-                  <span className="text-xs font-semibold text-foreground/60">Veritabanı Durumu</span>
+              <div className="flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3 border-b border-border bg-white/[0.02]">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <Activity className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-foreground/40" />
+                  <span className="text-[10px] sm:text-xs font-semibold text-foreground/60">Veritabanı Durumu</span>
                   {isConnected && (
                     <motion.span
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
-                      className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full"
+                      className="flex items-center gap-1 text-[9px] sm:text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 sm:px-2 py-0.5 rounded-full"
                     >
                       <CheckCircle2 className="w-2.5 h-2.5" /> Aktif
                     </motion.span>
                   )}
                 </div>
-                <div className="flex items-center gap-3 text-[10px] text-foreground/25 font-mono">
-                  {latencyMs && <span>{latencyMs}ms gecikme</span>}
+                <div className="flex items-center gap-2 sm:gap-3 text-[9px] sm:text-[10px] text-foreground/25 font-mono">
+                  {latencyMs && <span className="hidden sm:inline">{latencyMs}ms gecikme</span>}
                   {kvTotalKeys != null && <span>{kvTotalKeys} KV key</span>}
                 </div>
               </div>
 
               {/* Tablo grid */}
-              <div className="p-3">
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+              <div className="p-2 sm:p-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5 sm:gap-2">
                   {tables.map((t, i) => (
                     <motion.div
                       key={t.table}
@@ -341,7 +342,7 @@ export function SyncStatusBar({ tableName }: SyncStatusBarProps) {
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       transition={{ delay: i * 0.03, type: 'spring', stiffness: 400, damping: 28 }}
                       className={`
-                        flex items-center gap-2 px-3 py-2 rounded-xl border text-xs transition-all
+                        flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl border text-[10px] sm:text-xs transition-all
                         ${t.table === tableName
                           ? t.rowCount > 0
                             ? 'bg-emerald-950/40 border-emerald-700/40 shadow-[inset_0_0_12px_rgba(52,211,153,0.06)]'

@@ -55,7 +55,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { cariToDb, cariFromDb } from './CariPage';
 import { productToDb, productFromDb } from './StokPage';
 import { PaymentSelector } from '../components/PaymentSelector';
-import { saveCek, type CekData } from './CeklerPage';
+import { type CekData } from './CeklerPage';
 import { useModuleBus } from '../hooks/useModuleBus';
 import { getPagePermissions } from '../utils/permissions';
 import { usePageSecurity } from '../hooks/usePageSecurity';
@@ -161,6 +161,12 @@ export function SalesPage() {
   const [alisKdvRate, setAlisKdvRate] = useState(20);
   const [alisInvoicePhoto, setAlisInvoicePhoto] = useState('');
   const [alisInvoiceNo, setAlisInvoiceNo] = useState('');
+
+  // ─── Satış Fatura Takibi ─────────────────────────────────────────────────
+  const [satisHasInvoice, setSatisHasInvoice] = useState(false);
+  const [satisInvoiceType, setSatisInvoiceType] = useState<'urun' | 'genel'>('urun');
+  const [satisInvoiceName, setSatisInvoiceName] = useState('');
+  const [satisKdvRate, setSatisKdvRate] = useState(20);
 
   // ─── SENKRONİZASYON (KV STORE) ────────────────────────────────────────────────
   const { data: syncCariList, updateItem: updateCariSync, addItem: addCariSync } = useTableSync<any>({
@@ -555,6 +561,11 @@ export function SalesPage() {
     setGiderDescription('');
     setGiderPhoto('');
     setAlisHasInvoice(false);
+    setAlisInvoiceNo('');
+    setAlisInvoicePhoto('');
+    setSatisHasInvoice(false);
+    setSatisInvoiceType('urun');
+    setSatisInvoiceName('');
     setAlisKdvRate(20);
     setAlisInvoicePhoto('');
     setAlisInvoiceNo('');
@@ -589,7 +600,7 @@ export function SalesPage() {
   };
 
   return (
-    <div className="p-3 sm:p-6 lg:p-8 space-y-4 sm:space-y-6 pb-4 sm:pb-6">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))] lg:pb-8">
       {/* Gün Sonu Kapalı Uyarısı */}
       {isDayClosed && (
         <motion.div
@@ -670,6 +681,7 @@ export function SalesPage() {
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="overflow-hidden"
           >
             {/* Bugünün Özeti */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-3 sm:mb-4">
@@ -782,9 +794,11 @@ export function SalesPage() {
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-md z-50" />
           <Dialog.Content 
-            className="fixed inset-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 bg-card sm:border sm:border-border p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-8 w-full sm:w-[95vw] sm:max-w-5xl h-full sm:h-auto sm:max-h-[90vh] overflow-y-auto z-50 shadow-2xl sm:rounded-3xl overscroll-contain"
+            className="fixed inset-x-0 bottom-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 bg-card sm:border sm:border-border p-4 pt-6 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-8 w-full sm:w-[95vw] sm:max-w-5xl max-h-[96vh] sm:h-auto sm:max-h-[90vh] overflow-y-auto z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] sm:shadow-2xl rounded-t-[2rem] sm:rounded-3xl overscroll-contain"
             aria-describedby={undefined}
           >
+            {/* Grabber for Mobile */}
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-secondary rounded-full sm:hidden" />
             
             {/* Mode Selection */}
             {currentStep === 'mode' && (
@@ -900,7 +914,7 @@ export function SalesPage() {
                   </div>
                 </div>
 
-                <div className="card-premium rounded-xl sm:rounded-2xl p-3 sm:p-6 mb-4 sm:mb-6">
+                <div className="card-premium rounded-xl sm:rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6">
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
                     <div className="flex-1 relative group">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground/70 group-focus-within:text-blue-400 transition-colors" />
@@ -1109,7 +1123,7 @@ export function SalesPage() {
 
             {/* Product Selection & Cart */}
             {currentStep === 'products' && (['satis', 'alis'].includes(selectedMode || '')) && (
-              <>
+              <div className="flex flex-col h-[85vh] sm:h-[75vh]">
                 {/* ── Başlık ───────────────────────────────────────────────── */}
                 <div className="flex items-center gap-3 mb-3 sm:mb-4 shrink-0">
                   <button
@@ -1165,7 +1179,7 @@ export function SalesPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-6 mb-4 sm:mb-6 min-h-0 flex-1">
 
                   {/* ── Ürün Listesi (mobil: sadece list tabında görünür) ──── */}
-                  <div className={`lg:col-span-2 card-premium rounded-xl sm:rounded-2xl p-3 sm:p-6 flex flex-col min-h-0 ${
+                  <div className={`lg:col-span-2 card-premium rounded-xl sm:rounded-2xl p-4 sm:p-6 flex flex-col min-h-0 ${
                     productMobileTab === 'cart' ? 'hidden lg:flex' : 'flex'
                   }`}>
                     {/* Arama */}
@@ -1195,15 +1209,15 @@ export function SalesPage() {
                         return (
                           <div
                             key={product.id}
-                            className={`rounded-xl border transition-all ${
+                            className={`rounded-2xl border transition-all overflow-hidden ${
                               isSelected
-                                ? 'bg-blue-600/15 border-blue-500/60'
-                                : 'bg-secondary/40 border-border hover:border-border cursor-pointer active:opacity-70'
+                                ? 'bg-blue-600/10 border-blue-500/50 shadow-[0_0_20px_rgba(59,130,246,0.1)]'
+                                : 'bg-secondary/40 border-border/50 hover:border-border/80 cursor-pointer active:scale-[0.98]'
                             }`}
                           >
                             {/* Satır */}
                             <div
-                              className="flex items-center justify-between gap-2 p-3"
+                              className="flex items-center justify-between gap-3 p-4 sm:p-5"
                               onClick={() => {
                                 if (isSelected) {
                                   setSelectedProduct(null);
@@ -1215,25 +1229,33 @@ export function SalesPage() {
                               }}
                             >
                               <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <p className="text-foreground font-bold text-sm truncate">{product.name}</p>
+                                <div className="flex items-center gap-2 flex-wrap mb-1">
+                                  <p className={`font-bold sm:text-base truncate ${isSelected ? 'text-blue-400' : 'text-foreground'}`}>
+                                    {product.name}
+                                  </p>
                                   {product.isFrequent && (
-                                    <span className="px-1.5 py-0.5 bg-green-500/20 text-green-400 text-[10px] uppercase font-bold rounded">
+                                    <span className="px-2 py-0.5 bg-green-500/10 border border-green-500/20 text-green-400 text-[10px] uppercase font-black rounded-lg tracking-wider">
                                       {t('salesPage.frequent')}
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-muted-foreground text-xs truncate">
+                                <p className="text-muted-foreground text-xs sm:text-sm truncate font-medium">
                                   ₺{product.price} / {product.unit}
                                   {product.currentStock != null && (
-                                    <span className="ml-2 text-muted-foreground">Stok: {product.currentStock} {product.unit}</span>
+                                    <span className={`ml-3 px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                      product.currentStock <= 0 ? 'bg-rose-500/10 text-rose-400' 
+                                      : product.currentStock < (product.minStock || 0) ? 'bg-orange-500/10 text-orange-400' 
+                                      : 'bg-emerald-500/10 text-emerald-400'
+                                    }`}>
+                                      Stok: {product.currentStock}
+                                    </span>
                                   )}
                                 </p>
                               </div>
-                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
-                                isSelected ? 'bg-blue-500 border-blue-500' : 'border-border'
+                              <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 flex items-center justify-center shrink-0 transition-transform ${
+                                isSelected ? 'bg-blue-500 border-blue-500 scale-110' : 'border-border'
                               }`}>
-                                {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
+                                {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-white" />}
                               </div>
                             </div>
 
@@ -1244,8 +1266,8 @@ export function SalesPage() {
                                   initial={{ opacity: 0, height: 0 }}
                                   animate={{ opacity: 1, height: 'auto' }}
                                   exit={{ opacity: 0, height: 0 }}
-                                  transition={{ duration: 0.18, ease: 'easeOut' }}
-                                  className="overflow-hidden"
+                                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                                  className="overflow-hidden bg-black/20"
                                 >
                                   <div className="px-3 pb-3 pt-1 border-t border-blue-500/20">
                                     <div className="flex flex-col gap-2 mb-3">
@@ -1342,7 +1364,7 @@ export function SalesPage() {
                   </div>
 
                   {/* ── Sepet (mobil: sadece cart tabında görünür) ─────────── */}
-                  <div className={`card-premium rounded-xl sm:rounded-2xl p-3 sm:p-6 flex flex-col min-h-0 ${
+                  <div className={`card-premium rounded-xl sm:rounded-2xl p-4 sm:p-6 flex flex-col min-h-0 ${
                     productMobileTab === 'list' ? 'hidden lg:flex' : 'flex'
                   }`}>
                     <div className="flex items-center justify-between mb-3 shrink-0">
@@ -1371,37 +1393,43 @@ export function SalesPage() {
                                 animate={{ opacity: 1, x: 0 }}
                                 exit={{ opacity: 0, x: -20 }}
                                 layout
-                                className={`p-3 rounded-xl ${
+                                className={`p-4 sm:p-5 rounded-2xl flex flex-col gap-2 ${
                                   item.type === 'iade'
-                                    ? 'bg-red-600/10 border border-red-600/30'
-                                    : 'bg-secondary/50 border border-border'
+                                    ? 'bg-gradient-to-r from-red-600/10 to-transparent border border-red-500/20 shadow-sm'
+                                    : 'bg-white/[0.03] border border-border shadow-sm'
                                 }`}
                               >
-                                <div className="flex items-start justify-between gap-2 mb-1.5">
+                                <div className="flex items-start justify-between gap-3">
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-foreground font-semibold text-xs sm:text-sm truncate">{item.productName}</p>
-                                    <p className="text-muted-foreground text-[10px] sm:text-xs">
-                                      {Math.abs(item.quantity)} {item.unit} × ₺{(item.unitPrice || 0).toLocaleString('tr-TR')}
+                                    <p className="text-foreground font-bold text-sm sm:text-base leading-tight truncate mb-1">
+                                      {item.productName}
                                     </p>
+                                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                      <p className="text-muted-foreground text-[11px] sm:text-xs font-semibold bg-secondary/50 px-2 py-0.5 rounded-md border border-border">
+                                        {Math.abs(item.quantity)} {item.unit} × ₺{(item.unitPrice || 0).toLocaleString('tr-TR')}
+                                      </p>
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                                        item.type === 'iade'
+                                          ? 'bg-red-600/20 text-red-400'
+                                          : item.type === 'alis'
+                                            ? 'bg-blue-600/20 text-blue-400'
+                                            : 'bg-emerald-600/20 text-emerald-400'
+                                      }`}>
+                                        {item.type === 'iade' ? t('salesPage.return') : item.type === 'alis' ? t('salesPage.purchase') : t('salesPage.sale')}
+                                      </span>
+                                    </div>
                                   </div>
-                                  <button
-                                    onClick={() => handleRemoveProduct(item.id)}
-                                    className="p-1 hover:bg-secondary rounded transition-colors shrink-0"
-                                  >
-                                    <X className="w-4 h-4 text-muted-foreground" />
-                                  </button>
+                                  <div className="flex flex-col items-end shrink-0 gap-1.5">
+                                    <button
+                                      onClick={() => handleRemoveProduct(item.id)}
+                                      className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded-lg transition-colors shadow-sm"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                  </div>
                                 </div>
-                                <div className="flex items-center justify-between">
-                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                    item.type === 'iade'
-                                      ? 'bg-red-600/20 text-red-400'
-                                      : item.type === 'alis'
-                                        ? 'bg-blue-600/20 text-blue-400'
-                                        : 'bg-green-600/20 text-green-400'
-                                  }`}>
-                                    {item.type === 'iade' ? t('salesPage.return') : item.type === 'alis' ? t('salesPage.purchase') : t('salesPage.sale')}
-                                  </span>
-                                  <p className={`text-sm font-bold ${item.type === 'iade' ? 'text-red-400' : 'text-green-400'}`}>
+                                <div className="flex justify-end border-t border-white/5 pt-2 mt-1">
+                                  <p className={`text-base sm:text-lg font-black tracking-tight ${item.type === 'iade' ? 'text-red-400' : 'text-emerald-400'}`}>
                                     ₺{(Math.abs(item.totalPrice) || 0).toLocaleString('tr-TR')}
                                   </p>
                                 </div>
@@ -1456,7 +1484,7 @@ export function SalesPage() {
                     <ArrowRight className="w-5 h-5" />
                   </button>
                 </div>
-              </>
+              </div>
             )}
 
             {/* Payment Info */}
@@ -1479,7 +1507,7 @@ export function SalesPage() {
                   </div>
                 </div>
 
-                <div className="card-premium rounded-xl sm:rounded-2xl p-3 sm:p-6 mb-4 sm:mb-6">
+                <div className="card-premium rounded-xl sm:rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 relative z-50">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     {/* Fiş Tarihi */}
                     <div className="sm:col-span-2">
@@ -1571,8 +1599,9 @@ export function SalesPage() {
                         )}
                         <AnimatePresence>
                           {alisHasInvoice && (
-                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-3 overflow-hidden">
-                              <div className="grid grid-cols-2 gap-3">
+                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                              <div className="space-y-3 pb-2 pt-2">
+                                <div className="grid grid-cols-2 gap-3">
                                 <div>
                                   <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Fatura No</label>
                                   <input value={alisInvoiceNo} onChange={e => setAlisInvoiceNo(e.target.value)} placeholder="Opsiyonel"
@@ -1610,6 +1639,69 @@ export function SalesPage() {
                                   </label>
                                 )}
                               </div>
+                            </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    )}
+
+                    {/* ─── Satış Fatura Takibi ─── */}
+                    {selectedMode === 'satis' && (
+                      <div className="sm:col-span-2 p-4 bg-emerald-500/5 border border-emerald-500/15 rounded-2xl space-y-3">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <FileText className="w-3.5 h-3.5" /> Fatura Kesilecek Mi?
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setSatisHasInvoice(!satisHasInvoice)}
+                            className={`relative w-11 h-6 rounded-full transition-all ${satisHasInvoice ? 'bg-emerald-500' : 'bg-white/10'}`}
+                          >
+                            <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${satisHasInvoice ? 'left-[22px]' : 'left-0.5'}`} />
+                          </button>
+                        </div>
+                        {!satisHasInvoice && (
+                          <p className="text-[10px] text-muted-foreground">Bu satış için fatura kesilmeyecek.</p>
+                        )}
+                        <AnimatePresence>
+                          {satisHasInvoice && (
+                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                              <div className="space-y-3 pb-2 pt-2">
+                                <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                  <label className="text-[10px] text-muted-foreground font-medium block">Nasıl Kesilecek?</label>
+                                  <div className="flex gap-1 bg-white/5 p-1 rounded-xl">
+                                    <button 
+                                      type="button" 
+                                      onClick={() => setSatisInvoiceType('urun')}
+                                      className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all ${satisInvoiceType === 'urun' ? 'bg-emerald-500 text-white' : 'text-muted-foreground hover:bg-white/10'}`}
+                                    >Ürün Bazlı</button>
+                                    <button 
+                                      type="button" 
+                                      onClick={() => setSatisInvoiceType('genel')}
+                                      className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all ${satisInvoiceType === 'genel' ? 'bg-emerald-500 text-white' : 'text-muted-foreground hover:bg-white/10'}`}
+                                    >Genel İsimle</button>
+                                  </div>
+                                </div>
+                                
+                                {satisInvoiceType === 'genel' && (
+                                  <div className="space-y-1">
+                                    <label className="text-[10px] text-muted-foreground font-medium block">Genel İsim Seçin</label>
+                                    <select 
+                                      value={satisInvoiceName} 
+                                      onChange={e => setSatisInvoiceName(e.target.value)}
+                                      className="w-full px-3 py-2 bg-white/[0.04] border border-border rounded-xl text-foreground text-xs outline-none"
+                                    >
+                                      <option value="">Seçiniz...</option>
+                                      {(getFromStorage<{id: string, name: string}[]>('invoice_names_data') || []).map(inv => (
+                                        <option key={inv.id} value={inv.name}>{inv.name}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                             </motion.div>
                           )}
                         </AnimatePresence>
@@ -1833,6 +1925,9 @@ export function SalesPage() {
                         date: fisDate ? fisDate.toISOString() : new Date().toISOString(),
                         notifyCustomer: notifyCustomer,
                         createdById: currentEmployee?.id,
+                        hasInvoice: selectedMode === 'satis' && satisHasInvoice,
+                        invoiceType: selectedMode === 'satis' && satisHasInvoice ? satisInvoiceType : undefined,
+                        invoiceName: selectedMode === 'satis' && satisHasInvoice && satisInvoiceType === 'genel' ? satisInvoiceName : undefined,
                         // Alış fatura takibi
                         invoiceInfo: selectedMode === 'alis' ? {
                           hasInvoice: alisHasInvoice,
@@ -2029,17 +2124,25 @@ export function SalesPage() {
 
                         // Çek ödemesi ise çek kaydı oluştur
                         if (paymentInfo!.method === 'cek' && paymentInfo!.dueDate) {
+                          const isVerilen = selectedMode === 'alis';
                           const newCek: CekData = {
                             id: `cek-fis-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-                            direction: 'alinan',
+                            direction: isVerilen ? 'verilen' : 'alinan',
                             amount: paymentInfo!.amount,
                             bankName: paymentInfo!.checkBankName || t('salesPage.notSpecified'),
                             checkNumber: paymentInfo!.checkNumber,
                             dueDate: paymentInfo!.dueDate,
                             issueDate: paymentInfo!.issueDate || new Date().toISOString().split('T')[0],
-                            sourceType: selectedCari?.type === 'Toptancı' ? 'toptanci' : 'musteri',
-                            sourceName: selectedCari?.companyName || t('salesPage.unknown'),
-                            sourceId: selectedCari?.id || '',
+                            
+                            // Fields for alinan
+                            sourceType: isVerilen ? 'toptanci' : (selectedCari?.type === 'Toptancı' ? 'toptanci' : 'musteri'),
+                            sourceName: isVerilen ? t('salesPage.system') : (selectedCari?.companyName || t('salesPage.unknown')),
+                            sourceId: isVerilen ? '' : (selectedCari?.id || ''),
+                            
+                            // Fields for verilen
+                            recipientName: isVerilen ? (selectedCari?.companyName || t('salesPage.unknown')) : undefined,
+                            paymentReason: isVerilen ? t('salesPage.purchasePayment') : undefined,
+
                             relatedFisId: fisData.id,
                             relatedFisDescription: `${selectedMode === 'satis' ? t('salesPage.sale') : t('salesPage.purchase')} ${t('salesPage.receipt')} #${fisData.id.slice(-6)}`,
                             photoFront: paymentInfo!.checkPhoto || null,
@@ -2142,7 +2245,7 @@ export function SalesPage() {
                       initial={{ opacity: 0, y: 15 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.05 }}
-                      className="p-3 sm:p-5 rounded-xl sm:rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-border"
+                      className="p-3 sm:p-5 rounded-xl sm:rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-border relative z-50"
                     >
                       <div className="flex items-center gap-2 mb-3 sm:mb-4">
                         <div className="w-7 h-7 rounded-lg bg-red-500/15 flex items-center justify-center">
@@ -2184,24 +2287,26 @@ export function SalesPage() {
                             animate={{ opacity: 1, height: 'auto' }}
                             exit={{ opacity: 0, height: 0 }}
                             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-                            className="mt-3"
+                            className="overflow-hidden"
                           >
-                            <label className="flex items-center gap-2 text-foreground/80 text-xs font-medium mb-1.5">
-                              <User className="w-3.5 h-3.5" />
-                              {t('salesPage.selectPersonnel')} <span className="text-red-400">*</span>
-                            </label>
-                            <select
-                              value={giderEmployee}
-                              onChange={(e) => setGiderEmployee(e.target.value)}
-                              className="w-full px-3 py-2.5 bg-secondary/50 border border-border rounded-lg text-foreground text-sm focus:outline-none focus:border-red-500 hover:border-border/80 transition-all"
-                            >
-                              <option value="">{t('salesPage.selectPersonnel')}</option>
-                              {personelList.map((person: any) => (
-                                <option key={person.id} value={person.name}>
-                                  {person.name} - {person.position}
-                                </option>
-                              ))}
-                            </select>
+                            <div className="pt-3">
+                              <label className="flex items-center gap-2 text-foreground/80 text-xs font-medium mb-1.5">
+                                <User className="w-3.5 h-3.5" />
+                                {t('salesPage.selectPersonnel')} <span className="text-red-400">*</span>
+                              </label>
+                              <select
+                                value={giderEmployee}
+                                onChange={(e) => setGiderEmployee(e.target.value)}
+                                className="w-full px-3 py-2.5 bg-secondary/50 border border-border rounded-lg text-foreground text-sm focus:outline-none focus:border-red-500 hover:border-border/80 transition-all"
+                              >
+                                <option value="">{t('salesPage.selectPersonnel')}</option>
+                                {personelList.map((person: any) => (
+                                  <option key={person.id} value={person.name}>
+                                    {person.name} - {person.position}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
                           </motion.div>
                         )}
                         {giderCategory === 'Yakıt' && (
@@ -2210,24 +2315,26 @@ export function SalesPage() {
                             animate={{ opacity: 1, height: 'auto' }}
                             exit={{ opacity: 0, height: 0 }}
                             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-                            className="mt-3"
+                            className="overflow-hidden"
                           >
-                            <label className="flex items-center gap-2 text-foreground/80 text-xs font-medium mb-1.5">
-                              <Truck className="w-3.5 h-3.5" />
-                              Araç Seçimi
-                            </label>
-                            <select
-                              value={giderVehicle}
-                              onChange={(e) => setGiderVehicle(e.target.value)}
-                              className="w-full px-3 py-2.5 bg-secondary/50 border border-border rounded-lg text-foreground text-sm focus:outline-none focus:border-red-500 hover:border-border/80 transition-all"
-                            >
-                              <option value="">Araç seçin (opsiyonel)</option>
-                              {vehicleList.map((v: any) => (
-                                <option key={v.id} value={v.plate || v.name}>
-                                  {v.plate || v.name} {v.brand ? `- ${v.brand} ${v.model || ''}` : ''}
-                                </option>
-                              ))}
-                            </select>
+                            <div className="pt-3">
+                              <label className="flex items-center gap-2 text-foreground/80 text-xs font-medium mb-1.5">
+                                <Truck className="w-3.5 h-3.5" />
+                                Araç Seçimi
+                              </label>
+                              <select
+                                value={giderVehicle}
+                                onChange={(e) => setGiderVehicle(e.target.value)}
+                                className="w-full px-3 py-2.5 bg-secondary/50 border border-border rounded-lg text-foreground text-sm focus:outline-none focus:border-red-500 hover:border-border/80 transition-all"
+                              >
+                                <option value="">Araç seçin (opsiyonel)</option>
+                                {vehicleList.map((v: any) => (
+                                  <option key={v.id} value={v.plate || v.name}>
+                                    {v.plate || v.name} {v.brand ? `- ${v.brand} ${v.model || ''}` : ''}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
                           </motion.div>
                         )}
                       </AnimatePresence>
@@ -2238,7 +2345,7 @@ export function SalesPage() {
                       initial={{ opacity: 0, y: 15 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.1 }}
-                      className="p-3 sm:p-5 rounded-xl sm:rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-border"
+                      className="p-3 sm:p-5 rounded-xl sm:rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-border relative z-40"
                     >
                       <div className="flex items-center gap-2 mb-3 sm:mb-4">
                         <div className="w-7 h-7 rounded-lg bg-orange-500/15 flex items-center justify-center">
@@ -2383,9 +2490,10 @@ export function SalesPage() {
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: 'auto' }}
                             exit={{ opacity: 0, height: 0 }}
-                            className="mt-3 pt-3 border-t border-border space-y-3"
+                            className="overflow-hidden"
                           >
-                            <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider">{t('salesPage.paymentDetails')}</p>
+                            <div className="mt-3 pt-3 border-t border-border space-y-3 pb-1">
+                              <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider">{t('salesPage.paymentDetails')}</p>
                             
                             {paymentInfo?.method === 'kredi-karti' && (
                               <>
@@ -2455,6 +2563,7 @@ export function SalesPage() {
                                 </div>
                               </div>
                             )}
+                            </div>
                           </motion.div>
                         )}
                       </AnimatePresence>
@@ -2589,6 +2698,32 @@ export function SalesPage() {
                       };
                       // KV STORE SENKRONİZASYONU İLE KASAYA GİDER OLARAK EKLE
                       addKasaSync(newKasaEntry);
+
+                      // Çek ödemesi ise verilen çek olarak kaydet
+                      if (paymentInfo!.method === 'cek' && paymentInfo!.dueDate) {
+                        const newCek: CekData = {
+                          id: `cek-gider-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+                          direction: 'verilen',
+                          amount: giderAmount,
+                          bankName: paymentInfo!.checkBankName || t('salesPage.notSpecified'),
+                          checkNumber: paymentInfo!.checkNumber,
+                          dueDate: paymentInfo!.dueDate,
+                          issueDate: paymentInfo!.issueDate || new Date().toISOString().split('T')[0],
+                          sourceType: 'musteri', // Not matching perfectly for given checks but 'musteri' is a fallback type
+                          sourceName: t('salesPage.system'),
+                          sourceId: '',
+                          recipientName: giderEmployee || giderCategory,
+                          paymentReason: `${giderCategory} - ${giderDescription || 'Gider Fişi'}`,
+                          relatedFisId: giderFisData.id,
+                          relatedFisDescription: `Gider Fişi #${giderFisData.id.slice(-6)}`,
+                          photoFront: paymentInfo!.checkPhoto || null,
+                          photoBack: null,
+                          status: 'beklemede',
+                          createdAt: new Date().toISOString(),
+                          createdBy: currentEmployee?.name || t('salesPage.system'),
+                        };
+                        addCekSync(newCek);
+                      }
 
                       toast.success(t('salesPage.expenseReceiptSaved'), {
                         description: `${giderCategory} - ₺${giderAmount.toLocaleString()}`

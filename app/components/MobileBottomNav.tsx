@@ -434,7 +434,7 @@ export function MobileBottomNav() {
                   onClick={() => { haptic('light'); navigate(item.path); }}
                   aria-label={t(item.labelKey)}
                   aria-current={active ? 'page' : undefined}
-                  className="flex-1 flex flex-col items-center justify-center gap-1 py-1.5 relative min-w-0 min-h-[48px] rounded-[18px] transition-colors active:bg-white/5"
+                  className="flex-1 flex flex-col items-center justify-center gap-1 py-2 relative min-w-0 min-h-[56px] rounded-[18px] transition-colors active:bg-white/5"
                 >
                   {/* Active pill background */}
                   {active && (
@@ -481,7 +481,7 @@ export function MobileBottomNav() {
               onClick={() => { haptic('medium'); setIsMoreOpen(true); }}
               aria-label="Tüm modüller"
               aria-expanded={isMoreOpen}
-              className="flex-1 flex flex-col items-center justify-center gap-1 py-1.5 relative min-w-0 min-h-[48px] rounded-[18px] transition-colors active:bg-white/5"
+              className="flex-1 flex flex-col items-center justify-center gap-1 py-2 relative min-w-0 min-h-[56px] rounded-[18px] transition-colors active:bg-white/5"
             >
               {isMoreActive && (
                 <div className="absolute inset-0 rounded-[18px] bg-purple-500/10" />

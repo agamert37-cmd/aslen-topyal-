@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { useRouteError, Link } from 'react-router';
-import { AlertTriangle, Home, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Home, RefreshCw, Terminal } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 const errorTranslations: Record<string, Record<string, string>> = {
@@ -78,21 +78,30 @@ export function ErrorPage() {
           </details>
         )}
 
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-3">
+          <div className="flex gap-3">
+            <button
+              onClick={() => window.location.reload()}
+              className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-foreground rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              {txt.refresh}
+            </button>
+            <Link
+              to="/"
+              className="flex-1 px-4 py-2 bg-secondary hover:bg-secondary/80 text-foreground rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+            >
+              <Home className="w-4 h-4" />
+              {txt.home}
+            </Link>
+          </div>
           <button
-            onClick={() => window.location.reload()}
-            className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-foreground rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+            onClick={() => { window.location.href = '#/sistem-onarim'; window.location.reload(); }}
+            className="w-full mt-2 px-4 py-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 rounded-lg font-bold transition-colors flex items-center justify-center gap-2"
           >
-            <RefreshCw className="w-4 h-4" />
-            {txt.refresh}
+            <Terminal className="w-5 h-5" />
+            SİSTEM ONARIM (YAPAY ZEKA)
           </button>
-          <Link
-            to="/"
-            className="flex-1 px-4 py-2 bg-secondary hover:bg-secondary text-foreground rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-          >
-            <Home className="w-4 h-4" />
-            {txt.home}
-          </Link>
         </div>
       </div>
     </div>
