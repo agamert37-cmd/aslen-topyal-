@@ -1536,13 +1536,6 @@ export function StokPage() {
                   className="w-full pl-10 pr-4 py-2.5 bg-secondary/50 border border-border rounded-xl text-sm text-foreground placeholder-gray-600 focus:border-blue-500/50 transition-all outline-none"
                 />
               </div>
-              <button
-                onClick={() => setIsScannerOpen(true)}
-                className="px-3 py-2.5 bg-secondary/50 border border-border hover:border-blue-500/50 rounded-xl transition-all text-muted-foreground hover:text-blue-400"
-                title="Barkod / QR Tara"
-              >
-                <Camera className="w-4 h-4" />
-              </button>
             </div>
             <div className="grid grid-cols-2 sm:flex gap-2 items-center">
               <select
@@ -2366,7 +2359,6 @@ export function StokPage() {
                   <input type="hidden" name="price" value="0" />
                 )}
               </div>
-              <input type="text" name="description" defaultValue={editingMovement?.description || ''} placeholder="Aciklama (Opsiyonel)" className="w-full p-3 bg-secondary/60 border border-border rounded-xl text-foreground outline-none focus:border-indigo-500/50 text-sm transition-all" />
               <button type="submit" className="w-full py-3 mt-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-foreground font-bold rounded-xl transition-all active:scale-[0.98] shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2">
                 {editingMovement ? <Edit className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
                 {editingMovement ? 'Hareketi Güncelle' : 'Hareketi Kaydet'}
@@ -2442,18 +2434,6 @@ export function StokPage() {
           )}
         </Dialog.Content></Dialog.Portal>
       </Dialog.Root>
-
-      {/* Barkod / QR Tarayıcı */}
-      {isScannerOpen && (
-        <BarcodeScanner
-          onDetect={(value) => {
-            setSearchTerm(value);
-            setIsScannerOpen(false);
-            toast.success(`Barkod okundu: ${value}`, { duration: 2000 });
-          }}
-          onClose={() => setIsScannerOpen(false)}
-        />
-      )}
 
       {changeLogTarget && (
         <ChangeLogModal

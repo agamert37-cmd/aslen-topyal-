@@ -13,7 +13,9 @@ const SYSTEM_REPAIR_KEY_STORAGE = 'isleyen_et_system_repair_key';
 
 export function getSystemRepairKey(): string {
   try {
-    const override = localStorage.getItem('ops_center_gpt_override'); // we might allow ops center to override both, but maybe not. Let's keep it separate
+    const override = localStorage.getItem('ops_center_gpt_override');
+    if (override && override.trim() !== '') return override.trim();
+    
     const key = localStorage.getItem(SYSTEM_REPAIR_KEY_STORAGE);
     if (key && key.trim() !== '') return key.trim();
   } catch (e) {

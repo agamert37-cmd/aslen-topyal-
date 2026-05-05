@@ -26,7 +26,7 @@ const setLS = (key: string, value: any) => {
 
 export interface PendingAITransaction {
   id: string;
-  type: 'satis' | 'alis' | 'gider' | 'cek' | 'tahsilat';
+  type: 'satis' | 'alis' | 'gider' | 'cek' | 'tahsilat' | 'cari';
   data: any;
   summary: string;
   createdAt: string;
@@ -43,7 +43,7 @@ export function AIPendingApprovals() {
 
   // Table Sync Hooks
   const { addItem: addFisSync } = useTableSync<any>({ tableName: 'fisler', storageKey: StorageKey.FISLER });
-  const { data: syncCariList, updateItem: updateCariSync } = useTableSync<any>({ tableName: 'cari_hesaplar', storageKey: StorageKey.CARI_DATA });
+  const { data: syncCariList, updateItem: updateCariSync, addItem: addCariSync } = useTableSync<any>({ tableName: 'cari_hesaplar', storageKey: StorageKey.CARI_DATA });
   const { addItem: addKasaSync } = useTableSync<any>({ tableName: 'kasa_islemleri', storageKey: StorageKey.KASA_DATA });
 
   // Load items
@@ -109,6 +109,24 @@ export function AIPendingApprovals() {
              date: new Date().toISOString().split('T')[0],
              description: newFis.description || `Yapay Zeka Onayı: ${item.summary}`
           });
+      } else if (item.type === 'cari') {
+          const newCari = {
+             type: item.data.type || 'Müşteri',
+             companyName: item.data.companyName || item.data.name || 'Yeni İsimsiz Cari',
+             contactPerson: item.data.contactPerson || item.data.name || '',
+             phone: item.data.phone || '0000000000',
+             email: item.data.email || '',
+             address: item.data.address || 'Belirtilmedi',
+             taxNumber: item.data.taxNumber || '1111111111',
+             taxOffice: item.data.taxOffice || 'Bilinmiyor',
+             region: item.data.region || 'Merkez',
+             balance: Number(item.data.balance) || 0,
+             transactions: 0,
+             transactionHistory: [],
+             id: `cari-${Date.now()}`,
+             createdAt: new Date().toISOString()
+          };
+          await addCariSync(newCari);
       }
 
       const updated = pendingItems.map(p => p.id === item.id ? { ...p, status: 'approved' as const } : p);

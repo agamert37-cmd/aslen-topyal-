@@ -197,6 +197,8 @@ export function FaturaPage() {
     description: '',
     tevkifatRate: 0,
     perItemKdv: false, // Kalem bazlı KDV modu
+    location: 'Dukkan' as 'Dukkan' | 'Iceberg',
+    cageId: '',
   });
   const [formItems, setFormItems] = useState<FaturaItem[]>([]);
   const [showCariDropdown, setShowCariDropdown] = useState(false);
@@ -210,6 +212,10 @@ export function FaturaPage() {
      return getFromStorage<{id: string, name: string}[]>('invoice_names_data') || [];
   });
   const [newInvoiceName, setNewInvoiceName] = useState('');
+  
+  const [icebergCages, setIcebergCages] = useState<{id: string, name: string}[]>(() => {
+     return getFromStorage<{id: string, name: string}[]>('iceberg_cages_data') || [];
+  });
 
   // ─── useTableSync ENTEGRASYONU ──────────────────────────────────────
   const { data: syncFaturalar, addItem: addFaturaSync, updateItem: updateFaturaSync, deleteItem: deleteFaturaSync } = useTableSync<any>({
@@ -417,6 +423,8 @@ export function FaturaPage() {
           kdvRate: item.itemKdvRate || form.kdvRate,
           kdvAmount: itemKdvAmt,
           grossAmount: item.totalPrice + itemKdvAmt,
+          location: form.location,
+          cageId: form.location === 'Iceberg' ? form.cageId : undefined,
         };
 
         // useTableSync updateItem ile hem localStorage hem KV'ye yaz
@@ -472,7 +480,9 @@ export function FaturaPage() {
           description: `Fatura İPTAL #${fatura.id.slice(0, 12)} — ${item.name}`,
           faturaId: fatura.id,
         };
-
+        // iptaller dükkana döner gibi basite indirgenebilir ya da önceki fatura movement ile aynısı yazılabilir ama burası iptal.
+        // iptallerde location korunursa iyi olur. (Vakit kısıtlıysa fatura iptal location belirtmeyecek)
+        
         await updateStokItem(linkedStockId, {
           currentStock: (stock.currentStock ?? 0) + qtyDelta,
           movements: [reverseMovement, ...(stock.movements || [])],
@@ -1285,7 +1295,7 @@ export function FaturaPage() {
                 </div>
               </div>
 
-              {/* KDV + Mal Karşılığı */}
+                {/* KDV + Mal Karşılığı */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-1.5 block">KDV Oranı</label>
@@ -1312,6 +1322,38 @@ export function FaturaPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Depo / Konum (Sadece Alış & Mal Karşılığı) */}
+              {form.type === 'alis' && form.isLinkedToGoods && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 p-4 border border-cyan-500/20 bg-cyan-500/5 rounded-xl">
+                  <div>
+                    <label className="text-xs text-cyan-400 font-bold uppercase tracking-wider mb-1.5 block">Stok Hedefi</label>
+                    <select
+                      value={form.location}
+                      onChange={e => setForm(f => ({ ...f, location: e.target.value as any, cageId: '' }))}
+                      className="w-full px-4 py-3 bg-white/[0.04] border border-cyan-500/30 rounded-xl text-foreground text-sm outline-none focus:border-cyan-400/50"
+                    >
+                      <option value="Dukkan" className="bg-card">Dükkan</option>
+                      <option value="Iceberg" className="bg-card">Iceberg (Soğuk Hava)</option>
+                    </select>
+                  </div>
+                  {form.location === 'Iceberg' && (
+                    <div>
+                      <label className="text-xs text-cyan-400 font-bold uppercase tracking-wider mb-1.5 block">Iceberg Kafesi</label>
+                      <select
+                        value={form.cageId}
+                        onChange={e => setForm(f => ({ ...f, cageId: e.target.value }))}
+                        className="w-full px-4 py-3 bg-white/[0.04] border border-cyan-500/30 rounded-xl text-foreground text-sm outline-none focus:border-cyan-400/50"
+                      >
+                        <option value="" className="bg-card">Kafes Seçin...</option>
+                        {icebergCages.map(c => (
+                          <option key={c.id} value={c.id} className="bg-card">{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Fatura Kalemleri */}
               <div>

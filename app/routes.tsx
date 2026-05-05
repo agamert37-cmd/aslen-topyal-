@@ -21,7 +21,6 @@ import { DashboardPage } from "./pages/site/DashboardPage";
 // Lazy loaded — ilk yüklemede indirilmez, sayfaya girilince yüklenir
 const SalesPage        = lazy(() => import("./pages/SalesPage").then(m => ({ default: m.SalesPage })));
 const TahsilatPage     = lazy(() => import("./pages/TahsilatPage").then(m => ({ default: m.TahsilatPage })));
-const GunSonuPage      = lazy(() => import("./pages/GunSonuPage").then(m => ({ default: m.GunSonuPage })));
 const AracTakipPage    = lazy(() => import("./pages/AracTakipPage").then(m => ({ default: m.AracTakipPage })));
 const ChatPage         = lazy(() => import("./pages/ChatPage").then(m => ({ default: m.ChatPage })));
 const StokPage         = lazy(() => import("./pages/StokPage").then(m => ({ default: m.StokPage })));
@@ -130,7 +129,6 @@ export const router = AppRouter([
           { path: "dashboard",         element: P(<DashboardPage />) },
           { path: "sales",             element: P(<Lazy><SalesPage /></Lazy>) },
           { path: "tahsilat",          element: P(<Lazy><TahsilatPage /></Lazy>) },
-          { path: "gun-sonu",          element: P(<Lazy><GunSonuPage /></Lazy>) },
           { path: "arac-takip",        element: P(<Lazy><AracTakipPage /></Lazy>) },
           { path: "chat",              element: P(<Lazy><ChatPage /></Lazy>) },
           { path: "stok",              element: P(<Lazy><StokPage /></Lazy>) },

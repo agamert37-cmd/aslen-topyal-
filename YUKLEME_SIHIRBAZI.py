@@ -50,12 +50,13 @@ class ModernInstaller(tk.Tk):
         url_frame = ttk.Frame(main_frame)
         url_frame.pack(fill=tk.X, pady=10)
         
-        # Seçenekler: Yeni Kurulum veya Güncelleme
+        # Seçenekler: Yeni Kurulum, Güncelleme veya Kaldırma
         self.action_var = tk.StringVar(value="Yeni Kurulum")
         action_frame = ttk.Frame(url_frame)
         action_frame.pack(fill=tk.X, pady=(0, 10))
-        ttk.Radiobutton(action_frame, text="Sıfırdan Yeni Kurulum Yap", variable=self.action_var, value="Yeni Kurulum", command=self.update_ui_state).pack(side=tk.LEFT, padx=(0, 20))
-        ttk.Radiobutton(action_frame, text="Mevcut Kurulumu Güncelle", variable=self.action_var, value="Güncelleme", command=self.update_ui_state).pack(side=tk.LEFT)
+        ttk.Radiobutton(action_frame, text="Sıfırdan Yeni Kurulum Yap", variable=self.action_var, value="Yeni Kurulum", command=self.update_ui_state).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Radiobutton(action_frame, text="Mevcut Kurulumu Güncelle", variable=self.action_var, value="Güncelleme", command=self.update_ui_state).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Radiobutton(action_frame, text="Sistemden Tamamen Kaldır", variable=self.action_var, value="Kaldır", command=self.update_ui_state).pack(side=tk.LEFT)
 
         self.lbl_repo_or_dir = ttk.Label(url_frame, text="Proje GitHub URL (Token içeren URL kullanılabilir):")
         self.lbl_repo_or_dir.pack(anchor=tk.W, pady=2)
@@ -111,11 +112,24 @@ class ModernInstaller(tk.Tk):
             self.combo_dirs.pack_forget()
             self.entry_repo.pack(fill=tk.X, pady=5)
             self.btn_start.config(text="Sistemi Kur ve Derle")
-        else:
+        elif action == "Güncelleme":
             self.lbl_repo_or_dir.config(text="Hangi Mevcut Kurulumu Güncelleyelim?")
             self.entry_repo.pack_forget()
             self.combo_dirs.pack(fill=tk.X, pady=5)
             self.btn_start.config(text="Güncelle ve Derle")
+            
+            # Mevcutları Listele
+            dirs = self.get_existing_projects()
+            self.combo_dirs['values'] = dirs
+            if dirs:
+                self.combo_dirs.current(0)
+            else:
+                self.combo_dirs.set("Mevcut bir proje bulunamadı!")
+        else: # Kaldır
+            self.lbl_repo_or_dir.config(text="Hangi Kurulumu Sistemden Tamamen Kaldıralım?")
+            self.entry_repo.pack_forget()
+            self.combo_dirs.pack(fill=tk.X, pady=5)
+            self.btn_start.config(text="Sistemden Tamamen Kaldır")
             
             # Mevcutları Listele
             dirs = self.get_existing_projects()
@@ -209,10 +223,14 @@ class ModernInstaller(tk.Tk):
             repo_url = None
             target_dir = self.dir_var.get().strip()
             if not target_dir or target_dir == "Mevcut bir proje bulunamadı!":
-                messagebox.showwarning("Eksik Bilgi", "Lütfen güncellenecek mevcut kurulumu seçin.")
+                messagebox.showwarning("Eksik Bilgi", "Lütfen işlem yapılacak mevcut kurulumu seçin.")
                 return
             if not os.path.isdir(target_dir):
                 messagebox.showwarning("Hata", "Seçilen dizin geçersiz!")
+                return
+            
+        if action == "Kaldır":
+            if not messagebox.askyesno("Emin misiniz?", f"Seçilen kurulum tamamen silinecek:\n\n{target_dir}\n\nMasaüstündeki ilgili kısayollar da kaldırılacak. Bu işlem geri alınamaz!\nDevam etmek istiyor musunuz?"):
                 return
             
         self.set_gui_state(self.btn_start, tk.DISABLED)
@@ -227,6 +245,52 @@ class ModernInstaller(tk.Tk):
     def install_process(self, action, repo_url, target_dir):
         desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
         
+        if action == "Kaldır":
+            self.log("------------------------------------------")
+            self.log(f"Çalışma Dizini Siliniyor: {target_dir}")
+            self.set_progress(10)
+            
+            try:
+                # remove read-only attribute handling for rmtree
+                def remove_readonly(func, path, excinfo):
+                    os.chmod(path, 0o777)
+                    func(path)
+                
+                shutil.rmtree(target_dir, onerror=remove_readonly)
+                self.log(f"BAŞARILI: {target_dir} dizini silindi.")
+            except Exception as e:
+                self.log(f"HATA: Dizin silinemedi: {e}")
+            
+            self.set_progress(50)
+            self.log("Masaüstündeki ilgili uygulama dosyaları aranıyor...")
+            
+            apps_to_remove = ["Karargah_Yonetim", "Sistem_Site_Erisimi"]
+            removed_count = 0
+            if os.path.exists(desktop_path):
+                for file in os.listdir(desktop_path):
+                    if file.endswith(".exe"):
+                        for app_name in apps_to_remove:
+                            if file.startswith(app_name):
+                                try:
+                                    os.remove(os.path.join(desktop_path, file))
+                                    self.log(f"BAŞARILI: Masaüstünden '{file}' kaldırıldı.")
+                                    removed_count += 1
+                                except Exception as e:
+                                    self.log(f"HATA: '{file}' silinemedi. Lütfen masaüstünden elinizle silebilirsiniz. Sebebi: {e}")
+                                    
+            self.log(f"Toplam {removed_count} masaüstü dosyası silindi.")
+            self.set_progress(100)
+            self.log("------------------------------------------")
+            self.log("KALDIRMA İŞLEMİ TAMAMLANDI!")
+            
+            self.after(0, lambda: messagebox.showinfo("Başarılı", "Sistem başarıyla kaldırıldı!"))
+            
+            self.set_gui_state(self.btn_start, tk.NORMAL)
+            self.set_gui_state(self.entry_repo, tk.NORMAL)
+            self.set_gui_state(self.combo_dirs, tk.NORMAL)
+            self.after(0, self.update_ui_state) 
+            return
+
         if action == "Yeni Kurulum":
             # C:\Proje veya Desktop\Proje klasörünü oluştur
             base_dir = "C:\\Proje"

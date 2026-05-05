@@ -105,7 +105,10 @@ export function AIChatGPT() {
   };
   const [hasApiKey, setHasApiKey] = useState(() => {
     const key = getOpenAIKey();
-    return !!(key && key !== 'YOUR_OPENAI_API_KEY_HERE' && key.trim() !== '');
+    const gKey = localStorage.getItem('ops_gemini_key');
+    const hasOai = !!(key && key !== 'YOUR_OPENAI_API_KEY_HERE' && key.trim() !== '');
+    const hasGen = !!(gKey && gKey.startsWith('AIza'));
+    return hasOai || hasGen;
   });
 
   const scrollToBottom = () => {
@@ -121,10 +124,14 @@ export function AIChatGPT() {
 
     // API key kontrolü - localStorage ve .env'i birlikte kontrol et
     const apiKey = getOpenAIKey();
+    const gKey = localStorage.getItem('ops_gemini_key');
     const q = input.toLowerCase();
     const isSpecialReport = q.includes('grafik') || q.includes('rapor') || q.includes('trend') || q.includes('dağılım');
     
-    if ((!apiKey || apiKey === 'YOUR_OPENAI_API_KEY_HERE' || apiKey.trim() === '') && !isSpecialReport) {
+    const hasOAI = !!(apiKey && apiKey !== 'YOUR_OPENAI_API_KEY_HERE' && apiKey.trim() !== '');
+    const hasGem = !!(gKey && gKey.startsWith('AIza'));
+
+    if (!hasOAI && !hasGem && !isSpecialReport) {
       const errorMessage: Message = {
         id: Date.now().toString(),
         role: 'assistant',

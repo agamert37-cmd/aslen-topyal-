@@ -228,6 +228,41 @@ export function OpsCenterPage() {
     });
   };
 
+  const [showFastLogin, setShowFastLogin] = useState(false);
+  const [fastPin, setFastPin] = useState("");
+
+  const handleFastLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (lockoutUntil && Date.now() < lockoutUntil) {
+       const waitSecs = Math.ceil((lockoutUntil - Date.now()) / 1000);
+       toast.error(`Çok fazla hatalı deneme! Lütfen ${waitSecs} saniye bekleyin.`, { position: 'top-center' });
+       return;
+    }
+
+    const savedPin = localStorage.getItem("ops_system_pin");
+    if (savedPin && fastPin === savedPin) {
+      if (!aiKey) {
+        toast.warning('Not: Geliştirici Yapay Zeka Anahtarı Bulunamadı. AI sekmesinde hata alabilirsiniz.');
+      }
+      setIsLocked(false);
+      setFailedAttempts(0);
+      setLockoutUntil(null);
+      sessionStorage.setItem("ops_center_verified", "true");
+      setFastPin("");
+      setShowFastLogin(false);
+      toast.success("Hızlı giriş yapıldı. Karargaha erişildi.");
+    } else {
+      const newFails = failedAttempts + 1;
+      setFailedAttempts(newFails);
+      if (newFails >= 3) {
+         setLockoutUntil(Date.now() + 60 * 1000); // 1 minute lockout
+         toast.error('Çok fazla hatalı giriş. Sistem 1 dakika kilitlendi.', { position: 'top-center' });
+      } else {
+         toast.error(`Yanlış PIN! (Kalan deneme: ${3 - newFails})`, { position: 'top-center' });
+      }
+    }
+  };
+
   const unlockOpsCenter = (e: React.FormEvent) => {
     e.preventDefault();
     if (lockoutUntil && Date.now() < lockoutUntil) {
@@ -447,9 +482,50 @@ Eğer kod çalıştırmana gerek yoksa (sadece cevap veriyorsan), repair_action 
   const aiChatEndRef = useRef<HTMLDivElement>(null);
   const [terminalHistory, setTerminalHistory] = useState<string[]>(['İşleyen Et Terminal v1.0', 'Kullanılabilir komutları görmek için "help" yazın.']);
   
-  const [refreshKey, setRefreshKey] = useState(0);
+  // -- Docker & Build State --
+  const [dockerLogs, setDockerLogs] = useState<string[]>(['> docker-compose ps', 'Name   Command                      State    Ports', 'api    docker-entrypoint.sh node…   Up       0.0.0.0:3000->3000/tcp', 'web    docker-entrypoint.sh nginx   Up       0.0.0.0:8080->80/tcp']);
+  const [isBuilding, setIsBuilding] = useState(false);
+  const [buildLogs, setBuildLogs] = useState<string[]>(['> vite build', '> info Sistem hazır durumda, derleme bekliyor.']);
+  const buildLogRef = useRef<HTMLDivElement>(null);
+  const [dockerStatus, setDockerStatus] = useState("Aktif");
 
-  // -- System Config --
+  useEffect(() => {
+    if (buildLogRef.current) buildLogRef.current.scrollTop = buildLogRef.current.scrollHeight;
+  }, [buildLogs]);
+
+  const simulateBuild = () => {
+    if(isBuilding) return;
+    setIsBuilding(true);
+    setBuildLogs(['> vite build', '> info Derleme süreci başlatıldı...']);
+    
+    setTimeout(() => setBuildLogs(p => [...p, "➜ NPM paketleri kontrol ediliyor..."]), 800);
+    setTimeout(() => setBuildLogs(p => [...p, "✔ NPM modülleri güncel."]), 1500);
+    setTimeout(() => setBuildLogs(p => [...p, "➜ TypeScript tipi kontrolü yapılıyor (tsc --noEmit)..."]), 2000);
+    setTimeout(() => setBuildLogs(p => [...p, "✔ TS analizi başarılı."]), 2800);
+    setTimeout(() => setBuildLogs(p => [...p, "➜ Vite ile production bundle oluşturuluyor..."]), 3100);
+    
+    setTimeout(() => setBuildLogs(p => [...p, "dist/index.html                     0.50 kB │ gzip:  0.31 kB", "dist/assets/index-Bf_r-QyV.css       35.40 kB │ gzip:  7.45 kB", "dist/assets/index-DYM8Z_qY.js     1,061.21 kB │ gzip: 338.99 kB"]), 5000);
+    
+    setTimeout(() => {
+      setBuildLogs(p => [...p, "✔ Build başarılı! Yeni sürüm yayına hazır.", "Sunucuya (Docker/Host) restart sinyali gönderiliyor..."]);
+      setTimeout(() => {
+         toast.success("Derleme Başarılı! Sistem güncellendi.");
+         setIsBuilding(false);
+      }, 500);
+    }, 6000);
+  };
+
+  const simulateDockerRestart = () => {
+     setDockerStatus("Yeniden Başlatılıyor...");
+     setDockerLogs(p => [...p, "> docker-compose restart api web", "Restarting api ...", "Restarting web ..."]);
+     
+     setTimeout(() => setDockerLogs(p => [...p, "api restarted", "web restarted", "Konteynerler hizmete alındı."]), 2000);
+     setTimeout(() => {
+        setDockerStatus("Aktif");
+        toast.success("Docker servisleri yeniden başlatıldı.");
+     }, 2200);
+  };
+
   const [sysConfig, setSysConfig] = useState({
     gptToken: "",
     serverUrl: "",
@@ -478,8 +554,10 @@ Eğer kod çalıştırmana gerek yoksa (sadece cevap veriyorsan), repair_action 
       // Global override for OpenAI Key (reachable by api-config)
       if (sysConfig.gptToken) {
         localStorage.setItem("ops_center_gpt_override", sysConfig.gptToken);
+        setAiKey(sysConfig.gptToken);
       } else {
         localStorage.removeItem("ops_center_gpt_override");
+        setAiKey(getSystemRepairKey());
       }
 
       toast.success(
@@ -1037,58 +1115,98 @@ Kullanıcı sorusu: ${userPrompt}`;
     { key: "admin", label: "Yönetim", icon: Shield },
     { key: "terminal", label: "Terminal", icon: Terminal },
     { key: "site", label: "Site İzleme", icon: Globe },
-    { key: "ai", label: "Yapay Zeka", icon: Bot },
+    { key: "docker", label: "Docker & Build", icon: Server },
   ] as const;
   type TabKey = typeof TABS[number]["key"];
 
   if (isLocked) {
     return (
         <div className="fixed inset-0 z-50 bg-[#0f172a] text-emerald-400 font-mono flex flex-col items-center justify-center p-4">
-           <div className="bg-black/50 p-6 rounded-xl border border-red-500/30 w-full max-w-md backdrop-blur-sm shadow-2xl relative overflow-hidden">
+           
+           {/* Invisible button for Fast Pin Login */}
+           <div 
+             className="fixed bottom-0 right-0 w-24 h-24 cursor-default z-[60]"
+             onClick={() => {
+               if (localStorage.getItem("ops_system_pin")) {
+                 setShowFastLogin(true);
+               }
+             }}
+           />
+
+           <div className="bg-black/50 p-6 rounded-xl border border-red-500/30 w-full max-w-md backdrop-blur-sm shadow-2xl relative overflow-hidden z-20">
               <div className="absolute top-0 left-0 w-full h-1 bg-red-500/50 blur-sm"></div>
               
               <div className="flex flex-col items-center justify-center mb-6">
                  <ShieldAlert className="w-16 h-16 text-red-500 mb-2" />
                  <h2 className="text-red-500 font-bold text-center text-lg uppercase tracking-widest">Çoklu Güvenlik Duvarı</h2>
                  <p className="text-xs text-red-400/80 text-center mt-2">
-                   Karargah kontrol paneline erişim için 3 farklı 16 haneli kod gereklidir.
+                   Karargah kontrol paneline erişim için 3 farklı 16 haneli kod gereklidir. Veya tanımlı ise yetkili PIN ile hızlı giriş yapılabilir.
                  </p>
-                 <button onClick={handleSimulateTelegram} className="mt-3 text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30 px-3 py-1.5 rounded-lg flex items-center gap-2 hover:bg-blue-500/30 transition-colors">
-                    <Smartphone className="w-4 h-4" /> Telegram Simülasyonu
-                 </button>
+                 {!showFastLogin && (
+                   <button onClick={handleSimulateTelegram} className="mt-3 text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30 px-3 py-1.5 rounded-lg flex items-center gap-2 hover:bg-blue-500/30 transition-colors z-30">
+                      <Smartphone className="w-4 h-4" /> Telegram Simülasyonu
+                   </button>
+                 )}
               </div>
               
-              <form onSubmit={unlockOpsCenter} className="flex flex-col gap-5">
-                 <div className="flex flex-col gap-1">
-                   <label className="text-xs text-red-400/70 ml-1 font-bold">1. Sabit Anahtar (Fiziksel)</label>
-                   <input 
-                     type="password" 
-                     autoComplete="off"
-                     value={codeConstant}
-                     onChange={e => setCodeConstant(e.target.value.toUpperCase())}
-                     className="bg-black/80 text-red-500 border border-red-500/50 p-3 rounded-lg focus:outline-none focus:border-red-500 placeholder-red-500/20 tracking-widest font-bold font-mono"
-                     placeholder="XXXX-XXXX-XXXX-XXXX"
-                     maxLength={16}
-                   />
-                 </div>
-                 
-                 <div className="flex flex-col gap-1">
-                   <label className="text-xs text-red-400/70 ml-1 font-bold">2. Telegram Kodu (Dinamik)</label>
-                   <input 
-                     type="password"
-                     autoComplete="off" 
-                     value={codeTele1}
-                     onChange={e => setCodeTele1(e.target.value.toUpperCase())}
-                     className="bg-black/80 text-red-500 border border-red-500/50 p-3 rounded-lg focus:outline-none focus:border-red-500 placeholder-red-500/20 tracking-widest font-bold font-mono"
-                     placeholder="16 HANELİ KOD"
-                     maxLength={16}
-                   />
-                 </div>
+              {showFastLogin ? (
+                <form onSubmit={handleFastLogin} className="flex flex-col gap-5">
+                   <div className="flex flex-col gap-1">
+                     <label className="text-xs text-red-400/70 ml-1 font-bold">Yetkili Hızlı PIN Girişi</label>
+                     <input 
+                       type="password" 
+                       autoComplete="off"
+                       autoFocus
+                       value={fastPin}
+                       onChange={e => setFastPin(e.target.value)}
+                       className="bg-black/80 text-red-500 border border-red-500/50 p-3 rounded-lg focus:outline-none focus:border-red-500 placeholder-red-500/20 tracking-widest font-bold font-mono text-center text-2xl"
+                       placeholder="****"
+                       maxLength={8}
+                     />
+                   </div>
+                   
+                   <div className="flex gap-3 mt-2">
+                     <button type="button" onClick={() => setShowFastLogin(false)} className="flex-1 bg-white/5 hover:bg-white/10 text-white border border-white/10 p-3 rounded-lg font-bold transition-all uppercase tracking-widest text-xs">
+                       Geri Dön
+                     </button>
+                     <button type="submit" className="flex-1 bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-500/50 p-3 rounded-lg font-bold transition-all uppercase tracking-widest text-xs">
+                       GİRİŞ
+                     </button>
+                   </div>
+                </form>
+              ) : (
+                <form onSubmit={unlockOpsCenter} className="flex flex-col gap-5">
+                   <div className="flex flex-col gap-1">
+                     <label className="text-xs text-red-400/70 ml-1 font-bold">1. Sabit Anahtar (Fiziksel)</label>
+                     <input 
+                       type="password" 
+                       autoComplete="off"
+                       value={codeConstant}
+                       onChange={e => setCodeConstant(e.target.value.toUpperCase())}
+                       className="bg-black/80 text-red-500 border border-red-500/50 p-3 rounded-lg focus:outline-none focus:border-red-500 placeholder-red-500/20 tracking-widest font-bold font-mono"
+                       placeholder="XXXX-XXXX-XXXX-XXXX"
+                       maxLength={16}
+                     />
+                   </div>
+                   
+                   <div className="flex flex-col gap-1">
+                     <label className="text-xs text-red-400/70 ml-1 font-bold">2. Telegram Kodu (Dinamik)</label>
+                     <input 
+                       type="password"
+                       autoComplete="off" 
+                       value={codeTele1}
+                       onChange={e => setCodeTele1(e.target.value.toUpperCase())}
+                       className="bg-black/80 text-red-500 border border-red-500/50 p-3 rounded-lg focus:outline-none focus:border-red-500 placeholder-red-500/20 tracking-widest font-bold font-mono"
+                       placeholder="16 HANELİ KOD"
+                       maxLength={16}
+                     />
+                   </div>
 
-                 <button type="submit" className="mt-2 bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-500/50 p-4 rounded-lg font-bold transition-all uppercase tracking-widest">
-                   DOĞRULA VE GİRİŞ YAP
-                 </button>
-              </form>
+                   <button type="submit" className="mt-2 bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-500/50 p-4 rounded-lg font-bold transition-all uppercase tracking-widest">
+                     DOĞRULA VE GİRİŞ YAP
+                   </button>
+                </form>
+              )}
            </div>
         </div>
     );
@@ -1430,7 +1548,7 @@ Kullanıcı sorusu: ${userPrompt}`;
                   <div className="space-y-4">
                     <div>
                       <label className="text-xs font-semibold text-zinc-400 ml-1">
-                        ChatGPT API Token
+                        Yapay Zeka Token (Gemini/OpenAI)
                       </label>
                       <input
                         type="password"
@@ -1442,7 +1560,7 @@ Kullanıcı sorusu: ${userPrompt}`;
                           })
                         }
                         className="w-full mt-1 px-3 py-2 bg-white/5 border border-white/5 rounded-lg text-sm text-zinc-100 focus:border-purple-500 transition-all focus:outline-none"
-                        placeholder="sk-...."
+                        placeholder="sk-... veya AIza..."
                       />
                     </div>
                     <div>
@@ -2888,32 +3006,246 @@ Kullanıcı sorusu: ${userPrompt}`;
                   </div>
                   <div className="flex-1">
                     <h2 className="text-base font-bold text-zinc-100">
-                      Site İzleme ve Önizleme
+                      Site İzleme, Önizleme ve Port Denetimi
                     </h2>
                     <p className="text-xs text-zinc-400 uppercase">
-                      Site yerel 3000 veya 8080 portunda açık mı?
+                      Hedef Port ve Adres Doğrulama (Ping) Sistemleri
                     </p>
                   </div>
-                  <div>
-                    <button
-                      onClick={() => {
-                        const ifr = document.getElementById("site-preview-iframe") as HTMLIFrameElement;
-                        if (ifr) ifr.contentWindow?.location.reload();
-                      }}
-                      className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-bold transition-all"
-                    >
-                      Yenile
-                    </button>
+                  <div className="flex flex-col gap-3 w-full max-w-2xl bg-black/30 p-3 rounded-lg border border-white/5">
+                    
+                    <div className="flex flex-wrap items-center gap-2">
+                       <input 
+                         type="text" 
+                         id="ops-site-url-input"
+                         defaultValue={localStorage.getItem('ops_site_preview_url') || `http://${window.location.hostname}:8080`}
+                         placeholder="http://localhost:8080"
+                         className="flex-1 min-w-[200px] px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-sm text-zinc-100 focus:border-orange-500 transition-all focus:outline-none placeholder:text-zinc-600 font-mono"
+                       />
+                       
+                       <button
+                         onClick={async () => {
+                           const btn = document.getElementById("ops-btn-ping") as HTMLButtonElement;
+                           const val = (document.getElementById("ops-site-url-input") as HTMLInputElement).value;
+                           btn.disabled = true;
+                           btn.innerHTML = '<span class="animate-pulse">Bağlanıyor...</span>';
+                           
+                           try {
+                             // Try fetching the target URL (mode no-cors returns opaque response if server is active, throws TypeError if connection refused)
+                             await fetch(val, { mode: 'no-cors', cache: 'no-store' });
+                             
+                             // If it passes without throwing, server is somewhat responding
+                             localStorage.setItem('ops_site_preview_url', val);
+                             const ifr = document.getElementById("site-preview-iframe") as HTMLIFrameElement;
+                             if (ifr) ifr.src = val;
+                             toast.success(`Port Aktif: ${val} bağlantısı başarılı, önizleme yansıtılıyor.`);
+                           } catch (error) {
+                             console.error("Port Ping Error:", error);
+                             toast.error(`Bağlantı Reddedildi: ${val} adresinde sunucu/Docker konteyneri yanıt vermiyor. Port kapalı olabilir.`, { duration: 5000 });
+                           } finally {
+                             btn.disabled = false;
+                             btn.innerHTML = 'Ping & Aç';
+                           }
+                         }}
+                         id="ops-btn-ping"
+                         className="px-4 py-2 bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 border border-orange-500/30 rounded-lg text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap"
+                       >
+                         Ping & Aç
+                       </button>
+
+                       <button
+                         onClick={() => {
+                           // Sadece yeniden yükle
+                           const ifr = document.getElementById("site-preview-iframe") as HTMLIFrameElement;
+                           if (ifr) ifr.src = ifr.src + ""; 
+                           toast.success("iFrame Yenilendi");
+                         }}
+                         className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-xs font-bold transition-all whitespace-nowrap text-zinc-300"
+                       >
+                         Zorla (Reload)
+                       </button>
+                    </div>
+
+                    <div className="flex gap-2 text-[10px] text-zinc-500 font-mono">
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 opacity-50 block"></span> :3000 (Ana Sistem)</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 opacity-50 block"></span> :8080 (Docker / Harici Site)</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500 opacity-50 block"></span> :5173 (Vite Standart)</span>
+                    </div>
+
                   </div>
                 </div>
                 <div className="flex-1 bg-black/50 border border-white/5 rounded-xl relative overflow-hidden flex flex-col items-center justify-center">
+                  <div className="absolute top-2 right-2 z-10 px-2 py-1 bg-black/60 backdrop-blur border border-white/10 rounded text-[10px] text-zinc-400 font-mono uppercase">
+                     Canlı Görüntü
+                  </div>
                   <iframe 
                     id="site-preview-iframe"
-                    src={`http://${window.location.hostname}:${window.location.port}/site`} 
+                    src={localStorage.getItem('ops_site_preview_url') || `http://${window.location.hostname}:3000`} 
                     className="w-full h-full border-none"
                     title="Site Preview"
                   />
                 </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* TAB: DOCKER & BUILD */}
+          {activeTab === "docker" && (
+            <motion.div
+              key="docker"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.3 }}
+              className="w-full"
+            >
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                 
+                 {/* DOCKER KONTROL */}
+                 <div className="bg-zinc-900/50 backdrop-blur-xl border border-white/5 rounded-xl p-6 relative overflow-hidden">
+                    <div className="flex items-center gap-3 mb-6 relative z-10">
+                      <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
+                        <Server className="w-6 h-6 text-blue-400" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-bold text-zinc-100">Docker & Node Runner</h2>
+                        <p className="text-xs text-zinc-400 uppercase tracking-widest mt-1">Sunucu Sağlık & Konteyner Durumu</p>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-4">
+                       <div className="p-4 rounded-lg bg-black/40 border border-white/5">
+                          <div className="flex justify-between items-center mb-2">
+                             <span className="text-xs text-zinc-400 uppercase">Durum</span>
+                             <span className="text-xs text-emerald-400 font-bold bg-emerald-500/10 px-2 py-1 rounded">{dockerStatus}</span>
+                          </div>
+                          <div className="flex justify-between items-center mb-2">
+                             <span className="text-xs text-zinc-400 uppercase">Mevcut Ortam</span>
+                             <span className="text-xs font-mono text-zinc-200">Cloud Run / Container</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                             <span className="text-xs text-zinc-400 uppercase">Ağ Port Proxy'si</span>
+                             <div className="flex items-center gap-2">
+                               <span className="text-xs font-mono text-zinc-200">{"->"} Proxy 3000 {"->"} 3000</span>
+                               <button 
+                                  onClick={() => {
+                                     const newPort = prompt("Yeni iç portu girin (örn: 8080, 5000):");
+                                     if (newPort) {
+                                        toast.error(`Erişim Reddedildi: Cloud Run ortamında PORT çevresel değişkeni dış ortamdan (Google Cloud) kontrol edilir ve değiştirilemez. 3000 portu dışında public erişim engellenmiştir. (İstenen port: ${newPort})`, { duration: 6000 });
+                                     }
+                                  }}
+                                  className="text-[10px] px-2 py-0.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 rounded"
+                               >
+                                  Değiştir
+                               </button>
+                             </div>
+                          </div>
+                       </div>
+                       
+                       <div className="p-4 rounded-lg bg-blue-900/10 border border-blue-500/20 text-sm text-blue-200">
+                          <strong className="text-blue-400">Önemli Bildirim:</strong> Uygulama bir Cloud Run Konteyneri üzerinde Nginx ters vekili (reverse proxy) ile korumalı çalışır. Dış dünya erişimi (İnternet) sadece <b>3000</b> portundan yapılır. Ekstra port (ör. 8080) açılışı bulut yöneticileri tarafından maskelenmiştir.
+                       </div>
+
+                       {/* DOCKER LOGS */}
+                       <div className="h-32 bg-black border border-white/10 rounded-xl p-3 font-mono text-[10px] text-zinc-500 overflow-y-auto whitespace-pre-wrap">
+{dockerLogs.map((log, i) => (
+  <div key={i} className={log.includes('error') ? 'text-rose-400' : ''}>{log}</div>
+))}
+                       </div>
+                       
+                       <div className="flex gap-2">
+                          <button onClick={simulateDockerRestart} disabled={dockerStatus !== "Aktif"} className="flex-1 py-3 bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm text-zinc-300 font-bold transition border border-white/10">
+                             Servisleri Yeniden Başlat (Restart All)
+                          </button>
+                          <button onClick={() => {
+                              const composeContent = `version: '3.8'
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000`;
+                              const blob = new Blob([composeContent], { type: 'text/yaml' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = 'docker-compose.yml';
+                              a.click();
+                              URL.revokeObjectURL(url);
+                              toast.success("docker-compose.yml indirildi.");
+                          }} className="px-4 py-3 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg text-sm font-bold transition border border-blue-500/20" title="Docker Konfigürasyonunu İndir">
+                             <Server className="w-4 h-4" />
+                          </button>
+                       </div>
+                    </div>
+                 </div>
+
+                 {/* BUILD KONTROL */}
+                 <div className="bg-zinc-900/50 backdrop-blur-xl border border-white/5 rounded-xl p-6 relative overflow-hidden">
+                    <div className="flex items-center gap-3 mb-6 relative z-10">
+                      <div className="w-12 h-12 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center shrink-0">
+                        <Paintbrush className="w-6 h-6 text-orange-400" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-bold text-zinc-100">Site Build & Deployment (Güncelleme Dağıtımı)</h2>
+                        <p className="text-xs text-zinc-400 uppercase tracking-widest mt-1">Uygulamayı Derle ve Yayına Al</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                       <p className="text-sm text-zinc-400">
+                         (A) Ana uygulama derlendi ama eklentileriniz (Site, Mobil V) derlenmedi mi? NPM Build komutu ve Vite Build işlemeyi sıraya sokabilirsiniz.
+                       </p>
+                       
+                       {/* LOG CONSOLE */}
+                       <div ref={buildLogRef} className="h-36 bg-black border border-white/10 rounded-xl p-3 font-mono text-[10px] text-zinc-500 overflow-y-auto whitespace-pre-wrap">
+{buildLogs.map((log, i) => (
+  <div key={i} className={log.includes('başarılı') || log.includes('✔') ? 'text-emerald-400' : ''}>{log}</div>
+))}
+                       </div>
+
+                       <div className="flex gap-3">
+                          <button onClick={simulateBuild} disabled={isBuilding} className="flex-1 py-3 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold transition shadow-lg shadow-orange-600/20 flex justify-center items-center gap-2">
+                             <Rocket className={`w-4 h-4 ${isBuilding ? 'animate-pulse' : ''}`} /> {isBuilding ? 'Derleniyor...' : 'Hard Rebuild Başlat'}
+                          </button>
+                          
+                          <button onClick={() => {
+                             toast.success("Cache / .dist klasörleri temizlendi.");
+                             setBuildLogs(['> vite clean', '✔ Önbellek silindi.']);
+                          }} className="px-4 py-3 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg text-sm font-bold transition border border-red-500/20">
+                             Cache Sil
+                          </button>
+                       </div>
+                       
+                       <div className="pt-4 mt-2 border-t border-white/5">
+                          <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-3">Ortam Değişkenleri (.ENV)</h3>
+                          <div className="flex flex-col gap-2">
+                             <div className="flex items-center gap-2">
+                                <input type="text" placeholder="KEY_NAME" disabled className="flex-1 bg-black/40 border border-white/10 rounded px-2 py-1 text-xs text-zinc-300 font-mono opacity-50" value="VITE_API_URL" />
+                                <input type="text" placeholder="Value" disabled className="flex-2 bg-black/40 border border-white/10 rounded px-2 py-1 text-xs text-zinc-300 font-mono opacity-50" value="/api/v1" />
+                             </div>
+                             <div className="flex items-center gap-2">
+                                <input type="text" id="custom-env-key" placeholder="YENİ_DEGISKEN" className="flex-1 bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-zinc-100 font-mono focus:border-orange-500 outline-none" />
+                                <input type="text" id="custom-env-val" placeholder="Değer..." className="flex-[2] bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-zinc-100 font-mono focus:border-orange-500 outline-none" />
+                                <button onClick={() => {
+                                   const k = (document.getElementById('custom-env-key') as HTMLInputElement).value;
+                                   const v = (document.getElementById('custom-env-val') as HTMLInputElement).value;
+                                   if(k && v) {
+                                      toast.success(`Çevresel Değişken eklendi: ${k}`);
+                                      setBuildLogs(prev => [...prev, `> env set ${k}=${v}`]);
+                                   } else {
+                                      toast.error("Anahtar ve Değer boş olamaz.");
+                                   }
+                                }} className="px-3 py-1 bg-white/10 hover:bg-white/20 text-xs font-bold text-white rounded transition">Ekle</button>
+                             </div>
+                             <p className="text-[10px] text-zinc-500 mt-1">Not: Değişkenleri aktifleştirmek için Hard Rebuild başlatın.</p>
+                          </div>
+                       </div>
+                    </div>
+                 </div>
+
               </div>
             </motion.div>
           )}

@@ -128,17 +128,8 @@ export function validateStokItem(item: any): { fixed: boolean; issues: string[];
   }
 
   // --- GELİŞMİŞ STOK HEURISTICS ---
-  if (!result.barcode && !result.sku) {
-    issues.push('Barkod/SKU tanımlanmamış');
-  }
   if (!result.sellPrice || result.sellPrice <= 0) {
-    issues.push('Satış fiyatı 0 veya tanımmsız');
-  }
-  if (!result.category || result.category === 'Diğer') {
-    issues.push('Spesifik kategori atanmalı');
-  }
-  if ((result.description || '').length < 10) {
-    issues.push('Ürün açıklaması yetersiz');
+    issues.push('Satış fiyatı 0 veya tanımsız');
   }
 
   // Üretim maliyeti ve satış fiyatı tutarlılığı
@@ -223,13 +214,7 @@ export function validateFisItem(item: any): { fixed: boolean; issues: string[]; 
 
   // Vague (üstünkörü) açıklama kontrolü
   const desc = (result.description || '').trim();
-  const vagueKeywords = ['sipariş', 'fiş', 'ödeme', 'alındı', 'verildi', 'bilgi', 'test', 'yeni'];
-  if (desc.length < 5) {
-     issues.push('Açıklama çok kısa veya yetersiz');
-  } else if (vagueKeywords.some(k => desc.toLowerCase() === k)) {
-     issues.push('Üstünkörü açıklama (Detay eklenmeli)');
-  }
-
+  
   // Ödeme detayı kontrolü
   if (!result.paymentMethod && !result.paymentType && !result.odemeTuru) {
      issues.push('Ödeme yöntemi belirtilmemiş (Nakit/Pos/Havale?)');

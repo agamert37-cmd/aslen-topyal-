@@ -54,7 +54,7 @@ export interface AIResponse {
   chartConfig?: any;
   sql?: string;
   actionData?: any;
-  actionType?: 'satis' | 'alis' | 'gider' | 'cek' | 'tahsilat';
+  actionType?: 'satis' | 'alis' | 'gider' | 'cek' | 'tahsilat' | 'cari';
   actionSummary?: string;
 }
 
@@ -243,38 +243,12 @@ export async function chatWithAI(userMessage: string, conversationHistory: any[]
 
 GÖREVLERİN (ÇOK ÖNEMLİ):
 1. Raporlama ve Bilgi İsteme: Satışlar, cirolar, kasadaki para vb. sorulduğunda bilgiyi json ile ("chart", "stat" veya "text" type) ver.
-2. İşlem/Veri Girişi (SATIŞ, ALIŞ, GİDER, ÇEK, TAHSİLAT):
-   - Müşteri sana eksik bir işlem anlatırsa hemen kaydetmeye çalışma! Örn: "Ahmet'e kıyma verdim" derse.
-   - Doğal bir dille sor: "Tamam, Ahmet'in cari hesabını buldum. Kaç kilo kıyma verdin, fiyatı ne kadar?"
-   - Müşteri cevaplayınca tekrar sor: "Peki bu parayı peşin mi aldın, yoksa hesaba mı(cariye) yazayım?"
-3. Fiş / Fatura Belgesi Sorma: İşlemleri (özellikle alım, gider) oluşturmadan hemen önce kullanıcıya: "Bu işlemin bir fişi veya faturası var mı? Fotoğrafını eklemek istersen Onaylamalar sekmesinden yapabilirsin." diye hatırlat/sor.
-4. Hata ve Eksik Veri Yönetimi (Sorun Çözücü Çekirdek):
-   - Mantıksız veya eksik bilgi içeren bir işlemi (örneğin fiyatsız satış, tanımsız cariye işlem) KESİNLİKLE kabul etme.
-   - Hemen hatayı dökme, kibarca sorunu açıkla ve doğrusunu iste: "Sistemde 'Ali Bey' diye bir kayıt bulamadım. Yeni kişi olarak ekleyelim mi yoksa başka bir hesap mıydı?" veya "Kıyma verdin ama fiyatı söylemedin, kilosu ne kadardan hesaplayalım?"
-   - Sorunu çözdükten sonra sıradaki adıma geç.
-5. Iteratif (Adım Adım) Konuşma: Asla tek seferde her şeyi isteme. İnsanlar bilgisayardan çok anlamayabilir, yavaş yavaş sor. Herşeyi öğrendikten sonra:
-   "Anladım, Ahmet'e 5 kilo kıymayı 2000 TL'den verdim. Hesabına yazıyorum. Onaylıyor musun?" de.
-6. Onay alındığında: Eğer kullanıcı "evet", "onayla", "tamamdır", "kaydet" derse eksiksiz JSON Action'ı oluştur. 
+2. İşlem/Veri Girişi (SATIŞ, ALIŞ, vb) YAPAMAZSIN. Eğer müşteri eksik bir işlem oluştur, şunu kaydet derse nazikçe: "Kusura bakmayın, sadece veri analizi ve raporlama yapabiliyorum. Fiş, fatura veya işlem kayıtlarını ilgili sayfalardan manuel yapmanız gerekiyor." şeklinde cevap ver.
 
-ONAYLANAN İŞLEM İÇİN "action" JSON FORMATI:
-"type": "action"
-"actionType": "satis" | "alis" | "gider" | "cek" | "tahsilat"
-"actionData": { İşlemin kaydedileceği asıl veri nesnesi. Örneğin satis ise { "cariId": "...", "total": 2000, "payment": {"amount":0, "method": "acik_hesap"}, "items": [{"name": "Kıyma", "quantity": 5, "price": 400}] } }
-"actionSummary": "Ahmet hesabına 5 Kilo Kıyma (2000 TL) satışı. (Açık Hesap)"
-"answer": "İşlemi hazırladım! Yukarıdaki 'Onaylamalar' sekmesinden kontrol edip kaydedebilirsiniz. Varsa fiş/fatura fotoğrafını da oradan 'Fiş / Belge Fotoğrafı Ekle' butonuna basarak ekleyebilirsiniz."
-
-Eğer kullanıcı kendi adına yapıyorsa (örn. Kendi hesabıma gir vs., kimin yaptığı belirsizse), kullanıcının onaylayanın ismini approvedBy olarak "Sistem Asistanı" da bırakabilirsiniz.
-
-Mevcut Cariler (Bu listede yoksa sorun çıkart ve uyar!): ${JSON.stringify(cari.map((c: any) => ({ tip: c.type, id: c.id, ad: c.companyName || c.name })))}
-Personeller: ${JSON.stringify(personel.map((p: any) => ({ id: p.id, ad: p.name, rol: p.role })))}
-
-CEVAP FORMATI HER ZAMAN AŞAĞIDAKİ GİBİ BİR JSON OLMALIDIR (Basit cevaplar veya hatalar için type: "text" yap ve "answer" içini doldur):
+CEVAP FORMATI HER ZAMAN AŞAĞIDAKİ GİBİ BİR JSON OLMALIDIR:
 {
-  "type": "text" | "chart" | "action",
+  "type": "text" | "chart",
   "answer": "Kullanıcıya vereceğin sözlü/yazılı samimi ve çözüm odaklı cevap",
-  "actionType": "satis", 
-  "actionData": { ... }, 
-  "actionSummary": "kısa özet",
   "data": [],
   "chartType": "bar"
 }`;
@@ -286,8 +260,24 @@ CEVAP FORMATI HER ZAMAN AŞAĞIDAKİ GİBİ BİR JSON OLMALIDIR (Basit cevaplar 
 
     let aiResponse = "";
     
-    // API KEY VARSA OPENAI KULLAN, YOKSA GEMINI PROXY KULLAN
-    if (openai) {
+    const aiKeyOverride = localStorage.getItem('ops_center_gpt_override');
+    const geminiSpecKey = localStorage.getItem('ops_gemini_key');
+    const activeGeminiKey = (aiKeyOverride && aiKeyOverride.startsWith('AIza')) ? aiKeyOverride : geminiSpecKey;
+
+    if (activeGeminiKey && activeGeminiKey.startsWith('AIza')) {
+       // Gemini Doğrudan
+       const { GoogleGenAI } = await import('@google/genai');
+       const ai = new GoogleGenAI({ apiKey: activeGeminiKey });
+       const formattedPrompt = `${systemPrompt}\n\nGeçmiş Sohbet:\n${messages.map(m => `${m.role}: ${m.content}`).join('\n')}`;
+       const res = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: formattedPrompt,
+          config: {
+              temperature: 0.3
+          }
+       });
+       aiResponse = res.text || "";
+    } else if (openai) {
       const completion = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [{ role: 'system', content: systemPrompt }, ...messages],
@@ -296,8 +286,7 @@ CEVAP FORMATI HER ZAMAN AŞAĞIDAKİ GİBİ BİR JSON OLMALIDIR (Basit cevaplar 
       });
       aiResponse = completion.choices[0]?.message?.content || '';
     } else {
-       // Gemini Proxy Call
-       aiResponse = await chatWithGemini(messages, systemPrompt);
+       throw new Error('Geçerli bir yapay zeka API (OpenAI veya Gemini) anahtarı bulunamadı.');
     }
 
     if (!aiResponse) {

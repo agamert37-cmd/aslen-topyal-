@@ -60,20 +60,26 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  app.setAppUserModelId('com.isleyenet.karargah');
   createWindow();
 
   // ----- TRAY (Arka Planda Çalışma & Boğa İkonu) BAŞLANGIÇ -----
   let trayIconPath = path.join(__dirname, 'bull.svg');
-  // SVG'den NativeImage oluştur
-  let trayIcon = nativeImage.createFromPath(trayIconPath);
+  // SVG'den NativeImage oluştur - Windows'ta sorun olmasın diye PNG data URI fallback
+  // Basit mavi/lacivert K logolu 16x16 PNG fallback'i
+  const fallbackPngBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAZ0lEQVQ4T2NkoBAwUqifYdQABmIYhJ/+//+fwcTExEBPMwYGhkDqGMBwEGk4xDCQZgY2NhZGPn4+BglJCQZ0MTxmMzBxwS1nYGBgZ0B2IR5DcBqCD0zINZgbMDZgDAxMB2ADuIYDBwAAQ04yv6Y7O1IAAAAASUVORK5CYII=';
   
-  if (trayIcon.isEmpty()) {
-    // Eğer SVG okunamıyorsa public/favicon.svg'ye dönülebilir ama biz svg verdik
-    trayIcon = nativeImage.createFromPath(path.join(__dirname, '..', 'public', 'favicon.svg'));
+  let trayIcon;
+  try {
+     trayIcon = nativeImage.createFromPath(trayIconPath);
+     if (trayIcon.isEmpty()) {
+       trayIcon = nativeImage.createFromDataURL(fallbackPngBase64);
+     } else {
+       trayIcon = trayIcon.resize({ width: 16, height: 16 });
+     }
+  } catch(e) {
+     trayIcon = nativeImage.createFromDataURL(fallbackPngBase64);
   }
-  
-  // Tray için yeniden boyutlandırma
-  trayIcon = trayIcon.resize({ width: 16, height: 16 });
 
   appTray = new Tray(trayIcon);
   
@@ -158,8 +164,8 @@ ipcMain.handle('get-system-stats', async () => {
 ipcMain.on('run-update', (event) => {
   const isWin = process.platform === 'win32';
   const cmd = isWin 
-    ? 'set GIT_TERMINAL_PROMPT=0 && git pull --no-edit || echo "Git pull ignored" && docker-compose down && docker-compose up -d --build || docker compose down && docker compose up -d --build'
-    : 'env GIT_TERMINAL_PROMPT=0 git pull --no-edit || echo "Git pull ignored" && docker-compose down && docker-compose up -d --build || docker compose down && docker compose up -d --build || sh update.sh';
+    ? 'set GIT_TERMINAL_PROMPT=0 && git fetch --all && git reset --hard origin/main && git pull origin main --no-edit && docker-compose down && docker-compose up -d --build || docker compose down && docker compose up -d --build'
+    : 'env GIT_TERMINAL_PROMPT=0 git fetch --all && git reset --hard origin/main && git pull origin main --no-edit && docker-compose down && docker-compose up -d --build || docker compose down && docker compose up -d --build || sh update.sh';
   
   // Gelişmiş exec ayarları ile stream (Timeout 10dk, maxBuffer limitini çok yüksek tut ki taşmasın)
   const child = exec(cmd, { cwd: path.join(__dirname, '..'), timeout: 600000, maxBuffer: 100 * 1024 * 1024 });
@@ -183,8 +189,8 @@ ipcMain.handle('docker-update-restart', async (event) => {
     const isWin = process.platform === 'win32';
     // Fallback: try docker-compose first, if it fails try docker compose
     const cmd = isWin 
-      ? 'set GIT_TERMINAL_PROMPT=0 && git pull --no-edit || echo "Git pull warning"  && docker-compose down && docker-compose up -d --build || docker compose down && docker compose up -d --build'
-      : 'env GIT_TERMINAL_PROMPT=0 git pull --no-edit || echo "Git pull warning"  && docker-compose down && docker-compose up -d --build || docker compose down && docker compose up -d --build || sh update.sh';
+      ? 'set GIT_TERMINAL_PROMPT=0 && git fetch --all && git reset --hard origin/main && git pull origin main --no-edit && docker-compose down && docker-compose up -d --build || docker compose down && docker compose up -d --build'
+      : 'env GIT_TERMINAL_PROMPT=0 git fetch --all && git reset --hard origin/main && git pull origin main --no-edit && docker-compose down && docker-compose up -d --build || docker compose down && docker compose up -d --build || sh update.sh';
       
     // Gelişmiş exec: 5 dakika timeout (300000ms), 50MB bellek (derleme için)
     exec(cmd, { cwd: path.join(__dirname, '..'), timeout: 300000, maxBuffer: 50 * 1024 * 1024 }, (error, stdout, stderr) => {

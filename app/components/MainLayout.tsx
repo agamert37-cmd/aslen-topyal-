@@ -51,7 +51,8 @@ import {
   X,
   WifiOff,
   CloudLightning,
-  RefreshCw
+  RefreshCw,
+  Server
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ProfileEditModal } from './ProfileEditModal';
@@ -174,62 +175,40 @@ interface MenuGroup {
 
 const menuGroups: MenuGroup[] = [
   {
-    groupKey: 'ticari',
-    titleKey: 'Ticari İşlemler',
-    icon: ShoppingCart,
+    groupKey: 'basit',
+    titleKey: 'Basit',
+    icon: Zap,
     items: [
-      { path: '/dashboard', labelKey: 'nav.dashboard', icon: LayoutDashboard, color: 'blue', permKey: 'dashboard' },
       { path: '/sales', labelKey: 'nav.sales', icon: ShoppingCart, color: 'green', permKey: 'satis' },
-      { path: '/cari', labelKey: 'nav.customers', icon: Users, color: 'sky', permKey: 'cari' },
-      { path: '/pazarlama', labelKey: 'nav.marketing', icon: Megaphone, color: 'pink', permKey: 'ayarlar' },
-    ]
-  },
-  {
-    groupKey: 'stok',
-    titleKey: 'Stok & Depo',
-    icon: Package,
-    items: [
-      { path: '/stok', labelKey: 'nav.stock', icon: Package, color: 'indigo', permKey: 'stok' },
-      { path: '/stok-hareket', labelKey: 'nav.stockMovement', icon: ArrowLeftRight, color: 'cyan', permKey: 'stok' },
-      { path: '/iceberg', labelKey: 'nav.iceberg', icon: Warehouse, color: 'cyan', permKey: 'stok' },
-      { path: '/uretim', labelKey: 'nav.production', icon: Factory, color: 'orange', permKey: 'stok' },
-    ]
-  },
-  {
-    groupKey: 'finans',
-    titleKey: 'Finans',
-    icon: Wallet,
-    items: [
-      { path: '/kasa', labelKey: 'nav.cash', icon: Wallet, color: 'emerald', permKey: 'kasa' },
       { path: '/tahsilat', labelKey: 'nav.collection', icon: Banknote, color: 'lime', permKey: 'kasa' },
+      { path: '/cari', labelKey: 'nav.customers', icon: Users, color: 'sky', permKey: 'cari' },
       { path: '/cekler', labelKey: 'nav.checks', icon: FileEdit, color: 'purple', permKey: 'kasa' },
-      { path: '/faturalar', labelKey: 'nav.invoices', icon: FileCheck, color: 'indigo', permKey: 'kasa' },
+      { path: '/stok', labelKey: 'nav.stock', icon: Package, color: 'indigo', permKey: 'stok' },
+      { path: '/iceberg', labelKey: 'nav.iceberg', icon: Warehouse, color: 'cyan', permKey: 'stok' },
     ]
   },
   {
-    groupKey: 'rapor',
-    titleKey: 'Raporlar',
-    icon: FileText,
-    items: [
-      { path: '/gun-sonu', labelKey: 'nav.dayEnd', icon: CalendarCheck, color: 'rose', permKey: 'raporlar' },
-      { path: '/raporlar', labelKey: 'nav.reports', icon: FileText, color: 'cyan', permKey: 'raporlar' },
-      { path: '/fis-gecmisi', labelKey: 'nav.receiptHistory', icon: Receipt, color: 'amber', permKey: 'raporlar' },
-    ]
-  },
-  {
-    groupKey: 'sistem',
-    titleKey: 'Yönetim & Sistem',
+    groupKey: 'gelismis',
+    titleKey: 'Gelişmiş',
     icon: Settings,
     items: [
+      { path: '/dashboard', labelKey: 'nav.dashboard', icon: LayoutDashboard, color: 'blue', permKey: 'dashboard' },
+      { path: '/kasa', labelKey: 'nav.cash', icon: Wallet, color: 'emerald', permKey: 'kasa' },
+      { path: '/faturalar', labelKey: 'nav.invoices', icon: FileCheck, color: 'indigo', permKey: 'kasa' },
+      { path: '/stok-hareket', labelKey: 'nav.stockMovement', icon: ArrowLeftRight, color: 'cyan', permKey: 'stok' },
+      { path: '/uretim', labelKey: 'nav.production', icon: Factory, color: 'orange', permKey: 'stok' },
+      { path: '/fis-gecmisi', labelKey: 'nav.receiptHistory', icon: Receipt, color: 'amber', permKey: 'raporlar' },
+      { path: '/raporlar', labelKey: 'nav.reports', icon: FileText, color: 'cyan', permKey: 'raporlar' },
       { path: '/personel', labelKey: 'nav.personnel', icon: UserCog, color: 'purple', permKey: 'personel' },
       { path: '/arac', labelKey: 'nav.vehicles', icon: Truck, color: 'orange', permKey: 'personel' },
+      { path: '/pazarlama', labelKey: 'nav.marketing', icon: Megaphone, color: 'pink', permKey: 'ayarlar' },
       { path: '/dosyalar', labelKey: 'nav.files', icon: FolderOpen, color: 'teal', permKey: 'ayarlar' },
-      { path: '/chat', labelKey: 'nav.aiAssistant', icon: MessageSquare, color: 'violet', permKey: 'dashboard' },
+      { path: '/sunucu', labelKey: 'breadcrumb.server', icon: Server, color: 'blue', permKey: 'ayarlar' },
+      { path: '/settings', labelKey: 'nav.settings', icon: Settings, color: 'gray', permKey: 'ayarlar' },
       { path: '/ops-center', labelKey: 'Karargah', icon: Command, color: 'blue', permKey: 'ayarlar' },
       { path: '/data-audit', labelKey: 'nav.dataAudit', icon: ShieldAlert, color: 'rose', permKey: 'ayarlar' },
       { path: '/yedekler', labelKey: 'nav.backups', icon: Database, color: 'slate', permKey: 'ayarlar' },
       { path: '/guvenlik', labelKey: 'nav.security', icon: ShieldAlert, color: 'red', permKey: 'ayarlar' },
-      { path: '/settings', labelKey: 'nav.settings', icon: Settings, color: 'gray', permKey: 'ayarlar' },
     ]
   }
 ];
@@ -338,10 +317,24 @@ export function MainLayout() {
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
   const isMobile = useIsMobile();
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
-    ticari: true, stok: true // Default open a few
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
+     let defaultGroups: Record<string, boolean> = {};
+     menuGroups.forEach(g => {
+        if(g.items.some(i => location.pathname.startsWith(i.path))) {
+           defaultGroups[g.groupKey] = true;
+        }
+     });
+     // Eğer hiçbir grup açık değilse Dashboard (ticari) açık olsun
+     if (Object.keys(defaultGroups).length === 0) defaultGroups['ticari'] = true;
+     return defaultGroups;
   });
+
+  useEffect(() => {
+     const timer = setTimeout(() => setShowSplash(false), 2200);
+     return () => clearTimeout(timer);
+  }, []);
 
   const toggleGroup = (key: string) => {
     setOpenGroups(p => ({ ...p, [key]: !p[key] }));
@@ -589,6 +582,55 @@ export function MainLayout() {
     <Tooltip.Provider delayDuration={200}>
       <div className="h-dvh bg-background flex flex-col relative overflow-hidden text-foreground">
         <CustomElectronTitleBar />
+        
+        {/* Startup Splash Animation */}
+        <AnimatePresence>
+          {showSplash && (
+            <motion.div
+              initial={{ opacity: 1 }}
+              exit={{ opacity: 0, scale: 1.05, filter: "blur(10px)" }}
+              transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+              className="absolute inset-0 z-[99999] bg-[#0a0d14] flex flex-col items-center justify-center overflow-hidden"
+            >
+               <motion.div
+                 initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                 animate={{ opacity: 1, scale: 1, y: 0 }}
+                 transition={{ delay: 0.2, duration: 0.8, ease: "easeOut" }}
+                 className="flex flex-col items-center justify-center relative"
+               >
+                 <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-600 to-indigo-900 flex items-center justify-center shadow-[0_0_80px_rgba(37,99,235,0.4)] mb-8 border border-white/10 relative overflow-hidden">
+                   <motion.div
+                     animate={{ rotate: 360 }}
+                     transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                     className="absolute -inset-10 bg-[conic-gradient(from_90deg,transparent_0%,rgba(37,99,235,0.4)_50%,transparent_100%)]"
+                   />
+                   <div className="absolute inset-[2px] bg-[#0a0d14] rounded-[22px] flex items-center justify-center z-10">
+                     <Zap className="w-10 h-10 text-blue-500" />
+                   </div>
+                 </div>
+                 
+                 <h1 className="text-3xl font-bold text-white tracking-tight mb-2">
+                   Hoş Geldiniz, <span className="text-blue-400">{user?.name || "Kullanıcı"}</span>
+                 </h1>
+                 <p className="text-zinc-500 font-mono text-sm tracking-widest uppercase mb-10">
+                   KARARGAH OS Yükleniyor...
+                 </p>
+                 
+                 <div className="w-48 h-1 bg-white/10 rounded-full overflow-hidden">
+                   <motion.div
+                     initial={{ width: "0%" }}
+                     animate={{ width: "100%" }}
+                     transition={{ duration: 1.8, ease: "easeInOut" }}
+                     className="h-full bg-blue-500 rounded-full"
+                   />
+                 </div>
+               </motion.div>
+               
+               <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 50% 50%, rgba(37, 99, 235, 0.05) 0%, transparent 50%)' }} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="flex-1 flex min-h-0 relative">
           {/* Subtle Background Ambient Glow */}
           <div className="fixed inset-0 pointer-events-none z-0">
@@ -1346,6 +1388,14 @@ export function MainLayout() {
                 <Outlet />
               </motion.div>
             </AnimatePresence>
+            
+            {/* Gizli Karargah (Ops Center) Hızlı Giriş Butonu - Sağ Alt Köşe */}
+            <button 
+              onClick={() => navigate('/ops-center')}
+              title=" "
+              className="fixed bottom-0 right-0 w-24 h-24 opacity-0 z-50 cursor-pointer outline-none"
+              aria-label="Gizli Alan"
+            />
           </main>
         </div>
         </div>
