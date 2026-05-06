@@ -1,3 +1,4 @@
+import { useGlobalTableData } from '../contexts/GlobalTableSyncContext';
 /**
  * Üretim Takip Sayfası - İŞLEYEN ET
  * 
@@ -38,6 +39,7 @@ import { useModuleBus } from '../hooks/useModuleBus';
 import { getPagePermissions } from '../utils/permissions';
 import { usePageSecurity } from '../hooks/usePageSecurity';
 import { productToDb, Product } from './StokPage';
+import { v4 as uuidv4 } from 'uuid';
 
 // [AJAN-2 | claude/serene-gagarin | 2026-03-24] Son düzenleyen: Claude Sonnet 4.6
 
@@ -815,11 +817,8 @@ export function UretimPage() {
   const [editingProfile, setEditingProfile] = useState<UretimProfile | null>(null);
 
   // Cari verisi — toptancı TR kodunu otomatik doldurmak için
-  const cariList = useMemo(() => {
-    try {
-      return getFromStorage<any[]>(StorageKey.CARI_DATA) || [];
-    } catch { return []; }
-  }, []);
+  const rawCariList = useGlobalTableData<any>('cari_hesaplar');
+  const cariList = useMemo(() => Array.isArray(rawCariList) ? rawCariList : [], [rawCariList]);
 
   /** Toptancı adına göre onaylı işletme numarasını (TR kodu) bul */
   const findTrKodu = (supplierName: string): string => {
@@ -832,18 +831,14 @@ export function UretimPage() {
     return cari?.approvedBusinessNo || cari?.approved_business_no || '';
   };
 
-  // Stok verisi - her yeni üretim başlatıldığında taze oku (isimsizleri temizle & normalize et)
-  const [stokList, setStokList] = useState<any[]>([]);
-  const refreshStok = () => {
-    const raw = getFromStorage<any[]>(StorageKey.STOK_DATA) || [];
-    // İsimsiz (boş isimli) stok ürünlerini temizle & movements/fiyat normalize et
-    const cleaned = raw
+  // Stok verisi - Global Context'ten proaktif
+  const rawStok = useGlobalTableData<any>('urunler') || [];
+  const stokList = useMemo(() => {
+    return rawStok
       .filter(s => (s.name || '').trim().length > 0)
       .map(s => {
-        // movements doğrudan array olabilir veya supplier_entries içinden parse edilmesi gerekebilir
         let movements = Array.isArray(s.movements) ? s.movements : [];
         let category = s.category || 'Genel';
-        // Eğer movements boşsa ama supplier_entries varsa → parse et (KV'den gelen format)
         if (movements.length === 0 && s.supplier_entries) {
           try {
             const parsed = typeof s.supplier_entries === 'string'
@@ -851,7 +846,7 @@ export function UretimPage() {
               : s.supplier_entries;
             if (Array.isArray(parsed)) {
               movements = parsed.map((entry: any) => ({
-                id: entry.id || crypto.randomUUID(),
+                id: entry.id || uuidv4(),
                 type: 'ALIS',
                 partyName: entry.supplierName || 'Bilinmeyen',
                 date: entry.date || new Date().toISOString(),
@@ -873,11 +868,7 @@ export function UretimPage() {
           sellPrice: s.sellPrice ?? s.sell_price ?? s.price ?? 0,
         };
       });
-    if (cleaned.length !== raw.length) {
-      setInStorage(StorageKey.STOK_DATA, cleaned);
-    }
-    setStokList(cleaned);
-  };
+  }, [rawStok]);
 
   // Seçili stok ürünün toptancı bilgileri
   const [selectedStokItem, setSelectedStokItem] = useState<any>(null);
@@ -992,7 +983,7 @@ export function UretimPage() {
 
   // ─── Kıyma Karışım State ─────────────────────────────────────────
   const [kiymaKalemler, setKiymaKalemler] = useState<KiymaKalem[]>([
-    { id: crypto.randomUUID(), name: '', stokId: '', kg: 0, birimFiyat: 0, useStokFiyat: true, stokOrtMaliyet: 0 }
+    { id: uuidv4(), name: '', stokId: '', kg: 0, birimFiyat: 0, useStokFiyat: true, stokOrtMaliyet: 0 }
   ]);
   const [kiymaOzelMarj, setKiymaOzelMarj] = useState(20);
   const [kiymaReceteAdi, setKiymaReceteAdi] = useState('');
@@ -1081,7 +1072,7 @@ export function UretimPage() {
     }
     const stokMiktar = item.currentStock ?? item.stock ?? 0;
     setKarisimGirdiler(prev => [...prev, {
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       stokId: item.id,
       urunAdi: item.name || '',
       miktar: 0,
@@ -1118,8 +1109,7 @@ export function UretimPage() {
         }
       }).catch(() => {});
     }
-    refreshStok();
-  }, []);
+      }, []);
 
   // ─── Calculations ────────────────────────────────────────────────
   const calc = useMemo(() => {
@@ -1271,7 +1261,7 @@ export function UretimPage() {
     }
 
     const newProfile: UretimProfile = {
-      id: editingProfile?.id || crypto.randomUUID(),
+      id: editingProfile?.id || uuidv4(),
       name: profileForm.name,
       defaultTupKg: profileForm.defaultTupKg,
       defaultPaketlemeMaliyeti: profileForm.defaultPaketlemeMaliyeti,
@@ -1326,7 +1316,7 @@ export function UretimPage() {
     try {
 
     const newKayit: UretimKayit = {
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       profileId: selectedProfile.id,
       profileName: selectedProfile.name,
       date: new Date().toISOString(),
@@ -1376,7 +1366,7 @@ export function UretimPage() {
             movements = parsed.movements;
           } else if (Array.isArray(parsed)) {
             movements = parsed.map((e: any) => ({
-              id: e.id || crypto.randomUUID(),
+              id: e.id || uuidv4(),
               type: 'ALIS',
               partyName: e.supplierName || 'Bilinmeyen',
               date: e.date || new Date().toISOString(),
@@ -1400,7 +1390,7 @@ export function UretimPage() {
         const newStock = Math.max(0, s.currentStock - form.cigKg);
         const movements = [...(s.movements || [])];
         movements.push({
-          id: crypto.randomUUID(),
+          id: uuidv4(),
           type: 'URETIM_CIKIS',
           partyName: 'Uretim: ' + selectedProfile.name,
           date: new Date().toISOString(),
@@ -1458,7 +1448,7 @@ export function UretimPage() {
     };
 
     const ciktiMovement = {
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       type: 'URETIM_GIRIS' as const,
       partyName: 'Uretim: ' + selectedProfile.name,
       date: new Date().toISOString(),
@@ -1498,7 +1488,7 @@ export function UretimPage() {
       };
       newKayit.ciktiStokId = existingCikti.id;
     } else {
-      const newCiktiId = crypto.randomUUID();
+      const newCiktiId = uuidv4();
       const now = new Date().toISOString();
       updatedStok.push({
         id: newCiktiId,
@@ -1677,7 +1667,7 @@ export function UretimPage() {
 
       // Kayıt oluştur (UretimKayit formatına uygun)
       const newKayit: UretimKayit = {
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         profileId: '__hizli_isleme__',
         profileName: 'Hızlı İşleme',
         date: new Date().toISOString(),
@@ -1720,7 +1710,7 @@ export function UretimPage() {
             const parsed = typeof s.supplier_entries === 'string' ? JSON.parse(s.supplier_entries) : s.supplier_entries;
             if (parsed && Array.isArray(parsed.movements)) movements = parsed.movements;
             else if (Array.isArray(parsed)) movements = parsed.map((e: any) => ({
-              id: e.id || crypto.randomUUID(), type: 'ALIS', partyName: e.supplierName || 'Bilinmeyen',
+              id: e.id || uuidv4(), type: 'ALIS', partyName: e.supplierName || 'Bilinmeyen',
               date: e.date || new Date().toISOString(), quantity: e.quantity || 0, price: e.buyPrice || 0, totalAmount: e.totalAmount || 0,
             }));
           } catch {}
@@ -1733,7 +1723,7 @@ export function UretimPage() {
         if (s.id === hizliForm.hammaddeStokId) {
           const newStock = Math.max(0, s.currentStock - hizliForm.girisMiktar);
           const movements = [...(s.movements || []), {
-            id: crypto.randomUUID(),
+            id: uuidv4(),
             type: 'URETIM_CIKIS',
             partyName: 'Hızlı İşleme',
             date: new Date().toISOString(),
@@ -1749,7 +1739,7 @@ export function UretimPage() {
 
       // 2) Çıktı ürünü stoka ekle
       const ciktiMovement = {
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         type: 'URETIM_GIRIS' as const,
         partyName: 'Hızlı İşleme',
         date: new Date().toISOString(),
@@ -1771,7 +1761,7 @@ export function UretimPage() {
         };
         newKayit.ciktiStokId = existingCikti.id;
       } else {
-        const newCiktiId = crypto.randomUUID();
+        const newCiktiId = uuidv4();
         const now = new Date().toISOString();
         const hammaddeItem = updatedStok.find(s => s.id === hizliForm.hammaddeStokId);
         updatedStok.push({
@@ -1840,7 +1830,7 @@ export function UretimPage() {
       const birimMaliyet = karisimCalc.birimMaliyet;
 
       const newKayit: UretimKayit = {
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         profileId: '__karisim__',
         profileName: 'Karışım İşleme',
         date: new Date().toISOString(),
@@ -1891,7 +1881,7 @@ export function UretimPage() {
             const parsed = typeof s.supplier_entries === 'string' ? JSON.parse(s.supplier_entries) : s.supplier_entries;
             if (parsed && Array.isArray(parsed.movements)) movements = parsed.movements;
             else if (Array.isArray(parsed)) movements = parsed.map((e: any) => ({
-              id: e.id || crypto.randomUUID(), type: 'ALIS', partyName: e.supplierName || 'Bilinmeyen',
+              id: e.id || uuidv4(), type: 'ALIS', partyName: e.supplierName || 'Bilinmeyen',
               date: e.date || new Date().toISOString(), quantity: e.quantity || 0, price: e.buyPrice || 0, totalAmount: e.totalAmount || 0,
             }));
           } catch {}
@@ -1907,7 +1897,7 @@ export function UretimPage() {
           if (s.id === girdi.stokId) {
             const newStock = Math.max(0, s.currentStock - girdi.miktar);
             const movements = [...(s.movements || []), {
-              id: crypto.randomUUID(),
+              id: uuidv4(),
               type: 'URETIM_CIKIS',
               partyName: 'Karışım İşleme',
               date: new Date().toISOString(),
@@ -1925,7 +1915,7 @@ export function UretimPage() {
 
       // 2) Çıktı ürünü stoka ekle
       const ciktiMovement = {
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         type: 'URETIM_GIRIS' as const,
         partyName: 'Karışım İşleme',
         date: new Date().toISOString(),
@@ -1944,7 +1934,7 @@ export function UretimPage() {
         newKayit.ciktiStokId = existingCikti.id;
         changedIds.push(existingCikti.id);
       } else {
-        const newCiktiId = crypto.randomUUID();
+        const newCiktiId = uuidv4();
         const now = new Date().toISOString();
         updatedStok.push({
           id: newCiktiId, name: karisimCikti.urunAdi, category: 'Karışım', unit: 'KG',
@@ -2125,9 +2115,9 @@ export function UretimPage() {
             whileTap={{ scale: 0.96 }}
             onClick={() => {
               setActiveView(tab.key as any);
-              if (tab.key === 'yeni') { resetForm(); refreshStok(); }
-              if (tab.key === 'hizli') { resetHizliForm(); refreshStok(); }
-              if (tab.key === 'karisim') { resetKarisimForm(); refreshStok(); }
+              if (tab.key === 'yeni') { resetForm(); }
+              if (tab.key === 'hizli') { resetHizliForm(); }
+              if (tab.key === 'karisim') { resetKarisimForm(); }
             }}
             className={`relative flex-1 flex items-center justify-center gap-1.5 md:gap-2 px-2.5 md:px-4 py-2.5 md:py-2.5 rounded-lg md:rounded-xl font-medium text-[11px] md:text-sm whitespace-nowrap transition-all duration-300 active:scale-[0.97] ${
               activeView === tab.key
@@ -4053,14 +4043,14 @@ export function UretimPage() {
                   <motion.button
                     whileHover={{ scale: 1.02, y: -1 }}
                     whileTap={{ scale: 0.97 }}
-                    onClick={() => { setActiveView('hizli'); resetHizliForm(); refreshStok(); }}
+                    onClick={() => { setActiveView('hizli'); resetHizliForm(); }}
                     className="px-6 py-2.5 md:py-3 text-sm bg-gradient-to-r from-violet-500 to-blue-600 text-foreground font-semibold rounded-xl shadow-lg shadow-violet-500/20 hover:shadow-violet-500/30 active:from-violet-600 active:to-blue-700 transition-all duration-300">
                     <span className="flex items-center gap-2"><Scissors className="w-4 h-4" />Hızlı İşleme</span>
                   </motion.button>
                   <motion.button
                     whileHover={{ scale: 1.02, y: -1 }}
                     whileTap={{ scale: 0.97 }}
-                    onClick={() => { setActiveView('yeni'); refreshStok(); }}
+                    onClick={() => { setActiveView('yeni'); }}
                     className="px-6 py-2.5 md:py-3 text-sm bg-gradient-to-r from-orange-500 to-red-600 text-foreground font-semibold rounded-xl shadow-lg shadow-orange-500/20 hover:shadow-orange-500/30 active:from-orange-600 active:to-red-700 transition-all duration-300">
                     <span className="flex items-center gap-2"><PlayCircle className="w-4 h-4" />Detaylı Üretim</span>
                   </motion.button>
@@ -4091,13 +4081,13 @@ export function UretimPage() {
                   <div className="flex items-center gap-1.5">
                     <motion.button
                       whileTap={{ scale: 0.97 }}
-                      onClick={() => { setActiveView('hizli'); resetHizliForm(); refreshStok(); }}
+                      onClick={() => { setActiveView('hizli'); resetHizliForm(); }}
                       className="flex items-center gap-1 md:gap-1.5 px-2.5 md:px-3 py-1.5 md:py-2 text-[11px] md:text-xs font-semibold bg-gradient-to-r from-violet-600/20 to-blue-600/15 hover:from-violet-600/30 hover:to-blue-600/25 text-violet-400 rounded-lg md:rounded-xl border border-violet-500/15 transition-all duration-300 active:scale-[0.97]">
                       <Scissors className="w-3 h-3" /> <span className="hidden sm:inline">Hızlı İşleme</span><span className="sm:hidden">İşle</span>
                     </motion.button>
                     <motion.button
                       whileTap={{ scale: 0.97 }}
-                      onClick={() => { setActiveView('yeni'); refreshStok(); }}
+                      onClick={() => { setActiveView('yeni'); }}
                       className="flex items-center gap-1 md:gap-1.5 px-2.5 md:px-3.5 py-1.5 md:py-2 text-[11px] md:text-xs font-semibold bg-gradient-to-r from-orange-600/20 to-red-600/15 hover:from-orange-600/30 hover:to-red-600/25 text-orange-400 rounded-lg md:rounded-xl border border-orange-500/15 transition-all duration-300 active:scale-[0.97]">
                       <Plus className="w-3 h-3" /> <span className="hidden sm:inline">{t('uretim.tabs.new', 'Yeni Üretim')}</span><span className="sm:hidden">{t('uretim.tabs.new_short', 'Yeni')}</span>
                     </motion.button>
@@ -4660,7 +4650,7 @@ export function UretimPage() {
                   </h3>
                   <button
                     onClick={() => setKiymaKalemler(prev => [...prev, {
-                      id: crypto.randomUUID(), name: '', stokId: '', kg: 0, birimFiyat: 0, useStokFiyat: true, stokOrtMaliyet: 0,
+                      id: uuidv4(), name: '', stokId: '', kg: 0, birimFiyat: 0, useStokFiyat: true, stokOrtMaliyet: 0,
                     }])}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 text-xs font-medium rounded-lg border border-red-500/20 transition-all duration-200"
                   >
@@ -4894,7 +4884,7 @@ export function UretimPage() {
                             const n = kiymaReceteAdi.trim();
                             if (!n) { toast.warning('Reçete adı girin'); return; }
                             const yeni: KiymaRecete = {
-                              id: crypto.randomUUID(), name: n,
+                              id: uuidv4(), name: n,
                               kalemler: kiymaKalemler.filter(k => k.kg > 0),
                               createdAt: new Date().toISOString(),
                             };
@@ -4912,7 +4902,7 @@ export function UretimPage() {
                           const n = kiymaReceteAdi.trim();
                           if (!n) { toast.warning('Reçete adı girin'); return; }
                           const yeni: KiymaRecete = {
-                            id: crypto.randomUUID(), name: n,
+                            id: uuidv4(), name: n,
                             kalemler: kiymaKalemler.filter(k => k.kg > 0),
                             createdAt: new Date().toISOString(),
                           };
@@ -5120,8 +5110,8 @@ export function UretimPage() {
                         <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-all">
                           <button
                             onClick={() => {
-                              const yeniKalemler = r.kalemler.map(k => ({ ...k, id: crypto.randomUUID() }));
-                              setKiymaKalemler(yeniKalemler.length > 0 ? yeniKalemler : [{ id: crypto.randomUUID(), name: '', stokId: '', kg: 0, birimFiyat: 0, useStokFiyat: true, stokOrtMaliyet: 0 }]);
+                              const yeniKalemler = r.kalemler.map(k => ({ ...k, id: uuidv4() }));
+                              setKiymaKalemler(yeniKalemler.length > 0 ? yeniKalemler : [{ id: uuidv4(), name: '', stokId: '', kg: 0, birimFiyat: 0, useStokFiyat: true, stokOrtMaliyet: 0 }]);
                               setKiymaReceteAdi(r.name + ' (kopya)');
                               toast.success(`"${r.name}" hesaplayıcıya yüklendi`);
                             }}

@@ -124,6 +124,10 @@ export const TABLE_NAMES = [
   'favorite_items',      // Hızlı erişim için işaretlenen kayıtlar
   'performance_metrics', // Uygulama çalışma/hız istatistikleri
   'iletisim_talepleri',  // Siteden gelen müşteri talepleri
+  'nakliyeciler',
+  'iceberg_cages',
+  'transporters',
+  'invoice_names',
 ] as const;
 
 export type TableName = typeof TABLE_NAMES[number];

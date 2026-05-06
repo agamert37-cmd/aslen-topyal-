@@ -32,6 +32,7 @@ import { addPDFHeader, addPDFFooter, addReportInfoBox, tableStyles } from '../ut
 import { getPagePermissions } from '../utils/permissions';
 import { usePageSecurity } from '../hooks/usePageSecurity';
 import { InteractiveDataPanel, type PanelColumn } from '../components/InteractiveDataPanel';
+import { v4 as uuidv4 } from 'uuid';
 
 interface StokHareket {
   id: string;
@@ -309,7 +310,7 @@ export function StokHareketPage() {
     if (!product) { toast.error('Ürün bulunamadı!'); return; }
 
     const newGiris: StokGiris = {
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       date: gecmisForm.date || today.toISOString(),
       productId: gecmisForm.productId,
       productName: product.name,

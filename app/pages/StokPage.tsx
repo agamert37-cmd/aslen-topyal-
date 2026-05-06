@@ -16,6 +16,7 @@ import { SyncStatusBar, SyncBadge } from '../components/SyncStatusBar';
 import { SwipeToDelete } from '../components/MobileHelpers';
 import { DataIssueBadge } from '../components/DataIssueBadge';
 import { useTableSync } from '../hooks/useTableSync';
+import { useGlobalTableData } from '../contexts/GlobalTableSyncContext';
 import { validateStokItem } from '../utils/data-integrity';
 import { getFromStorage, setInStorage, StorageKey } from '../utils/storage';
 import { logActivity } from '../utils/activityLogger';
@@ -37,6 +38,7 @@ import { kvGet, kvSet } from '../lib/pouchdb-kv';
 import { BarcodeScanner } from '../components/BarcodeScanner';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { DuplicateFinderModal } from '../components/DuplicateFinderModal';
+import { v4 as uuidv4 } from 'uuid';
 
 export type MovementType = 'ALIS' | 'SATIS' | 'MUSTERI_IADE' | 'TOPTANCI_IADE' | 'FIRE' | 'URETIM_CIKIS' | 'URETIM_GIRIS' | 'FATURA_ALIS' | 'FATURA_SATIS' | 'FATURA_IPTAL' | 'ONCEKI_BAKIYE' | 'TRANSFER';
 export type ProductCategory = string;
@@ -121,7 +123,7 @@ export function productFromDb(row: any): Product {
       const data = JSON.parse(row.supplier_entries);
       if (Array.isArray(data)) {
         parsed.movements = data.map((entry: any) => ({
-          id: entry.id || crypto.randomUUID(),
+          id: entry.id || uuidv4(),
           type: 'ALIS',
           partyName: entry.supplierName || 'Bilinmeyen Toptanci',
           date: entry.date || new Date().toISOString(),
@@ -139,7 +141,7 @@ export function productFromDb(row: any): Product {
       }
     } else if (Array.isArray(row.supplier_entries)) {
        parsed.movements = row.supplier_entries.map((entry: any) => ({
-          id: entry.id || crypto.randomUUID(),
+          id: entry.id || uuidv4(),
           type: 'ALIS',
           partyName: entry.supplierName || 'Bilinmeyen Toptanci',
           date: entry.date || new Date().toISOString(),
@@ -282,12 +284,17 @@ function CustomSelect({ value, onChange, options, placeholder, name }: {
   );
 }
 
-// ─── Glassmorphism Card ────────────────────────────────────
-function GlassCard({ children, className = '', hover = false, ...props }: React.HTMLAttributes<HTMLDivElement> & { hover?: boolean }) {
+// ─── Premium Card ────────────────────────────────────
+function PremiumCard({ children, className = '', hover = false, ...props }: React.HTMLAttributes<HTMLDivElement> & { hover?: boolean }) {
   return (
-    <div className={`rounded-2xl lg:rounded-3xl card-premium ${hover ? 'hover:border-blue-500/30 transition-all duration-300' : ''} ${className}`} {...props}>
+    <motion.div 
+      whileHover={hover ? { scale: 1.01, y: -2, boxShadow: '0 8px 30px rgba(0,0,0,0.12)' } : undefined}
+      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+      className={`card-premium rounded-2xl lg:rounded-3xl p-4 sm:p-5 ${hover ? 'hover:border-cyan-500/30 transition-colors duration-300' : ''} ${className}`} 
+      {...(props as any)}
+    >
       {children}
-    </div>
+    </motion.div>
   );
 }
 
@@ -382,12 +389,14 @@ const ProductCard = React.memo(React.forwardRef(({
       ref={ref}
       layout
       variants={staggerItem}
-      exit={{ opacity: 0, y: -8, transition: { duration: 0.18 } }}
-      whileHover={{ y: -1, transition: { duration: 0.15 } }}
+      exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
+      whileHover={{ scale: 1.01, y: -2, zIndex: 10, transition: { type: "spring", stiffness: 400, damping: 30 } }}
     >
         <div
-          className={`rounded-2xl border transition-colors overflow-hidden ${isMobile ? '' : 'backdrop-blur-md'} ${
-            isNeg ? 'bg-gradient-to-br from-red-500/10 via-card to-card border-red-500/25 hover:border-red-500/40' : isCrit ? 'bg-gradient-to-br from-amber-500/8 via-card to-card border-amber-500/20 hover:border-amber-500/35' : 'card-premium hover:border-blue-500/30'
+          className={`rounded-2xl border transition-colors overflow-hidden relative ${isMobile ? '' : 'backdrop-blur-md'} ${
+            isNeg ? 'bg-gradient-to-br from-red-500/10 via-card to-card border-red-500/25 shadow-[0_4px_24px_rgba(239,68,68,0.1)] hover:border-red-500/40 hover:bg-white/10' : 
+            isCrit ? 'bg-gradient-to-br from-amber-500/8 via-card to-card border-amber-500/20 shadow-[0_4px_24px_rgba(245,158,11,0.1)] hover:border-amber-500/35 hover:bg-white/10' : 
+            'bg-white/5 border border-white/10 shadow-[0_4px_24px_rgba(0,0,0,0.2)] hover:border-blue-500/30 hover:bg-white/10'
           }`}
         >
           {/* Main Row */}
@@ -580,16 +589,12 @@ export function StokPage() {
     // Sistem verisi yenilendiginde stok yenile
     const unsub3 = on('system:data_refreshed', () => {
       refreshProducts();
-      setIcebergCages(getFromStorage<IcebergCage[]>('iceberg_cages_data') || []);
-      setTransporters(getFromStorage<{id: string, name: string}[]>('transporters_data') || []);
     });
 
     // Backup restore sonrasi yenile
     const unsub4 = on('system:backup_restored', () => {
       console.log('[StokPage] Backup restore algılandi, stok yenileniyor');
       refreshProducts();
-      setIcebergCages(getFromStorage<IcebergCage[]>('iceberg_cages_data') || []);
-      setTransporters(getFromStorage<{id: string, name: string}[]>('transporters_data') || []);
     });
 
     // Fatura eklendi/iptal edildi — stok etkisi olabilir
@@ -637,7 +642,7 @@ export function StokPage() {
     const delta = reverse ? -effect.delta : effect.delta;
     const txType = reverse ? (effect.txType === 'debit' ? 'credit' : 'debit') : effect.txType as 'debit' | 'credit';
     const newTransaction = {
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       date: new Date().toISOString(),
       description: reverse
         ? `[IPTAL] ${productName} — ${movement.quantity} stok hareketi iptal edildi`
@@ -867,24 +872,11 @@ export function StokPage() {
   const [editingCatName, setEditingCatName] = useState('');
 
   // Iceberg Cages & Transporters
-  const [icebergCages, setIcebergCages] = useState<IcebergCage[]>(() => 
-    getFromStorage<IcebergCage[]>('iceberg_cages_data') || []
-  );
-  const [transporters, setTransporters] = useState<{id: string, name: string}[]>(() => 
-    getFromStorage<{id: string, name: string}[]>('transporters_data') || []
-  );
+  const icebergCagesData = useGlobalTableData<IcebergCage>('iceberg_cages');
+  const icebergCages = useMemo(() => Array.isArray(icebergCagesData) ? icebergCagesData : [], [icebergCagesData]);
 
-  const saveIcebergCages = (updated: IcebergCage[]) => {
-    setIcebergCages(updated);
-    setInStorage('iceberg_cages_data', updated);
-    emit('system:data_refreshed', { source: 'StokPage' });
-  };
-  
-  const saveTransporters = (updated: {id: string, name: string}[]) => {
-    setTransporters(updated);
-    setInStorage('transporters_data', updated);
-    emit('system:data_refreshed', { source: 'StokPage' });
-  };
+  const transportersData = useGlobalTableData<{id: string, name: string}>('transporters');
+  const transporters = useMemo(() => Array.isArray(transportersData) ? transportersData : [], [transportersData]);
 
   const partyInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -1016,7 +1008,7 @@ export function StokPage() {
     const name = fd.get('name') as string;
     if (!sec.preCheck('add', { name })) return;
     const newProduct: Product = {
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       name: sec.sanitize(name),
       category: addFormCategory as ProductCategory,
       unit: addFormUnit as 'KG' | 'Adet' | 'Koli',
@@ -1082,7 +1074,7 @@ export function StokPage() {
         };
       } else {
         updatedMovements.push({
-          id: crypto.randomUUID(),
+          id: uuidv4(),
           type: 'ONCEKI_BAKIYE',
           partyName: 'Önceki Bakiye',
           date: new Date().toISOString(),
@@ -1213,7 +1205,7 @@ export function StokPage() {
 
     if (!sec.preCheck(editingMovement ? 'edit' : 'add', { partyName: partyName || (isTransfer ? 'İç Transfer' : 'Önceki Bakiye'), description: desc })) return;
 
-    const movementId = editingMovement ? editingMovement.id : crypto.randomUUID();
+    const movementId = editingMovement ? editingMovement.id : uuidv4();
     const mvDate = editingMovement ? editingMovement.date : new Date().toISOString();
 
     const newMv: StockMovement = {
@@ -1400,7 +1392,12 @@ export function StokPage() {
   };
 
   return (
-    <div className="p-3 sm:p-6 lg:p-10 space-y-3 sm:space-y-6 lg:space-y-8 bg-background min-h-screen text-foreground font-sans pb-[calc(6rem+env(safe-area-inset-bottom,0px))] lg:pb-10">
+    <motion.div 
+      initial={{ opacity: 0, filter: 'blur(10px)' }} 
+      animate={{ opacity: 1, filter: 'blur(0px)' }} 
+      transition={{ duration: 0.5 }}
+      className="p-3 sm:p-6 lg:p-10 space-y-3 sm:space-y-6 lg:space-y-8 bg-background min-h-screen text-foreground font-sans pb-[calc(6rem+env(safe-area-inset-bottom,0px))] lg:pb-10"
+    >
       <SyncStatusBar tableName="urunler" />
 
       {/* Module Health Banner */}
@@ -1425,18 +1422,27 @@ export function StokPage() {
 
       {/* ─── Header ─── */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
+        <motion.div
+           initial={{ x: -20, opacity: 0 }} 
+           animate={{ x: 0, opacity: 1 }} 
+           transition={{ duration: 0.5, delay: 0.1 }}
+        >
           <div className="flex items-center gap-3 mb-1.5">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center shadow-lg shadow-blue-600/20 glow-blue">
-              <Warehouse className="w-5 h-5 sm:w-6 sm:h-6 text-foreground" />
+            <div className="p-2 sm:p-3 rounded-xl bg-blue-500/15 border border-blue-500/20 shadow-lg shadow-blue-500/10">
+              <Warehouse className="w-6 h-6 sm:w-8 sm:h-8 text-blue-400" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">Depo & Stok</h1>
-              <p className="text-xs sm:text-sm text-muted-foreground">Urun tanimlari, maliyet analizi ve depo hareketleri</p>
+              <h1 className="text-2xl sm:text-3xl font-black text-foreground flex items-center gap-3">Depo & Stok</h1>
+              <p className="text-muted-foreground mt-1 max-w-xl text-xs sm:text-sm">Urun tanimlari, maliyet analizi ve depo hareketleri</p>
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2 sm:gap-3">
+        </motion.div>
+        <motion.div 
+           initial={{ x: 20, opacity: 0 }} 
+           animate={{ x: 0, opacity: 1 }} 
+           transition={{ duration: 0.5, delay: 0.1 }}
+           className="flex items-center gap-2 sm:gap-3"
+        >
           <SyncBadge tableName="urunler" />
           <button
             onClick={() => { refreshProducts(); toast.success('Stok verileri yenileniyor...'); }}
@@ -1467,11 +1473,19 @@ export function StokPage() {
               <Plus className="w-4 h-4 sm:w-5 sm:h-5" /> <span className="hidden sm:inline">Yeni Urun</span><span className="sm:hidden">Ekle</span>
             </motion.button>
           )}
-        </div>
+        </motion.div>
       </div>
 
       {/* ─── Bento Stats ─── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <motion.div 
+        variants={{
+          hidden: { opacity: 0, y: 20 },
+          show: { opacity: 1, y: 0, transition: { staggerChildren: 0.1 } }
+        }}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4"
+      >
         {[
           { label: 'Toplam Urun', value: stats.total, icon: Package, gradient: 'from-blue-500/10 via-[#111] to-[#111]', border: 'border-blue-500/20 hover:border-blue-500/40', iconBg: 'bg-blue-500/20', text: 'text-blue-400', glow: 'bg-blue-500/10', shadow: 'shadow-blue-500/10' },
           { label: 'Kritik Stok', value: stats.critical.length, icon: AlertCircle, gradient: 'from-amber-500/10 via-[#111] to-[#111]', border: 'border-amber-500/20 hover:border-amber-500/40', iconBg: 'bg-amber-500/20', text: 'text-amber-400', glow: 'bg-amber-500/10', shadow: 'shadow-amber-500/10' },
@@ -1480,9 +1494,7 @@ export function StokPage() {
         ].map((s, i) => (
           <motion.div
             key={i}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.07 }}
+            variants={{ hidden: { opacity: 0, y: 15 }, show: { opacity: 1, y: 0 } }}
             className={`relative p-4 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl bg-gradient-to-br ${s.gradient} border ${s.border} overflow-hidden group transition-all`}
           >
             <div className={`absolute -top-8 -right-8 w-28 h-28 ${s.glow} rounded-full blur-2xl group-hover:opacity-100 opacity-70 transition-all pointer-events-none`} />
@@ -1497,10 +1509,15 @@ export function StokPage() {
             </div>
           </motion.div>
         ))}
-      </div>
+      </motion.div>
 
       {/* ─── Tabs ─── */}
-      <div className="flex gap-1 p-1 rounded-2xl glass border border-border overflow-x-auto scrollbar-hide no-scrollbar">
+      <motion.div 
+         initial={{ opacity: 0, y: 10 }}
+         animate={{ opacity: 1, y: 0 }}
+         transition={{ duration: 0.3, delay: 0.2 }}
+         className="flex gap-1 p-1 rounded-2xl glass border border-border overflow-x-auto scrollbar-hide no-scrollbar"
+      >
         {tabs.map(tab => (
           <button
             key={tab.key}
@@ -1520,13 +1537,13 @@ export function StokPage() {
             )}
           </button>
         ))}
-      </div>
+      </motion.div>
 
       {/* ═══════════════ TAB: Urunler ═══════════════ */}
       {activeTab === 'urunler' && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
           {/* Filter Bar */}
-          <GlassCard className="p-3 sm:p-4 flex flex-col sm:flex-row gap-3">
+          <PremiumCard className="flex flex-col sm:flex-row gap-3 p-3 sm:p-4">
             <div className="flex-1 relative flex gap-2">
               <div className="flex-1 relative">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -1582,7 +1599,7 @@ export function StokPage() {
                 ))}
               </div>
             </div>
-          </GlassCard>
+          </PremiumCard>
 
           {/* Product Count */}
           <div className="flex items-center justify-between px-1">
@@ -1625,11 +1642,11 @@ export function StokPage() {
             </AnimatePresence>
 
             {filteredProducts.length === 0 && (
-              <GlassCard className="p-12 text-center">
+              <PremiumCard className="p-12 text-center">
                 <Package className="w-12 h-12 text-gray-700 mx-auto mb-3" />
                 <p className="text-muted-foreground font-medium">Urun bulunamadi</p>
                 <p className="text-gray-600 text-sm mt-1">Arama kriterlerinizi degistirin veya yeni urun ekleyin</p>
-              </GlassCard>
+              </PremiumCard>
             )}
           </motion.div>
         </motion.div>
@@ -1639,7 +1656,7 @@ export function StokPage() {
       {activeTab === 'uyarilar' && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
           {/* Critical Stock */}
-          <GlassCard className="p-5 sm:p-6">
+          <PremiumCard className="p-5 sm:p-6">
             <div className="flex items-center gap-3 mb-5">
               <div className="w-10 h-10 rounded-xl bg-orange-500/15 flex items-center justify-center">
                 <AlertCircle className="w-5 h-5 text-orange-400" />
@@ -1678,10 +1695,10 @@ export function StokPage() {
                 ))}
               </div>
             )}
-          </GlassCard>
+          </PremiumCard>
 
           {/* Negative Stock */}
-          <GlassCard className="p-5 sm:p-6">
+          <PremiumCard className="p-5 sm:p-6">
             <div className="flex items-center gap-3 mb-5">
               <div className="w-10 h-10 rounded-xl bg-red-500/15 flex items-center justify-center">
                 <AlertTriangle className="w-5 h-5 text-red-400" />
@@ -1725,14 +1742,14 @@ export function StokPage() {
                 ))}
               </div>
             )}
-          </GlassCard>
+          </PremiumCard>
         </motion.div>
       )}
 
       {/* ═══════════════ TAB: Kategoriler ═══════════════ */}
       {activeTab === 'kategoriler' && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
-          <GlassCard className="p-5 sm:p-6">
+          <PremiumCard className="p-5 sm:p-6">
             <div className="flex items-center gap-3 mb-5">
               <div className="w-10 h-10 rounded-xl bg-purple-500/15 flex items-center justify-center">
                 <FolderOpen className="w-5 h-5 text-purple-400" />
@@ -1801,7 +1818,7 @@ export function StokPage() {
                 );
               })}
             </div>
-          </GlassCard>
+          </PremiumCard>
         </motion.div>
       )}
 
@@ -1835,18 +1852,17 @@ export function StokPage() {
           {/* Row 1: Category Pie + Stock Value Bar */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
             {/* Category Pie Chart */}
-            <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}
-              className="p-4 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl card-premium flex flex-col"
-            >
-              <div className="flex items-center gap-3 mb-4 sm:mb-6">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-cyan-500/15 flex items-center justify-center">
-                  <PieChart className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400" />
+            <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}>
+              <PremiumCard hover className="p-4 sm:p-5 lg:p-6 flex flex-col h-full">
+                <div className="flex items-center gap-3 mb-4 sm:mb-6">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-cyan-500/15 flex items-center justify-center">
+                    <PieChart className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm sm:text-base lg:text-lg font-bold text-foreground">Kategoriye Gore Dagilim</h2>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">Urun sayilarinin kategori bazli analizi</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-sm sm:text-base lg:text-lg font-bold text-foreground">Kategoriye Gore Dagilim</h2>
-                  <p className="text-[10px] sm:text-xs text-muted-foreground">Urun sayilarinin kategori bazli analizi</p>
-                </div>
-              </div>
               {categoryPieData.length > 0 ? (
                 <div className="flex flex-col sm:flex-row items-center gap-4 flex-1">
                   <div className="w-full sm:w-1/2 h-[200px] sm:h-[220px]">
@@ -1882,21 +1898,21 @@ export function StokPage() {
               ) : (
                 <EmptyChartState message="Kategori verisi yok" />
               )}
+              </PremiumCard>
             </motion.div>
 
             {/* Stock Value Bar Chart */}
-            <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }}
-              className="p-4 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl card-premium flex flex-col"
-            >
-              <div className="flex items-center gap-3 mb-4 sm:mb-6">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center">
-                  <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
+            <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }}>
+              <PremiumCard hover className="p-4 sm:p-5 lg:p-6 flex flex-col h-full">
+                <div className="flex items-center gap-3 mb-4 sm:mb-6">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center">
+                    <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm sm:text-base lg:text-lg font-bold text-foreground">Deger Bazli Siralama</h2>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">Stok degerine gore en yuksek 8 urun</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-sm sm:text-base lg:text-lg font-bold text-foreground">Deger Bazli Siralama</h2>
-                  <p className="text-[10px] sm:text-xs text-muted-foreground">Stok degerine gore en yuksek 8 urun</p>
-                </div>
-              </div>
               {topValueData.length > 0 ? (
                 <div className="flex-1 h-[220px] sm:h-[240px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -1918,22 +1934,22 @@ export function StokPage() {
               ) : (
                 <EmptyChartState message="Stok degeri verisi yok" />
               )}
+              </PremiumCard>
             </motion.div>
           </div>
 
           {/* Row 2: Stock Levels Area Chart (full width) */}
-          <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 }}
-            className="p-4 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl card-premium flex flex-col"
-          >
-            <div className="flex items-center gap-3 mb-4 sm:mb-6">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-500/15 flex items-center justify-center">
-                <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
+          <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 }}>
+            <PremiumCard hover className="p-4 sm:p-5 lg:p-6 flex flex-col h-full">
+              <div className="flex items-center gap-3 mb-4 sm:mb-6">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-500/15 flex items-center justify-center">
+                  <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
+                </div>
+                <div>
+                  <h2 className="text-sm sm:text-base lg:text-lg font-bold text-foreground">Stok Seviyeleri</h2>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">Mevcut stok & minimum stok karsilastirmasi (ilk 10 urun)</p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-sm sm:text-base lg:text-lg font-bold text-foreground">Stok Seviyeleri</h2>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Mevcut stok & minimum stok karsilastirmasi (ilk 10 urun)</p>
-              </div>
-            </div>
             {stockLevelData.length > 0 ? (
               <div className="h-[260px] sm:h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
@@ -1960,6 +1976,7 @@ export function StokPage() {
             ) : (
               <EmptyChartState message="Stok seviyesi verisi yok" />
             )}
+            </PremiumCard>
           </motion.div>
 
           {/* Row 3: KDV Özeti & Fatura Stoku */}
@@ -1967,7 +1984,7 @@ export function StokPage() {
             <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.35 }}
               className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4"
             >
-              <div className="p-4 sm:p-5 rounded-2xl card-premium">
+              <PremiumCard hover className="p-4 sm:p-5">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-8 h-8 rounded-lg bg-orange-500/15 flex items-center justify-center">
                     <ArrowDownRight className="w-4 h-4 text-orange-400" />
@@ -1978,8 +1995,8 @@ export function StokPage() {
                   </div>
                 </div>
                 <p className="text-[10px] text-gray-600">Toptancı alışlarından ödenen KDV</p>
-              </div>
-              <div className="p-4 sm:p-5 rounded-2xl card-premium">
+              </PremiumCard>
+              <PremiumCard hover className="p-4 sm:p-5">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center">
                     <ArrowUpRight className="w-4 h-4 text-emerald-400" />
@@ -1990,8 +2007,8 @@ export function StokPage() {
                   </div>
                 </div>
                 <p className="text-[10px] text-gray-600">Müşteriye yansıtılan KDV</p>
-              </div>
-              <div className="p-4 sm:p-5 rounded-2xl card-premium">
+              </PremiumCard>
+              <PremiumCard hover className="p-4 sm:p-5">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-8 h-8 rounded-lg bg-blue-500/15 flex items-center justify-center">
                     <Scale className="w-4 h-4 text-blue-400" />
@@ -2007,45 +2024,49 @@ export function StokPage() {
                   Satış KDV - Alış KDV · {stats.kdvSummary.faturaMovements} fatura hareketi
                   {stats.faturaStokuCount > 0 && ` · ${stats.faturaStokuCount} fatura stok ürünü`}
                 </p>
-              </div>
+              </PremiumCard>
             </motion.div>
           )}
 
           {/* Row 4: Recent Movements */}
-          <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.4 }}
-            className="p-4 sm:p-5 lg:p-6 rounded-2xl lg:rounded-3xl card-premium"
-          >
-            <div className="flex items-center gap-3 mb-4 sm:mb-5">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-500/15 flex items-center justify-center">
-                <History className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-400" />
+          <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.4 }}>
+            <PremiumCard hover className="p-4 sm:p-5 lg:p-6">
+              <div className="flex items-center gap-3 mb-4 sm:mb-5">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-500/15 flex items-center justify-center">
+                  <History className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-400" />
+                </div>
+                <div>
+                  <h2 className="text-sm sm:text-base lg:text-lg font-bold text-foreground">Son Hareketler</h2>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">Toplam {stats.totalMovements} hareket · Tum urunler</p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-sm sm:text-base lg:text-lg font-bold text-foreground">Son Hareketler</h2>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Toplam {stats.totalMovements} hareket · Tum urunler</p>
-              </div>
-            </div>
-            {stats.recentMovements.length === 0 ? (
-              <EmptyChartState message="Henuz hareket yok" />
-            ) : (
-              <div className="space-y-1.5 max-h-[400px] overflow-y-auto custom-scrollbar">
-                {stats.recentMovements.map((m: any, i) => (
-                  <div key={m.id || i} className="flex items-center gap-2.5 p-2.5 sm:p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-border transition-all">
-                    <MovementBadge type={m.type} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs sm:text-sm font-semibold text-foreground truncate">{m.productName}</p>
-                      <p className="text-[10px] text-gray-600">{m.partyName}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className={`text-xs font-bold tabular-nums ${['ALIS', 'MUSTERI_IADE', 'URETIM_GIRIS', 'FATURA_ALIS'].includes(m.type) ? 'text-emerald-400' : m.type === 'FATURA_IPTAL' ? 'text-rose-400' : 'text-red-400'}`}>
-                        {['ALIS', 'MUSTERI_IADE', 'URETIM_GIRIS', 'FATURA_ALIS'].includes(m.type) ? '+' : '-'}{m.quantity} {m.productUnit}
-                      </p>
-                      {m.kdvAmount ? <p className="text-[8px] text-blue-400 font-mono">KDV: ₺{m.kdvAmount.toFixed(2)}</p> : null}
-                      <p className="text-[9px] text-gray-600 font-mono">{new Date(m.date).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+              {stats.recentMovements.length === 0 ? (
+                <EmptyChartState message="Henuz hareket yok" />
+              ) : (
+                <div className="space-y-1.5 max-h-[400px] overflow-y-auto custom-scrollbar">
+                  {stats.recentMovements.map((m: any, i) => (
+                    <motion.div 
+                      key={m.id || i} 
+                      whileHover={{ scale: 1.01 }}
+                      className="flex items-center gap-2.5 p-2.5 sm:p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-border transition-all"
+                    >
+                      <MovementBadge type={m.type} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs sm:text-sm font-semibold text-foreground truncate">{m.productName}</p>
+                        <p className="text-[10px] text-gray-600">{m.partyName}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className={`text-xs font-bold tabular-nums ${['ALIS', 'MUSTERI_IADE', 'URETIM_GIRIS', 'FATURA_ALIS'].includes(m.type) ? 'text-emerald-400' : m.type === 'FATURA_IPTAL' ? 'text-rose-400' : 'text-red-400'}`}>
+                          {['ALIS', 'MUSTERI_IADE', 'URETIM_GIRIS', 'FATURA_ALIS'].includes(m.type) ? '+' : '-'}{m.quantity} {m.productUnit}
+                        </p>
+                        {m.kdvAmount ? <p className="text-[8px] text-blue-400 font-mono">KDV: ₺{m.kdvAmount.toFixed(2)}</p> : null}
+                        <p className="text-[9px] text-gray-600 font-mono">{new Date(m.date).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })}</p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </PremiumCard>
           </motion.div>
         </motion.div>
         );
@@ -2079,11 +2100,11 @@ export function StokPage() {
           </div>
 
           {silindenStoklar.length === 0 ? (
-            <div className="card-premium rounded-2xl p-12 flex flex-col items-center text-center">
+            <PremiumCard className="p-12 flex flex-col items-center text-center">
               <Archive className="w-12 h-12 text-gray-700 mb-3" />
               <p className="text-muted-foreground font-bold">Silinen ürün yok</p>
               <p className="text-xs text-gray-600 mt-1">Silinen ürünler burada arşivlenecek</p>
-            </div>
+            </PremiumCard>
           ) : (
             <div className="space-y-2">
               {silindenStoklar.map((p: any, i: number) => (
@@ -2091,8 +2112,8 @@ export function StokPage() {
                   key={p.id + i}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="card-premium rounded-xl p-4 flex items-center gap-4"
                 >
+                  <PremiumCard hover className="p-4 flex items-center gap-4 h-full">
                   <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center shrink-0">
                     <Trash2 className="w-4 h-4 text-red-400" />
                   </div>
@@ -2113,6 +2134,7 @@ export function StokPage() {
                       {p.deletedAt ? new Date(p.deletedAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : ''}
                     </p>
                   </div>
+                  </PremiumCard>
                 </motion.div>
               ))}
             </div>
@@ -2449,6 +2471,6 @@ export function StokPage() {
           onMergeComplete={() => setShowDupFinder(false)}
         />
       )}
-    </div>
+    </motion.div>
   );
 }

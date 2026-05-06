@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid';
 // [AJAN-3 | claude/multi-db-sync-setup-3DmYn | 2026-04-14]
 // PouchDB ↔ uygulama nesnesi dönüşüm fonksiyonları
 // GlobalTableSyncContext, CariPage ve StokPage ortak kullanır.
@@ -85,7 +86,7 @@ export function productFromDb(row: any): any {
       const data = JSON.parse(row.supplier_entries);
       if (Array.isArray(data)) {
         parsed.movements = data.map((entry: any) => ({
-          id: entry.id || crypto.randomUUID(),
+          id: entry.id || uuidv4(),
           type: 'ALIS',
           partyName: entry.supplierName || 'Bilinmeyen Toptanci',
           date: entry.date || new Date().toISOString(),
@@ -100,7 +101,7 @@ export function productFromDb(row: any): any {
       }
     } else if (Array.isArray(row.supplier_entries)) {
       parsed.movements = row.supplier_entries.map((entry: any) => ({
-        id: entry.id || crypto.randomUUID(),
+        id: entry.id || uuidv4(),
         type: 'ALIS',
         partyName: entry.supplierName || 'Bilinmeyen Toptanci',
         date: entry.date || new Date().toISOString(),

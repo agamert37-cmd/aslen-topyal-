@@ -465,6 +465,7 @@ Eğer kod çalıştırmana gerek yoksa (sadece cevap veriyorsan), repair_action 
 
 
   // -- Server Data --
+  const [refreshKey, setRefreshKey] = useState(0);
   const [connStatus, setConnStatus] = useState<{
     ok: boolean;
     version?: string;
@@ -804,8 +805,19 @@ Kullanıcı sorusu: ${userPrompt}`;
            if (!prompt) {
               setTerminalHistory(prev => [...prev, 'Lütfen AI asistanına bir soru sorun. Örn: ai sistem durumunu özetle']);
            } else {
-              setTerminalHistory(prev => [...prev, 'AI asistanı düşünüyor... (Kendi prompt / gemini entegrasyonuna bağlı olmak kaydıyla sadece terminal log döndürecek)']);
-              setTerminalHistory(prev => [...prev, '> Yakında AI entegrasyonu tam port edilecek.']);
+              setTerminalHistory(prev => [...prev, '> AI asistanı düşünüyor...']);
+              try {
+                const parsed = await processRepairAI(prompt);
+                setTerminalHistory(prev => [
+                  ...prev, 
+                  `> AI Yanıtı:`,
+                  parsed?.message || 'Yanıt alınamadı veya anahtar girilmedi.',
+                  parsed?.preview?.description ? `> Uyarı: ${parsed.preview.description}` : '',
+                  parsed?.repair_action ? `> Aksiyon Kodu: ${parsed.repair_action.type}` : ''
+                ].filter(Boolean) as string[]);
+              } catch (err: any) {
+                setTerminalHistory(prev => [...prev, `> AI Hatası: ${err.message}`]);
+              }
            }
         } else if (mainCmd === 'sh') {
            const commandToRun = args.slice(1).join(' ');
@@ -1116,6 +1128,7 @@ Kullanıcı sorusu: ${userPrompt}`;
     { key: "terminal", label: "Terminal", icon: Terminal },
     { key: "site", label: "Site İzleme", icon: Globe },
     { key: "docker", label: "Docker & Build", icon: Server },
+    { key: "ai", label: "AI Asistan", icon: Wand2 },
   ] as const;
   type TabKey = typeof TABS[number]["key"];
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Database, RefreshCw, CheckCircle, XCircle, AlertCircle, Loader2,
   Eye, EyeOff, Save, Server, Zap, Cloud, CloudOff,
-  HardDrive, Activity, ArrowUpDown, Play, Download, Shield,
+  HardDrive, Activity, ArrowUpDown, Play, Download, Shield, Globe
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
@@ -75,6 +75,9 @@ export function SunucuPage() {
   const [initializing, setInitializing] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [seedProgress, setSeedProgress] = useState('');
+  
+  const [customPort, setCustomPort] = useState<string>('');
+  const [savingPort, setSavingPort] = useState(false);
 
   // ── Auto-refresh every 30s ──
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -151,11 +154,51 @@ export function SunucuPage() {
     }
   }, [canEdit, loadTableStatus]);
 
+  const loadServerConfig = useCallback(async () => {
+    try {
+      const res = await fetch('/api/server-config');
+      const data = await res.json();
+      if (data.success && data.config?.port) {
+        setCustomPort(String(data.config.port));
+      }
+    } catch (e) {
+      console.error("Server config failed", e);
+    }
+  }, []);
+
+  const handleSaveWebPort = async () => {
+    if (!canEdit) { toast.error('Yetkiniz yok.'); return; }
+    const p = parseInt(customPort);
+    if (!p || p < 1024 || p > 65535) {
+      toast.error('Lütfen geçerli bir port numarası giriniz (1024-65535).');
+      return;
+    }
+    setSavingPort(true);
+    try {
+      const res = await fetch('/api/server-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ port: p })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(data.message || 'Port kaydedildi.');
+      } else {
+        toast.error(data.error || 'Hata oluştu.');
+      }
+    } catch (e) {
+      toast.error('Sunucu erişilemiyor.');
+    } finally {
+      setSavingPort(false);
+    }
+  };
+
   // Initial load
   useEffect(() => {
     handleTestConnection();
     loadTableStatus();
-  }, []);
+    loadServerConfig();
+  }, [loadServerConfig]);
 
   // Auto-refresh
   useEffect(() => {
@@ -419,6 +462,36 @@ export function SunucuPage() {
           <strong className="text-muted-foreground">Veritabanlarını Başlat:</strong> CouchDB'de mevcut olmayan tabloları oluşturur. Mevcut veriler silinmez.
           {' '}<strong className="text-muted-foreground">LocalStorage → PouchDB Aktar:</strong> Tarayıcıdaki tüm verileri PouchDB'ye kopyalar; ardından PouchDB → CouchDB sync otomatik devam eder.
         </p>
+      </div>
+
+      {/* ── Web Sunucu Portu Config ─────────────────────── */}
+      <div className="rounded-2xl border border-white/8 bg-white/2 p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Globe className="w-4 h-4 text-blue-400" />
+          <h2 className="text-sm font-bold text-foreground">Sistem & Site Port Ayarı</h2>
+        </div>
+        <p className="text-xs text-muted-foreground">Web sitesinin hangi port üzerinden açılacağını belirleyin. Değişiklik cihazı/uygulamayı yeniden başlattıktan sonra aktif olur.</p>
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+          <div className="flex-1 w-full sm:w-auto">
+            <label className="block text-xs font-bold text-muted-foreground mb-1.5">Web Sunucu Portu</label>
+            <input
+              type="number"
+              value={customPort}
+              onChange={e => setCustomPort(e.target.value)}
+              placeholder="3000"
+              className={inputClass}
+              disabled={!canEdit}
+            />
+          </div>
+          <button
+            onClick={handleSaveWebPort}
+            disabled={savingPort || !canEdit}
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-foreground text-sm font-bold rounded-xl transition-colors sm:mt-5 disabled:opacity-50"
+          >
+            {savingPort ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            Portu Kaydet
+          </button>
+        </div>
       </div>
 
       {/* ── CouchDB Config ──────────────────────────────── */}

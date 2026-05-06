@@ -203,6 +203,7 @@ export function SalesPage() {
   const banks = useGlobalTableData<any>('bankalar');
   const personelList = useGlobalTableData<any>('personeller');
   const vehicleList = useGlobalTableData<any>('araclar');
+  const invoiceNamesList = useGlobalTableData<{id: string, name: string}>('invoice_names');
 
   const [cariSearchTerm, setCariSearchTerm] = useState('');
   const debouncedCariSearchTerm = useDebounce(cariSearchTerm, 300);
@@ -228,17 +229,12 @@ export function SalesPage() {
   const [productSource, setProductSource] = useState<'DEPO' | 'ICEBERG'>('DEPO');
   const [selectedCageId, setSelectedCageId] = useState<string>('');
 
-  // Storage'dan ürünleri yükle
-  const [baseProductList, setBaseProductList] = useState<any[]>(() => getFromStorage<any[]>(StorageKey.STOK_DATA) || []);
-  const [icebergCages, setIcebergCages] = useState<any[]>(() => getFromStorage<any[]>('iceberg_cages_data') || []);
-
-  // Modal açıldığında baseProductList güncelle
-  useEffect(() => {
-    if (isNewFisModalOpen) {
-      setBaseProductList(getFromStorage<any[]>(StorageKey.STOK_DATA) || []);
-      setIcebergCages(getFromStorage<any[]>('iceberg_cages_data') || []);
-    }
-  }, [isNewFisModalOpen]);
+  // Global Context'ten ürünleri yükle
+  const rawBaseProductList = useGlobalTableData<any>('urunler');
+  const baseProductList = useMemo(() => Array.isArray(rawBaseProductList) ? rawBaseProductList : [], [rawBaseProductList]);
+  
+  const icebergCagesData = useGlobalTableData<any>('iceberg_cages');
+  const icebergCages = React.useMemo(() => icebergCagesData || [], [icebergCagesData]);
 
   // Müşteri özelinde ürünleri ve fiyatları hesapla (Satış algoritması)
   const productList = useMemo(() => {
@@ -1694,7 +1690,7 @@ export function SalesPage() {
                                       className="w-full px-3 py-2 bg-white/[0.04] border border-border rounded-xl text-foreground text-xs outline-none"
                                     >
                                       <option value="">Seçiniz...</option>
-                                      {(getFromStorage<{id: string, name: string}[]>('invoice_names_data') || []).map(inv => (
+                                      {(invoiceNamesList || []).map(inv => (
                                         <option key={inv.id} value={inv.name}>{inv.name}</option>
                                       ))}
                                     </select>
@@ -1943,7 +1939,7 @@ export function SalesPage() {
                       emit('fis:created', { fisId: fisData.id, mode: selectedMode || '', total: calculateTotal(), cariId: selectedCari?.id });
 
                       // Stok güncelleme (Satış fişi)
-                      const existingStokList = getFromStorage<any[]>(StorageKey.STOK_DATA) || [];
+                      const existingStokList = baseProductList;
                       const updatedStokList = existingStokList.map(stock => {
                         const items = productItems.filter(p => p.productName === stock.name);
                         if (items.length > 0) {

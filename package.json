@@ -21,7 +21,7 @@
   },
   "scripts": {
     "dev": "tsx server.ts",
-    "start": "node server.js",
+    "start": "node --experimental-strip-types server.ts",
     "build": "vite build",
     "lint": "eslint .",
     "electron:dev": "cross-env NODE_ENV=development concurrently \"vite --port 8080 --host 0.0.0.0\" \"wait-on http://localhost:8080 && electron .\"",

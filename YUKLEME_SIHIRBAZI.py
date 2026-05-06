@@ -3,90 +3,104 @@ import sys
 import subprocess
 import shutil
 import threading
-import tkinter as tk
-from tkinter import ttk, messagebox, scrolledtext
 import urllib.request
 import json
+import time
 
-class ModernInstaller(tk.Tk):
+try:
+    import customtkinter as ctk
+except ImportError:
+    print("Gerekli arayüz kütüphanesi yükleniyor (customtkinter)...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "customtkinter"])
+    import customtkinter as ctk
+
+from tkinter import messagebox
+
+class ModernInstaller(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("Sistem Yükleme ve Derleme Sihirbazı v2.0")
-        self.geometry("750x550")
-        self.configure(bg="#1e1e2e")
-        self.style = ttk.Style(self)
-        self.style.theme_use('clam')
         
-        # Tema Ayarları
-        self.style.configure("TFrame", background="#1e1e2e")
-        self.style.configure("TLabel", background="#1e1e2e", foreground="#cdd6f4", font=("Segoe UI", 10))
-        self.style.configure("Title.TLabel", font=("Segoe UI", 16, "bold"), foreground="#89b4fa")
-        self.style.configure("TButton", background="#89b4fa", foreground="#1e1e2e", font=("Segoe UI", 10, "bold"), padding=5)
-        self.style.map("TButton", background=[("active", "#b4befe")])
-        self.style.configure("TProgressbar", thickness=20, bordercolor="#1e1e2e", background="#a6e3a1")
+        # Tema ve Renk Ayarları
+        ctk.set_appearance_mode("dark")
+        ctk.set_default_color_theme("blue")
+        
+        self.title("Karargah Sistem Yönetimi v3.0")
+        self.geometry("900x680")
+        self.minsize(800, 600)
 
-        # Ana Konteyner
-        main_frame = ttk.Frame(self)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=30, pady=30)
+        # Layout yapılandırması
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(2, weight=1)
 
-        # Başlık ve Açıklama
-        ttk.Label(main_frame, text="Sistem ve Karargah Kurulum Sihirbazı", style="Title.TLabel").pack(anchor=tk.W, pady=(0, 10))
-        desc = "Bu sihirbaz, kaynak kodları GitHub'dan çekecek, NodeJS ve Git gereksinimlerini kontrol edecek, ve ardından Karargah Uygulaması ile Ana Sistemin (Web) masaüstü .exe versiyonlarını derleyerek masaüstünüze kısayol/dosya bırakacaktır."
-        ttk.Label(main_frame, text=desc, wraplength=690).pack(anchor=tk.W, pady=(0, 20))
+        # ─── HEADER ───
+        self.header_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.header_frame.grid(row=0, column=0, padx=40, pady=(35, 15), sticky="ew")
+        
+        self.title_label = ctk.CTkLabel(self.header_frame, text="Sistem Yükleme & Güncelleme Sihirbazı", font=ctk.CTkFont(family="Segoe UI", size=26, weight="bold"))
+        self.title_label.pack(anchor="w")
+        
+        self.desc_label = ctk.CTkLabel(self.header_frame, text="Karargah uygulamanızı saniyeler içinde kurun, gelişmiş EXE ile derleyin veya son sürüme yenileyin.", font=ctk.CTkFont(family="Segoe UI", size=13), text_color="gray")
+        self.desc_label.pack(anchor="w", pady=(5, 0))
 
-        # Kontrol Paneli
-        req_frame = ttk.Frame(main_frame)
-        req_frame.pack(fill=tk.X, pady=10)
-        
-        ttk.Label(req_frame, text="Sistem Gereksinimleri:", font=("Segoe UI", 11, "bold")).grid(row=0, column=0, sticky=tk.W, pady=5)
-        
-        self.lbl_node = ttk.Label(req_frame, text="⏳ Node.js (npm) Kontrol Ediliyor...")
-        self.lbl_node.grid(row=1, column=0, sticky=tk.W, pady=2)
-        
-        self.lbl_git = ttk.Label(req_frame, text="⏳ Git Kontrol Ediliyor...")
-        self.lbl_git.grid(row=2, column=0, sticky=tk.W, pady=2)
+        # ─── AYARLAR (SETTINGS) ───
+        self.settings_frame = ctk.CTkFrame(self, corner_radius=15, fg_color="#181825")
+        self.settings_frame.grid(row=1, column=0, padx=40, pady=10, sticky="ew")
+        self.settings_frame.grid_columnconfigure(1, weight=1)
 
-        # URL Giriş
-        url_frame = ttk.Frame(main_frame)
-        url_frame.pack(fill=tk.X, pady=10)
+        # Aksiyon Seçimi
+        self.action_var = ctk.StringVar(value="Yeni Kurulum")
         
-        # Seçenekler: Yeni Kurulum, Güncelleme veya Kaldırma
-        self.action_var = tk.StringVar(value="Yeni Kurulum")
-        action_frame = ttk.Frame(url_frame)
-        action_frame.pack(fill=tk.X, pady=(0, 10))
-        ttk.Radiobutton(action_frame, text="Sıfırdan Yeni Kurulum Yap", variable=self.action_var, value="Yeni Kurulum", command=self.update_ui_state).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Radiobutton(action_frame, text="Mevcut Kurulumu Güncelle", variable=self.action_var, value="Güncelleme", command=self.update_ui_state).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Radiobutton(action_frame, text="Sistemden Tamamen Kaldır", variable=self.action_var, value="Kaldır", command=self.update_ui_state).pack(side=tk.LEFT)
+        self.radio_frame = ctk.CTkFrame(self.settings_frame, fg_color="transparent")
+        self.radio_frame.grid(row=0, column=0, columnspan=2, padx=20, pady=(25, 15), sticky="w")
+        
+        self.rb_install = ctk.CTkRadioButton(self.radio_frame, text="Sıfırdan Yeni Kurulum", variable=self.action_var, value="Yeni Kurulum", command=self.update_ui_state, font=ctk.CTkFont(weight="bold", size=13))
+        self.rb_install.pack(side="left", padx=(0, 25))
+        
+        self.rb_update = ctk.CTkRadioButton(self.radio_frame, text="Mevcut Kurulumu Güncelle", variable=self.action_var, value="Güncelleme", command=self.update_ui_state, font=ctk.CTkFont(weight="bold", size=13))
+        self.rb_update.pack(side="left", padx=(0, 25))
+        
+        self.rb_remove = ctk.CTkRadioButton(self.radio_frame, text="Sistemi Kaldır", variable=self.action_var, value="Kaldır", command=self.update_ui_state, text_color="#f38ba8", hover_color="#f38ba8", font=ctk.CTkFont(weight="bold", size=13))
+        self.rb_remove.pack(side="left")
 
-        self.lbl_repo_or_dir = ttk.Label(url_frame, text="Proje GitHub URL (Token içeren URL kullanılabilir):")
-        self.lbl_repo_or_dir.pack(anchor=tk.W, pady=2)
+        # Input & Seçimler
+        self.lbl_repo = ctk.CTkLabel(self.settings_frame, text="GitHub Depo URL:", font=ctk.CTkFont(weight="bold", size=13), text_color="#cdd6f4")
+        self.lbl_repo.grid(row=1, column=0, padx=25, pady=(10, 25), sticky="w")
         
-        # URL Giriş alanı (Yeni Kurulum için)
-        self.repo_var = tk.StringVar(value="") 
-        self.entry_repo = ttk.Entry(url_frame, textvariable=self.repo_var, width=80, font=("Consolas", 10))
-        self.entry_repo.pack(fill=tk.X, pady=5)
-        
-        # Klasör Seçimi (Güncelleme için)
-        self.dir_var = tk.StringVar()
-        self.combo_dirs = ttk.Combobox(url_frame, textvariable=self.dir_var, width=77, state="readonly")
-        self.combo_dirs.pack(fill=tk.X, pady=5)
-        self.combo_dirs.pack_forget() # Başlangıçta gizli
+        self.repo_var = ctk.StringVar()
+        self.entry_repo = ctk.CTkEntry(self.settings_frame, textvariable=self.repo_var, placeholder_text="https://github.com/kullanici/repo.git", height=40, border_color="#313244", fg_color="#1e1e2e")
+        self.entry_repo.grid(row=1, column=1, padx=(0, 25), pady=(10, 25), sticky="ew")
 
-        # Log Çıktısı
-        self.log_area = scrolledtext.ScrolledText(main_frame, height=10, bg="#181825", fg="#a6e3a1", font=("Consolas", 9), borderwidth=0)
-        self.log_area.pack(fill=tk.BOTH, expand=True, pady=10)
+        self.dir_var = ctk.StringVar(value="Mevcut bir proje bulunamadı!")
+        self.combo_dirs = ctk.CTkOptionMenu(self.settings_frame, variable=self.dir_var, values=["Mevcut bir proje bulunamadı!"], height=40, fg_color="#1e1e2e", button_color="#313244", button_hover_color="#45475a", dropdown_fg_color="#1e1e2e", dynamic_resizing=False)
+        self.combo_dirs.grid(row=1, column=1, padx=(0, 25), pady=(10, 25), sticky="ew")
+        self.combo_dirs.grid_remove()
 
-        # İlerleme Çubuğu ve Buton
-        bottom_frame = ttk.Frame(main_frame)
-        bottom_frame.pack(fill=tk.X, pady=10)
-        
-        self.progress = ttk.Progressbar(bottom_frame, orient=tk.HORIZONTAL, mode='determinate')
-        self.progress.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 15))
-        
-        self.btn_start = ttk.Button(bottom_frame, text="Sistemi Kur ve Derle", command=self.start_thread, state=tk.DISABLED)
-        self.btn_start.pack(side=tk.RIGHT)
+        # ─── GEREKSİNİMLER VE LOG ───
+        self.log_frame = ctk.CTkFrame(self, corner_radius=15, fg_color="#11111b")
+        self.log_frame.grid(row=2, column=0, padx=40, pady=10, sticky="nsew")
+        self.log_frame.grid_rowconfigure(1, weight=1)
+        self.log_frame.grid_columnconfigure(0, weight=1)
 
-        # Başlangıç Kontrolleri
+        self.req_lbl = ctk.CTkLabel(self.log_frame, text="Sistem Gereksinimleri Onaylanıyor...", font=ctk.CTkFont(size=12, weight="bold"), text_color="#bac2de")
+        self.req_lbl.grid(row=0, column=0, padx=20, pady=(15, 0), sticky="w")
+
+        self.log_textbox = ctk.CTkTextbox(self.log_frame, fg_color="transparent", text_color="#a6e3a1", font=ctk.CTkFont(family="Consolas", size=13), wrap="word")
+        self.log_textbox.grid(row=1, column=0, padx=15, pady=15, sticky="nsew")
+        self.log_textbox.configure(state="disabled")
+
+        # ─── FOOTER (PROGRESS & BUTON) ───
+        self.footer_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.footer_frame.grid(row=3, column=0, padx=40, pady=(15, 30), sticky="ew")
+        self.footer_frame.grid_columnconfigure(0, weight=1)
+
+        self.progress_bar = ctk.CTkProgressBar(self.footer_frame, height=18, corner_radius=10, progress_color="#89b4fa", fg_color="#313244")
+        self.progress_bar.grid(row=0, column=0, sticky="ew", padx=(0, 25))
+        self.progress_bar.set(0)
+
+        self.btn_action = ctk.CTkButton(self.footer_frame, text="Sistemi Kur & Derle", command=self.start_thread, height=50, width=220, font=ctk.CTkFont(weight="bold", size=15), corner_radius=12)
+        self.btn_action.grid(row=0, column=1)
+
+        # İlk Kontroller
         self.check_requirements()
         self.update_ui_state()
 
@@ -100,103 +114,91 @@ class ModernInstaller(tk.Tk):
                 for d in os.listdir(bd):
                     full_path = os.path.join(bd, d)
                     if os.path.isdir(full_path):
-                        # Klasörün git reposu olup olmadığını da kontrol edebiliriz ama basitçe klasörleri alalım
-                        if os.path.exists(os.path.join(full_path, ".git")):
+                        if os.path.exists(os.path.join(full_path, "package.json")):
                             dirs.append(full_path)
         return dirs
 
     def update_ui_state(self):
         action = self.action_var.get()
         if action == "Yeni Kurulum":
-            self.lbl_repo_or_dir.config(text="Proje GitHub URL (Token içeren URL kullanılabilir):")
-            self.combo_dirs.pack_forget()
-            self.entry_repo.pack(fill=tk.X, pady=5)
-            self.btn_start.config(text="Sistemi Kur ve Derle")
+            self.lbl_repo.configure(text="GitHub Depo URL:")
+            self.combo_dirs.grid_remove()
+            self.entry_repo.grid()
+            self.btn_action.configure(text="Sıfırdan Kur & Derle", fg_color="#89b4fa", hover_color="#74c7ec", text_color="#181825")
         elif action == "Güncelleme":
-            self.lbl_repo_or_dir.config(text="Hangi Mevcut Kurulumu Güncelleyelim?")
-            self.entry_repo.pack_forget()
-            self.combo_dirs.pack(fill=tk.X, pady=5)
-            self.btn_start.config(text="Güncelle ve Derle")
-            
-            # Mevcutları Listele
+            self.lbl_repo.configure(text="Hedef Uygulama Dizini:")
+            self.entry_repo.grid_remove()
+            self.combo_dirs.grid()
             dirs = self.get_existing_projects()
-            self.combo_dirs['values'] = dirs
             if dirs:
-                self.combo_dirs.current(0)
+                self.combo_dirs.configure(values=dirs)
+                self.dir_var.set(dirs[0])
             else:
-                self.combo_dirs.set("Mevcut bir proje bulunamadı!")
-        else: # Kaldır
-            self.lbl_repo_or_dir.config(text="Hangi Kurulumu Sistemden Tamamen Kaldıralım?")
-            self.entry_repo.pack_forget()
-            self.combo_dirs.pack(fill=tk.X, pady=5)
-            self.btn_start.config(text="Sistemden Tamamen Kaldır")
-            
-            # Mevcutları Listele
+                self.combo_dirs.configure(values=["Mevcut bir proje bulunamadı!"])
+                self.dir_var.set("Mevcut bir proje bulunamadı!")
+            self.btn_action.configure(text="Güncelle & Sistemi Yenile", fg_color="#a6e3a1", hover_color="#94e2d5", text_color="#11111b")
+        elif action == "Kaldır":
+            self.lbl_repo.configure(text="Kaldırılacak Sistem Dizini:")
+            self.entry_repo.grid_remove()
+            self.combo_dirs.grid()
             dirs = self.get_existing_projects()
-            self.combo_dirs['values'] = dirs
             if dirs:
-                self.combo_dirs.current(0)
+                self.combo_dirs.configure(values=dirs)
+                self.dir_var.set(dirs[0])
             else:
-                self.combo_dirs.set("Mevcut bir proje bulunamadı!")
+                self.combo_dirs.configure(values=["Mevcut bir proje bulunamadı!"])
+                self.dir_var.set("Mevcut bir proje bulunamadı!")
+            self.btn_action.configure(text="Sistemi Tamamen Sil", fg_color="#f38ba8", hover_color="#eba0ac", text_color="#11111b")
 
     def log(self, message):
-        def _log():
-            self.log_area.insert(tk.END, f"> {message}\n")
-            self.log_area.see(tk.END)
-            self.update_idletasks()
-        self.after(0, _log)
+        self.log_textbox.configure(state="normal")
+        self.log_textbox.insert("end", message + "\n")
+        self.log_textbox.see("end")
+        self.log_textbox.configure(state="disabled")
 
-    def set_gui_state(self, widget, state):
-        self.after(0, lambda: widget.config(state=state))
+    def set_progress(self, percent):
+        self.progress_bar.set(percent / 100.0)
 
-    def set_progress(self, value):
-        self.after(0, lambda: self.progress.config(value=value))
+    def set_gui_state(self, state):
+        self.rb_install.configure(state=state)
+        self.rb_update.configure(state=state)
+        self.rb_remove.configure(state=state)
+        self.btn_action.configure(state=state)
+        self.entry_repo.configure(state=state)
+        self.combo_dirs.configure(state=state)
 
     def check_requirements(self):
-        self.log("Gereksinimler kontrol ediliyor...")
-        
-        node_ok = self.run_silent_cmd("node -v")
-        git_ok = self.run_silent_cmd("git --version")
-
-        if node_ok:
-            self.lbl_node.config(text="✅ Node.js ve NPM Yüklü", foreground="#a6e3a1")
-        else:
-            self.lbl_node.config(text="❌ Node.js Bulunamadı. Lütfen Node.js indirip kurun.", foreground="#f38ba8")
-        
-        if git_ok:
-            self.lbl_git.config(text="✅ Git Yüklü", foreground="#a6e3a1")
-        else:
-            self.lbl_git.config(text="❌ Git Bulunamadı. Lütfen Git indirip kurun.", foreground="#f38ba8")
-
-        if node_ok and git_ok:
-            self.btn_start.config(state=tk.NORMAL)
-            self.log("Sistem gereksinimleri karşılanıyor. Kuruluma başlayabilirsiniz.")
-        else:
-            self.log("HATA: Gerekli yazılımlar eksik. Kurulum başlatılamaz.")
-
-    def run_silent_cmd(self, cmd):
         try:
-            subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-            return True
-        except:
-            return False
+            subprocess.run(["node", "-v"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            node_ok = True
+        except Exception:
+            node_ok = False
+            
+        try:
+            subprocess.run(["git", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            git_ok = True
+        except Exception:
+            git_ok = False
+            
+        if node_ok and git_ok:
+            self.req_lbl.configure(text="Sistem Gereksinimleri Onaylandı (Node.js & Git Mevcut) ✅", text_color="#a6e3a1")
+            self.btn_action.configure(state="normal")
+        else:
+            self.req_lbl.configure(text="Eksik Gereksinimler Var! Node.js VEYA Git sistemde yüklü değil.", text_color="#f38ba8")
+            self.log("Lütfen https://nodejs.org ve https://git-scm.com adreslerinden Node ve Git'i indirin.")
+            self.btn_action.configure(state="disabled")
 
     def stream_command(self, cmd, cwd=None):
         try:
-            env = os.environ.copy()
-            env["GIT_TERMINAL_PROMPT"] = "0" # Gizli repolarda prompt açıp asılı kalmasını önler
-            env["CI"] = "true" # NPM gibi araçların etkileşimli modda kalmasını önler
-
             process = subprocess.Popen(
-                cmd, 
-                cwd=cwd, 
-                shell=True, 
-                stdout=subprocess.PIPE, 
-                stderr=subprocess.STDOUT, 
-                text=True, 
-                encoding='utf-8', 
-                errors='replace',
-                env=env
+                cmd,
+                cwd=cwd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                shell=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace'
             )
             
             for line in iter(process.stdout.readline, ''):
@@ -205,7 +207,6 @@ class ModernInstaller(tk.Tk):
             
             process.stdout.close()
             process.wait()
-            
             return process.returncode == 0
         except Exception as e:
             self.log(f"Komut Hatası ({cmd}): {e}")
@@ -233,9 +234,7 @@ class ModernInstaller(tk.Tk):
             if not messagebox.askyesno("Emin misiniz?", f"Seçilen kurulum tamamen silinecek:\n\n{target_dir}\n\nMasaüstündeki ilgili kısayollar da kaldırılacak. Bu işlem geri alınamaz!\nDevam etmek istiyor musunuz?"):
                 return
             
-        self.set_gui_state(self.btn_start, tk.DISABLED)
-        self.set_gui_state(self.entry_repo, tk.DISABLED)
-        self.set_gui_state(self.combo_dirs, tk.DISABLED)
+        self.set_gui_state("disabled")
         self.set_progress(0)
         
         thread = threading.Thread(target=self.install_process, args=(action, repo_url, target_dir))
@@ -251,18 +250,17 @@ class ModernInstaller(tk.Tk):
             self.set_progress(10)
             
             try:
-                # remove read-only attribute handling for rmtree
                 def remove_readonly(func, path, excinfo):
                     os.chmod(path, 0o777)
                     func(path)
-                
                 shutil.rmtree(target_dir, onerror=remove_readonly)
                 self.log(f"BAŞARILI: {target_dir} dizini silindi.")
             except Exception as e:
                 self.log(f"HATA: Dizin silinemedi: {e}")
             
-            self.set_progress(50)
+            self.set_progress(40)
             self.log("Masaüstündeki ilgili uygulama dosyaları aranıyor...")
+            time.sleep(1)
             
             apps_to_remove = ["Karargah_Yonetim", "Sistem_Site_Erisimi"]
             removed_count = 0
@@ -276,38 +274,30 @@ class ModernInstaller(tk.Tk):
                                     self.log(f"BAŞARILI: Masaüstünden '{file}' kaldırıldı.")
                                     removed_count += 1
                                 except Exception as e:
-                                    self.log(f"HATA: '{file}' silinemedi. Lütfen masaüstünden elinizle silebilirsiniz. Sebebi: {e}")
+                                    self.log(f"HATA: '{file}' silinemedi (Muhtemelen şu an arka planda çalışıyor).")
                                     
-            self.log(f"Toplam {removed_count} masaüstü dosyası silindi.")
             self.set_progress(100)
             self.log("------------------------------------------")
             self.log("KALDIRMA İŞLEMİ TAMAMLANDI!")
             
-            self.after(0, lambda: messagebox.showinfo("Başarılı", "Sistem başarıyla kaldırıldı!"))
-            
-            self.set_gui_state(self.btn_start, tk.NORMAL)
-            self.set_gui_state(self.entry_repo, tk.NORMAL)
-            self.set_gui_state(self.combo_dirs, tk.NORMAL)
+            self.after(0, lambda: messagebox.showinfo("Başarılı", "Sistem başarıyla tamamen kaldırıldı!"))
+            self.after(0, lambda: self.set_gui_state("normal"))
             self.after(0, self.update_ui_state) 
             return
 
         if action == "Yeni Kurulum":
-            # C:\Proje veya Desktop\Proje klasörünü oluştur
             base_dir = "C:\\Proje"
             try:
                 os.makedirs(base_dir, exist_ok=True)
             except Exception:
-                # C diskine yazma izni yoksa masaüstüne kur
                 base_dir = os.path.join(os.path.expanduser("~"), "Desktop", "Proje")
                 os.makedirs(base_dir, exist_ok=True)
     
-            # 1. Site, 2. Site ... klasör ismini belirle
             site_index = 1
             while True:
                 work_dir = os.path.join(base_dir, f"{site_index}. Site")
                 if not os.path.exists(work_dir):
                     break
-                # Eğer klasör varsa ama içi boşsa onu kullan
                 if os.path.isdir(work_dir) and not os.listdir(work_dir):
                     break
                 site_index += 1
@@ -320,109 +310,114 @@ class ModernInstaller(tk.Tk):
             self.set_progress(10)
             
             if not self.stream_command(f"git clone {repo_url} \"{work_dir}\""):
-                self.log("HATA: Git Clone başarısız oldu. URL'yi kontrol edin veya erişim yetkinizi (Token) doğrulayın.")
-                self.set_gui_state(self.btn_start, tk.NORMAL)
-                self.set_gui_state(self.entry_repo, tk.NORMAL)
-                self.set_gui_state(self.combo_dirs, tk.NORMAL)
+                self.log("HATA: Git Clone başarısız oldu. URL doğrulamasını kontrol edin.")
+                self.after(0, lambda: self.set_gui_state("normal"))
                 return
         else:
-            # Güncelleme İşlemi (git pull)
+            # Güncelleme İşlemi (git stahs & pull)
             work_dir = target_dir
             self.log("------------------------------------------")
+            self.log("Sistemleri güncellenmeye hazırlamak için çalışan paneller kapatılıyor...")
+            if os.name == 'nt':
+                os.system('taskkill /F /IM "Karargah_Yonetim*.exe" >nul 2>&1')
+                os.system('taskkill /F /IM "Sistem_Site_Erisimi*.exe" >nul 2>&1')
+            
             self.log(f"Çalışma Dizini: {work_dir}")
-            self.log("Adım 1/5: Kaynak kodları güncelleniyor (Git Pull)...")
+            self.log("Adım 1/5: Kaynak kodları güncelleniyor (Sistemden en son hali çekiliyor)...")
             self.set_progress(10)
             
-            self.stream_command("git checkout package-lock.json", cwd=work_dir) # Olası çakışmaları önler
-            self.stream_command("git checkout package.json", cwd=work_dir)
+            self.stream_command("git stash", cwd=work_dir)
+            self.stream_command("git fetch --all", cwd=work_dir)
             
-            if not self.stream_command("git pull", cwd=work_dir):
-                self.log("HATA: Git Pull başarısız oldu. Manuel kontrol gerekebilir.")
-                self.set_gui_state(self.btn_start, tk.NORMAL)
-                self.set_gui_state(self.entry_repo, tk.NORMAL)
-                self.set_gui_state(self.combo_dirs, tk.NORMAL)
-                return
+            if not self.stream_command("git reset --hard origin/main", cwd=work_dir):
+                self.log("UYARI: main dalı sıfırlanamadı, origin/master deneniyor...")
+                if not self.stream_command("git reset --hard origin/master", cwd=work_dir):
+                    self.log("HATA: Git güncel kodu çekerken hata oluştu. İnternet bağlantınızı doğrulayın.")
+                    self.after(0, lambda: self.set_gui_state("normal"))
+                    return
             
         self.set_progress(30)
-
         
-        # NPM Command with CMD wrapper for Windows
         npm_cmd = "npm.cmd" if os.name == 'nt' else "npm"
         npx_cmd = "npx.cmd" if os.name == 'nt' else "npx"
 
         self.log("------------------------------------------")
-        self.log("Adım 2/5: NPM Paketleri yükleniyor (Bu işlem internet hızınıza bağlı olarak zaman alabilir)...")
+        self.log("Adım 2/5: Güncel kütüphaneler yükleniyor (hızınıza göre sürebilir)...")
         if not self.stream_command(f"{npm_cmd} install --no-fund --no-audit --loglevel=error --legacy-peer-deps", cwd=work_dir):
             self.log("HATA: NPM paketleri yüklenemedi.")
-            self.set_gui_state(self.btn_start, tk.NORMAL)
-            self.set_gui_state(self.entry_repo, tk.NORMAL)
-            self.set_gui_state(self.combo_dirs, tk.NORMAL)
+            self.after(0, lambda: self.set_gui_state("normal"))
             return
             
         self.set_progress(60)
         
         self.log("------------------------------------------")
-        self.log("Adım 3/5: Proje Ön Derlemesi Yapılıyor (Web Frontend)...")
+        self.log("Adım 3/5: Proje Ön Derlemesi Yapılarak Bileşenler Optimize Ediliyor...")
         self.stream_command(f"{npm_cmd} run build", cwd=work_dir)
         
         self.set_progress(75)
         self.log("------------------------------------------")
-        self.log("Adım 4/5: Karargah ve Site İçin 2 Ayrı EXE Derleniyor...")
+        self.log("Adım 4/5: Yeni Sürüm Masaüstü Çalıştırılabilir Uygulamaları (EXE) Derleniyor...")
         
-        self.log("1. Karargah (Yönetim Paneli) EXE dosyası oluşturuluyor...")
+        self.log("-> Karargah EXE dosyası derleniyor...")
         build_k = self.stream_command(f'{npx_cmd} electron-builder --win portable -c.productName="Karargah_Yonetim"', cwd=work_dir)
         if not build_k:
-            self.log("UYARI: İlk electron-builder denemesi hata verdi. Yerel (lokal) paketten deneniyor...")
+            self.log("Yerel paketten derleme deneniyor...")
             self.stream_command(f"{npm_cmd} install electron-builder --save-dev --legacy-peer-deps", cwd=work_dir)
             self.stream_command(f'{npx_cmd} electron-builder --win portable -c.productName="Karargah_Yonetim"', cwd=work_dir)
             
         self.set_progress(85)
         
-        self.log("2. Sitenin Kendisi (Kullanıcı Arayüzü) EXE dosyası oluşturuluyor...")
+        self.log("-> Site/Kullanıcı EXE dosyası derleniyor...")
         self.stream_command(f'{npx_cmd} electron-builder --win portable -c.productName="Sistem_Site_Erisimi"', cwd=work_dir)
 
         self.set_progress(90)
         
         self.log("------------------------------------------")
-        self.log("Adım 5/5: Her İki Uygulamanın Masaüstüne Kopyalanması...")
+        self.log("Adım 5/5: Özel Yapılandırmalar ve Kısayolların Masaüstüne Aktarımı...")
         
         dist_path = os.path.join(work_dir, "dist-electron")
         if not os.path.exists(dist_path):
              dist_path = os.path.join(work_dir, "dist")
              
         exe_copied = 0
+        first_exe_path = None
         if os.path.exists(dist_path):
             for file in os.listdir(dist_path):
-                # .exe olanları al (Ancak "Setup" olan installer ise atla, portable direkt exe verir)
                 if file.endswith(".exe") and "Setup" not in file:
                     source_file = os.path.join(dist_path, file)
                     target_file = os.path.join(desktop_path, file)
                     try:
                         shutil.copy2(source_file, target_file)
-                        self.log(f"BAŞARILI: '{file}' masaüstüne kopyalandı!")
+                        self.log(f"BAŞARILI: YENİ SÜRÜM -> '{file}' masaüstüne yerleştirildi!")
                         exe_copied += 1
+                        if "Karargah" in file:
+                            first_exe_path = target_file
                     except Exception as e:
                         self.log(f"Kopyalama Hatası: {e}")
                         
         if exe_copied < 2:
-             self.log(f"İstenilen 2 exe'nin hepsi taşınamamış olabilir (Kopyalanan: {exe_copied}). Lütfen 'dist-electron' klasörünü kontrol edin.")
+             self.log(f"UYARI: Beklenen EXE dosyaları eksik kopyalanmış olabilir (Taşınan: {exe_copied}).")
              
         self.set_progress(100)
         self.log("------------------------------------------")
-        self.log("KURULUM TAMAMLANDI! 🎉")
-        self.log("Hem 'Karargah_Yonetim' hem de 'Sistem_Site' masaüstünüze eklendi.")
+        self.log("TÜM İŞLEMLER BAŞARIYLA TAMAMLANDI! 🎉")
         
-        # Messagebox shouldn't be called directly from worker thread ideally, but we can wrap it or just use `after`.
+        if action == "Güncelleme":
+            self.log("Güncellenmiş sistem yeniden başlatılıyor...")
+            if os.name == 'nt' and first_exe_path:
+                try:
+                    os.startfile(first_exe_path)
+                    self.log("Karargah uygulaması başarıyla başlatıldı.")
+                except Exception as e:
+                    self.log(f"Otomatik başlatma başarısız: {e}")
+
         if action == "Yeni Kurulum":
-             self.after(0, lambda: messagebox.showinfo("Başarılı", "İstediğiniz gibi 2 ayrı EXE oluşturuldu ve Masaüstünüze bırakıldı!"))
+             self.after(0, lambda: messagebox.showinfo("Gelişmiş Kurulum Tamamlandı", "Sistem sıfırdan başarıyla kuruldu. Masaüstünüzdeki kısayolları kullanarak giriş yapabilirsiniz!"))
         else:
-             self.after(0, lambda: messagebox.showinfo("Başarılı", "Uygulamalar güncellendi ve yeni EXE dosyaları Masaüstünüze bırakıldı!"))
+             self.after(0, lambda: messagebox.showinfo("Sistem Güncellendi", "Sistem başarıyla GitHub üzerinden en güncel versiyona taşındı. Masaüstünüzdeki uygulamalar yenilendi ve Karargah Yönetim uygulamanız yeniden başlatıldı!"))
         
-        self.set_gui_state(self.btn_start, tk.NORMAL)
-        self.set_gui_state(self.entry_repo, tk.NORMAL)
-        self.set_gui_state(self.combo_dirs, tk.NORMAL)
+        self.after(0, lambda: self.set_gui_state("normal"))
 
 if __name__ == "__main__":
     app = ModernInstaller()
     app.mainloop()
-

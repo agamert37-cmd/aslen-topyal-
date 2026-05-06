@@ -17,7 +17,8 @@ import {
   Palette, CheckCircle, LayoutDashboard,
   Layers, PanelRightOpen, PanelRightClose,
   Check, ChevronRight, Heart, Wand2, Rocket,
-  Upload, Package, Search as SearchIcon, Link2, FileImage
+  Upload, Package, Search as SearchIcon, Link2, FileImage, 
+  Network, UserCheck, Ban, Phone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
@@ -31,6 +32,8 @@ import { useModuleBus } from '../hooks/useModuleBus';
 import { getPagePermissions } from '../utils/permissions';
 import { usePageSecurity } from '../hooks/usePageSecurity';
 import { getVitrinAnalytics, getPopularProducts, getDailyStats, getVitrinEventsToday, clearVitrinAnalytics } from '../utils/vitrinAnalytics';
+import { getActiveSessions, forceLogoutSession } from '../utils/security';
+import { v4 as uuidv4 } from 'uuid';
 
 // ─── Interfaces ──────────────────────────────────────────────────
 interface HeroBanner {
@@ -262,6 +265,54 @@ function VitrinAnalyticsTab() {
         </div>
       )}
 
+      {/* Aktif Sistem Oturumları */}
+      <div className="bg-card rounded-2xl p-5 sm:p-6 border border-border">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center"><Network className="w-4 h-4 text-foreground" /></div>
+            <div><h3 className="text-sm font-bold text-foreground">Aktif Oturumlar (Panel)</h3><p className="text-[10px] text-muted-foreground">Şu an sistemi veya siteyi kullanan aktif oturumlar</p></div>
+          </div>
+          <button onClick={() => setRefreshKey(k => k + 1)} className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-muted-foreground transition-colors">Yenile</button>
+        </div>
+        <div className="space-y-3">
+          {(() => {
+            const sessions = getActiveSessions();
+            if (sessions.length === 0) return <div className="text-center py-8 text-gray-600 text-sm">Aktif oturum bulunamadı.</div>;
+            return sessions.map((s, idx) => (
+              <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-border gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                    <UserCheck className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-foreground">{s.userName || 'Bilinmeyen Kullanıcı'}</h4>
+                    <p className="text-[10px] text-muted-foreground truncate max-w-[200px] sm:max-w-[300px]">
+                      Platform: {(s.userAgent || '').slice(0, 40)}...
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+             <p className="text-xs text-emerald-400 font-bold flex items-center justify-end gap-1"><span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" /> Aktif</p>
+             <p className="text-[10px] text-muted-foreground mt-0.5">Son: {new Date(s.lastActiveAt).toLocaleTimeString('tr-TR')}</p>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      forceLogoutSession(s.id);
+                      toast.success('Oturum kapatıldı.');
+                      setRefreshKey(k => k + 1);
+                    }} 
+                    className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 object-cover transition-colors" title="Oturumu Sonlandır"
+                  >
+                    <Ban className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ));
+          })()}
+        </div>
+      </div>
+
       <div className="bg-card rounded-2xl p-5 sm:p-6 border border-border">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
@@ -394,7 +445,12 @@ function IletisimTalepleriTab() {
                 <tr key={i} className="hover:bg-white/5 transition-colors">
                   <td className="px-4 py-3 whitespace-nowrap text-xs">{new Date(t.createdAt).toLocaleString('tr-TR')}</td>
                   <td className="px-4 py-3 font-semibold">{t.name}</td>
-                  <td className="px-4 py-3 font-mono text-blue-400">{t.phone}</td>
+                  <td className="px-4 py-3 font-mono text-blue-400">
+                    <a href={`tel:${t.phone}`} className="flex items-center gap-1 hover:text-blue-300 hover:underline">
+                      <Phone className="w-3.5 h-3.5" />
+                      {t.phone}
+                    </a>
+                  </td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${t.status === 'tamamlandi' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-orange-500/20 text-orange-400'}`}>
                       {t.status === 'tamamlandi' ? 'Okundu/Arama Yapıldı' : 'Bekliyor'}
@@ -440,18 +496,13 @@ function IletisimTalepleriTab() {
 
 // ─── Fiyat Listesi Tab ─────────────────────────────────────────
 function FiyatListesiTab() {
-  const [cariler, setCariler] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
+  const cariler = useGlobalTableData<any>('cari_hesaplar') || [];
+  const products = useGlobalTableData<any>('urunler') || [];
   
   const [selectedCari, setSelectedCari] = useState<string>('');
   const [customTitle, setCustomTitle] = useState('');
   const [markupPercent, setMarkupPercent] = useState<number>(0);
   const [isGenerating, setIsGenerating] = useState(false);
-
-  useEffect(() => {
-    setCariler(getFromStorage<any[]>(StorageKey.CARI_DATA) || []);
-    setProducts(getFromStorage<any[]>(StorageKey.STOK_DATA) || []);
-  }, []);
 
   const handleGenerate = async () => {
     if (!selectedCari) {
@@ -926,9 +977,9 @@ function StokImportPanel({ onImport, existingProductNames }: { onImport: (items:
   const [stokSearch, setStokSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  const rawStokData = useGlobalTableData<any>('urunler') || [];
   const stokData = useMemo(() => {
-    const raw = getFromStorage<any[]>(StorageKey.STOK_DATA) || [];
-    return raw.filter((p: any) => p.name && p.name.trim().length > 0).map((p: any) => ({
+    return rawStokData.filter((p: any) => p.name && p.name.trim().length > 0).map((p: any) => ({
       id: p.id,
       name: p.name,
       category: p.category || 'Diger',
@@ -937,7 +988,7 @@ function StokImportPanel({ onImport, existingProductNames }: { onImport: (items:
       sellPrice: p.sellPrice ?? p.sell_price ?? 0,
       alreadyInVitrine: existingProductNames.some(n => n.toLowerCase() === p.name.toLowerCase()),
     }));
-  }, [existingProductNames]);
+  }, [existingProductNames, rawStokData]);
 
   const filteredStok = useMemo(() => {
     if (!stokSearch.trim()) return stokData;
@@ -1167,7 +1218,7 @@ export function PazarlamaPage() {
     const arr = content[key] as any[];
     const item = arr.find((i: any) => i.id === id);
     if (item) {
-      const copy = { ...item, id: crypto.randomUUID(), title: (item.title || item.name || item.question || '') + ' (Kopya)' };
+      const copy = { ...item, id: uuidv4(), title: (item.title || item.name || item.question || '') + ' (Kopya)' };
       if (copy.name) copy.name = copy.name + ' (Kopya)';
       updateContent({ [key]: [...arr, copy] } as any);
       toast.success('Öğe kopyalandı');
@@ -1450,7 +1501,7 @@ export function PazarlamaPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <TemplatePicker templates={ANNOUNCEMENT_TEMPLATES} label="Haber Sablonlari" color="cyan"
-                        onSelect={(t) => addItem('announcements', { id: crypto.randomUUID(), title: t.title, text: t.text, date: new Date().toISOString().split('T')[0], badge: t.badge, imageUrl: '', active: true })} />
+                        onSelect={(t) => addItem('announcements', { id: uuidv4(), title: t.title, text: t.text, date: new Date().toISOString().split('T')[0], badge: t.badge, imageUrl: '', active: true })} />
                       <span className="text-xs text-muted-foreground/70">{content.announcements.filter(a => a.active).length}/{content.announcements.length}</span>
                     </div>
                   </div>
@@ -1529,7 +1580,7 @@ export function PazarlamaPage() {
                       )}
                     </motion.div>
                   ))}
-                  <AddButton label="Yeni Haber Ekle" onClick={() => addItem('announcements', { id: crypto.randomUUID(), title: '', text: '', date: new Date().toISOString().split('T')[0], badge: 'Duyuru', imageUrl: '', active: true, relatedProducts: [] })} color="cyan" />
+                  <AddButton label="Yeni Haber Ekle" onClick={() => addItem('announcements', { id: uuidv4(), title: '', text: '', date: new Date().toISOString().split('T')[0], badge: 'Duyuru', imageUrl: '', active: true, relatedProducts: [] })} color="cyan" />
                 </div>
               )}
 
@@ -1540,7 +1591,7 @@ export function PazarlamaPage() {
                   <StokImportPanel onImport={(items) => {
                     items.forEach(item => {
                       addItem('products', {
-                        id: crypto.randomUUID(),
+                        id: uuidv4(),
                         name: item.name,
                         description: item.description || `${item.category} - ${item.unit}`,
                         imageUrl: '',
@@ -1563,7 +1614,7 @@ export function PazarlamaPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <TemplatePicker templates={PRODUCT_TEMPLATES} label="Urun Sablonlari" color="purple"
-                          onSelect={(t) => addItem('products', { id: crypto.randomUUID(), name: t.name, description: t.description, imageUrl: '', price: t.price, badge: t.badge, active: true })} />
+                          onSelect={(t) => addItem('products', { id: uuidv4(), name: t.name, description: t.description, imageUrl: '', price: t.price, badge: t.badge, active: true })} />
                         <span className="text-xs text-muted-foreground/50">{content.products.filter(p => p.active).length}/{content.products.length}</span>
                       </div>
                     </div>
@@ -1591,7 +1642,7 @@ export function PazarlamaPage() {
                         </motion.div>
                       ))}
                     </div>
-                    <AddButton label="Yeni Urun Ekle" onClick={() => addItem('products', { id: crypto.randomUUID(), name: '', description: '', imageUrl: '', price: '', badge: '', active: true })} color="purple" />
+                    <AddButton label="Yeni Urun Ekle" onClick={() => addItem('products', { id: uuidv4(), name: '', description: '', imageUrl: '', price: '', badge: '', active: true })} color="purple" />
                   </div>
                 </div>
               )}
@@ -1790,7 +1841,7 @@ export function PazarlamaPage() {
                       </motion.div>
                     ))}
                   </div>
-                  <AddButton label="Yeni Kart Ekle" onClick={() => addItem('stats', { id: crypto.randomUUID(), icon: 'star', value: '', label: '', color: 'blue' })} color="emerald" />
+                  <AddButton label="Yeni Kart Ekle" onClick={() => addItem('stats', { id: uuidv4(), icon: 'star', value: '', label: '', color: 'blue' })} color="emerald" />
                 </div>
               )}
 

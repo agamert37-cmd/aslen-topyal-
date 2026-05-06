@@ -45,6 +45,7 @@ const FaturaPage       = lazy(() => import("./pages/FaturaPage").then(m => ({ de
 const OpsCenterPage  = lazy(() => import("./pages/ops/OpsCenterPage").then(m => ({ default: m.OpsCenterPage })));
 const DataAuditPage  = lazy(() => import("./pages/DataAuditPage").then(m => ({ default: m.DataAuditPage })));
 const UpdateNotesPage  = lazy(() => import("./pages/UpdateNotesPage").then(m => ({ default: m.UpdateNotesPage })));
+const SunucuPage       = lazy(() => import("./pages/SunucuPage").then(m => ({ default: m.SunucuPage })));
 
 // Sayfa yüklenirken gösterilecek spinner
 function PageLoader() {
@@ -146,6 +147,7 @@ export const router = AppRouter([
           { path: "dosyalar",          element: P(<Lazy><FilesPage /></Lazy>) },
           { path: "fis-gecmisi",       element: P(<Lazy><FisHistoryPage /></Lazy>) },
           { path: "settings",          element: P(<Lazy><SettingsPage /></Lazy>) },
+          { path: "sunucu",            element: P(<Lazy><SunucuPage /></Lazy>) },
           { path: "yedekler",          element: P(<Lazy><YedeklerPage /></Lazy>) },
           { path: "guvenlik",          element: P(<Lazy><SecurityPage /></Lazy>) },
           { path: "faturalar",         element: P(<Lazy><FaturaPage /></Lazy>) },

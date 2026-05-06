@@ -24,6 +24,7 @@ import { DuplicateFinderModal } from '../components/DuplicateFinderModal';
 import {
   AreaChart, Area, XAxis, Tooltip, ResponsiveContainer
 } from 'recharts';
+import { v4 as uuidv4 } from 'uuid';
 
 interface Personnel {
   id: string;
@@ -283,7 +284,7 @@ export function PersonelPage() {
       return;
     }
 
-    const newPersonnelId = crypto.randomUUID();
+    const newPersonnelId = uuidv4();
     const newPersonnel: any = {
       id: newPersonnelId, name: deepSanitize(nameVal), username: deepSanitize(uname),
       position: (fd.get('department') as string).trim(), role: requestedRole,
@@ -493,14 +494,15 @@ export function PersonelPage() {
     toast.error('Talep reddedildi.');
   };
 
+  const globalFisler = useGlobalTableData<any>('fisler') || [];
+  const globalKasa = useGlobalTableData<any>('kasa_islemleri') || [];
+
   const employeeActivityData = useMemo(() => {
     if (!selectedEmployee) return { todayCount: 0, chartData: [], logs: [], favoritePage: '-' };
     const name = selectedEmployee.name;
-    const fisler = getFromStorage<any[]>(StorageKey.FISLER) || [];
-    const kasa = getFromStorage<any[]>(StorageKey.KASA_DATA) || [];
     const allActions: any[] = [];
 
-    fisler.forEach(f => {
+    globalFisler.forEach(f => {
       if (f.createdBy === name || f.personel === name || f.employeeName === name) {
         if (!f.date) return; // Tarihsiz kayıt → aktivite analizine dahil etme
         const fDate = f.date;
@@ -511,7 +513,7 @@ export function PersonelPage() {
       }
     });
 
-    kasa.forEach(k => {
+    globalKasa.forEach(k => {
       if (k.createdBy === name) {
         if (!k.date) return; // Tarihsiz kayıt → aktivite analizine dahil etme
         const kDate = k.date;

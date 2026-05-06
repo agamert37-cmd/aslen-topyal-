@@ -631,13 +631,13 @@ export function MainLayout() {
           )}
         </AnimatePresence>
 
-        <div className="flex-1 flex min-h-0 relative">
-          {/* Subtle Background Ambient Glow */}
-          <div className="fixed inset-0 pointer-events-none z-0">
-            <div className="absolute top-[-15%] left-[15%] w-[40%] h-[45%] bg-blue-600/[0.04] rounded-full blur-[160px]" />
-            <div className="absolute bottom-[-10%] right-[5%] w-[35%] h-[40%] bg-indigo-600/[0.03] rounded-full blur-[160px]" />
-            <div className="absolute top-[50%] left-[60%] w-[25%] h-[30%] bg-cyan-600/[0.02] rounded-full blur-[140px]" />
-          </div>
+      <div className="flex-1 flex min-h-0 relative z-0">
+        {/* Subtle Background Ambient Glow */}
+        <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
+          <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }} transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut' }} className="absolute top-[-10%] left-[10%] w-[50%] h-[50%] bg-blue-500/[0.08] rounded-full blur-[160px]" />
+          <motion.div animate={{ scale: [1, 1.1, 1], opacity: [0.2, 0.4, 0.2] }} transition={{ duration: 20, repeat: Infinity, ease: 'linear' }} className="absolute bottom-[-10%] right-[10%] w-[40%] h-[40%] bg-purple-500/[0.06] rounded-full blur-[150px]" />
+          <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.2, 0.3, 0.2] }} transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }} className="absolute top-[40%] left-[50%] w-[35%] h-[35%] bg-emerald-500/[0.05] rounded-full blur-[140px]" />
+        </div>
 
           {/* Mobile Sidebar Overlay */}
         <AnimatePresence>

@@ -1,6 +1,7 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
+import fs from "fs";
 import { exec } from "child_process";
 import os from "os";
 import { createProxyMiddleware } from "http-proxy-middleware";
@@ -17,7 +18,24 @@ process.on('unhandledRejection', (reason, promise) => {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  
+  // Custom port configurator from file
+  let customPort = 3000;
+  const configPath = path.join(process.cwd(), "server-config.json");
+  if (fs.existsSync(configPath)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      if (parsed.port) customPort = parsed.port;
+    } catch (e) {
+      console.error("Config parse error", e);
+    }
+  }
+
+  // AI Studio enforces port 3000, but local desktop can use customized port.
+  // By defaulting to process.env.PORT, platforms can override it if needed.
+  // Actually, we'll try to listen on customPort, except if we are explicitly forced by AI Studio proxy (which usually ignores what we bind locally and maps port 3000 to external 80/443).
+  // Inside docker/cloud run, process.env.PORT is provided.
+  const PORT = process.env.PORT || customPort;
 
   // CouchDB Proxy - CORS hatalarını önlemek için Express üzerinden geçiş
   const couchDbTarget = process.env.VITE_COUCHDB_URL || "http://127.0.0.1:5984";
@@ -61,13 +79,44 @@ async function startServer() {
 
   // Check version
   app.get("/api/version", (req, res) => {
-    // get version from package.json or git log
     exec("git log -1 --pretty=%B", { cwd: process.cwd(), timeout: 10000 }, (error, stdout) => {
       res.json({
         success: !error,
         latestCommit: stdout ? stdout.toString().trim() : "Bilinmiyor",
       });
     });
+  });
+
+  // Save server config (Port vb.)
+  app.post("/api/server-config", (req, res) => {
+    const { port } = req.body;
+    try {
+      const configPath = path.join(process.cwd(), "server-config.json");
+      let current: any = {};
+      if (fs.existsSync(configPath)) {
+        current = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      }
+      if (port) current.port = Number(port);
+      fs.writeFileSync(configPath, JSON.stringify(current, null, 2));
+      res.json({ success: true, message: "Port güncellendi. Sistem yeniden başlattıktan sonra aktif olacaktır." });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  // Get server config
+  app.get("/api/server-config", (req, res) => {
+    try {
+      const configPath = path.join(process.cwd(), "server-config.json");
+      if (fs.existsSync(configPath)) {
+        const current = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        res.json({ success: true, config: current });
+      } else {
+        res.json({ success: true, config: { port: 3000 } });
+      }
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
   });
 
   // Execute update (pull & docker restart sim or actual)
@@ -140,8 +189,26 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
+    
+    // Serve static files with standard headers, but tell the browser NOT to cache index.html
+    const setCustomCacheControl = (res: any, path: string) => {
+      if (path.endsWith("index.html") || path.endsWith("sw.js")) {
+        // Prevent caching for index.html and service worker
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
+      } else {
+        // Cache assets (js, css, etc.) for a long time since they have hash in filenames
+        res.setHeader("Cache-Control", "public, max-age=31536000");
+      }
+    };
+
+    app.use(express.static(distPath, { setHeaders: setCustomCacheControl }));
+    
     app.get("*", (req, res) => {
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
       res.sendFile(path.join(distPath, "index.html"));
     });
   }

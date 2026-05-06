@@ -36,6 +36,7 @@ import { getPagePermissions } from '../utils/permissions';
 import { usePageSecurity } from '../hooks/usePageSecurity';
 import { kvGet, kvSet } from '../lib/pouchdb-kv';
 import { useDayControl } from '../hooks/useDayControl';
+import { v4 as uuidv4 } from 'uuid';
 
 interface POSDevice {
   id: string;
@@ -90,22 +91,14 @@ export function KasaPage() {
     () => (sessionStorage.getItem('mert4_filter_kasa_type') as 'Tümü'|'Gelir'|'Gider') ?? 'Tümü'
   );
   
-  const [posDevices, setPosDevices] = useState<POSDevice[]>(() => {
-    return getFromStorage<POSDevice[]>(StorageKey.POS_DATA) || [];
+  const { data: posDevicesRaw, addItem: addPosDevice, deleteItem: removePosDevice } = useTableSync<POSDevice>({
+    tableName: 'pos_devices',
+    storageKey: StorageKey.POS_DATA,
+    initialData: [],
   });
+  const posDevices = useMemo(() => Array.isArray(posDevicesRaw) ? posDevicesRaw : [], [posDevicesRaw]);
 
-  // BUG FIX [AJAN-2]: localStorage boşsa KV store'dan POS cihazlarını yükle (mobil ilk açılış)
-  useEffect(() => {
-    const saved = getFromStorage<POSDevice[]>(StorageKey.POS_DATA);
-    if (!saved || saved.length === 0) {
-      kvGet<POSDevice[]>('pos_devices').then(remote => {
-        if (remote && remote.length > 0) {
-          setPosDevices(remote);
-          setInStorage(StorageKey.POS_DATA, remote);
-        }
-      }).catch(() => {});
-    }
-  }, []);
+  // KV senkronizasyonu artık sistem tarafından yönetiliyor, lokal state silindi
 
   const [isPosModalOpen, setIsPosModalOpen] = useState(false);
   const [newPosForm, setNewPosForm] = useState({
@@ -188,7 +181,7 @@ export function KasaPage() {
     }
     
     const newTransaction: Transaction = {
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       type: modalType,
       category,
       description,
@@ -236,11 +229,7 @@ export function KasaPage() {
       ...newPosForm,
       createdAt: new Date().toISOString().split('T')[0],
     };
-    const updated = [newDevice, ...posDevices];
-    setPosDevices(updated);
-    setInStorage(StorageKey.POS_DATA, updated);
-    // BUG FIX [AJAN-2]: POS cihazını KV store'a da yaz
-    kvSet('pos_devices', updated).catch(e => console.error('[Kasa] POS kv sync:', e));
+    addPosDevice(newDevice);
     toast.success('POS cihazı sisteme eklendi');
     setIsPosModalOpen(false);
     setNewPosForm({ name: '', bankName: '', serialNumber: '' });
@@ -571,11 +560,7 @@ export function KasaPage() {
                       <button
                         onClick={() => {
                           if(confirm('POS cihazını silmek istediğinize emin misiniz?')) {
-                            const updated = posDevices.filter(d => d.id !== device.id);
-                            setPosDevices(updated);
-                            setInStorage(StorageKey.POS_DATA, updated);
-                            // BUG FIX [AJAN-2]: POS silme KV store'a da yaz
-                            kvSet('pos_devices', updated).catch(e => console.error('[Kasa] POS kv sync:', e));
+                            removePosDevice(device.id);
                             toast.success('POS Cihazı silindi.');
                           }
                         }}

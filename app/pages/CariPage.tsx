@@ -28,6 +28,7 @@ import { ChangeLogModal } from '../components/ChangeLogModal';
 import { DuplicateFinderModal } from '../components/DuplicateFinderModal';
 import { validateCariItem } from '../utils/data-integrity';
 import { DataIssueBadge } from '../components/DataIssueBadge';
+import { v4 as uuidv4 } from 'uuid';
 
 // ─── Interfaces ─────────────────────────────────────────────────────────────
 interface Cari {
@@ -957,7 +958,7 @@ export function CariPage() {
 
   const addOpeningEntry = () => {
     setOpeningEntries(prev => [...prev, {
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       date: new Date().toISOString().slice(0, 10),
       description: '',
       amount: '',
@@ -1067,7 +1068,7 @@ export function CariPage() {
     const simpleOpening = formData.openingBalance || 0;
     if (initialHistory.length === 0 && simpleOpening !== 0) {
       initialHistory.push({
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         date: new Date().toISOString(),
         description: 'Açılış Bakiyesi',
         amount: Math.abs(simpleOpening),
@@ -1082,7 +1083,7 @@ export function CariPage() {
       : simpleOpening;
 
     const newCari: Cari = {
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       ...sec.sanitizeAll(formData, ['companyName', 'contactPerson', 'address', 'email']),
       region: formRegion,
       balance: computedBalance,

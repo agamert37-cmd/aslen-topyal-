@@ -4,6 +4,7 @@
  */
 
 import { getFromStorage, setInStorage, StorageKey } from './storage';
+import { v4 as uuidv4 } from 'uuid';
 
 const STORAGE_PREFIX = 'isleyen_et_';
 
@@ -41,7 +42,7 @@ export function validateStokItem(item: any): { fixed: boolean; issues: string[];
 
   // ID kontrolü
   if (!result.id) {
-    result.id = crypto.randomUUID();
+    result.id = uuidv4();
     issues.push('Eksik ID oluşturuldu');
     fixed = true;
   }
@@ -83,7 +84,7 @@ export function validateStokItem(item: any): { fixed: boolean; issues: string[];
         const parsed = JSON.parse(result.supplier_entries);
         if (Array.isArray(parsed)) {
           result.movements = parsed.map((e: any) => ({
-            id: e.id || crypto.randomUUID(),
+            id: e.id || uuidv4(),
             type: 'ALIS',
             partyName: e.supplierName || 'Bilinmeyen',
             date: e.date || new Date().toISOString(),
@@ -149,7 +150,7 @@ export function validateCariItem(item: any): { fixed: boolean; issues: string[];
   const result = { ...item };
 
   if (!result.id) {
-    result.id = crypto.randomUUID();
+    result.id = uuidv4();
     issues.push('Eksik ID');
     fixed = true;
   }
@@ -190,7 +191,7 @@ export function validateFisItem(item: any): { fixed: boolean; issues: string[]; 
   const result = { ...item };
 
   if (!result.id) {
-    result.id = crypto.randomUUID();
+    result.id = uuidv4();
     issues.push('Eksik ID');
     fixed = true;
   }

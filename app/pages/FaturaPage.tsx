@@ -26,6 +26,7 @@ import { cariToDb, cariFromDb } from './CariPage';
 import { useGlobalTableData } from '../contexts/GlobalTableSyncContext';
 import { generateUBLXML, downloadXML, type UBLFaturaData } from '../utils/ublTr';
 import { getCompanyInfo } from './SettingsPage';
+import { v4 as uuidv4 } from 'uuid';
 
 // ─── Interfaces ────────────────────────────────────────────────
 export interface Fatura {
@@ -208,14 +209,21 @@ export function FaturaPage() {
   const [activePageTab, setActivePageTab] = useState<'faturalar' | 'kdvRaporu' | 'stokEtki'>('faturalar');
 
   const [isInvoiceNamesModalOpen, setIsInvoiceNamesModalOpen] = useState(false);
-  const [invoiceNamesList, setInvoiceNamesList] = useState<{id: string, name: string}[]>(() => {
-     return getFromStorage<{id: string, name: string}[]>('invoice_names_data') || [];
+    const { data: invoiceNamesListData, addItem: addInvoiceNameSync, deleteItem: delInvoiceNameSync } = useTableSync<any>({
+    tableName: 'invoice_names',
+    storageKey: 'invoice_names_data',
+    initialData: [],
+    orderBy: 'name',
+    orderAsc: true
   });
+  const invoiceNamesList = React.useMemo(() => invoiceNamesListData || [], [invoiceNamesListData]);
+
+  const icebergCagesData = useGlobalTableData<any>('iceberg_cages');
+  const icebergCages = React.useMemo(() => icebergCagesData || [], [icebergCagesData]);
+
   const [newInvoiceName, setNewInvoiceName] = useState('');
   
-  const [icebergCages, setIcebergCages] = useState<{id: string, name: string}[]>(() => {
-     return getFromStorage<{id: string, name: string}[]>('iceberg_cages_data') || [];
-  });
+  
 
   // ─── useTableSync ENTEGRASYONU ──────────────────────────────────────
   const { data: syncFaturalar, addItem: addFaturaSync, updateItem: updateFaturaSync, deleteItem: deleteFaturaSync } = useTableSync<any>({
@@ -334,6 +342,8 @@ export function FaturaPage() {
       description: '',
       tevkifatRate: 0,
       perItemKdv: false,
+      location: 'Dukkan' as 'Dukkan' | 'Iceberg',
+      cageId: '',
     });
     setFormItems([]);
     setCariSearchTerm('');
@@ -514,7 +524,7 @@ export function FaturaPage() {
       satirToplam: item.itemGrossTotal ?? (item.totalPrice * (1 + (item.itemKdvRate ?? fatura.kdvRate) / 100)),
     }));
     const ublData: UBLFaturaData = {
-      faturaUUID: fatura.id.replace(/[^a-f0-9-]/gi, '') || crypto.randomUUID(),
+      faturaUUID: fatura.id.replace(/[^a-f0-9-]/gi, '') || uuidv4(),
       faturaNo: fatura.faturaNo || `EAF${new Date().getFullYear()}${String(Date.now()).slice(-9)}`,
       tarih: fatura.date,
       saat: new Date(fatura.createdAt).toTimeString().slice(0, 8),
@@ -857,9 +867,7 @@ export function FaturaPage() {
                  />
                  <button onClick={() => {
                     if(!newInvoiceName.trim()) return;
-                    const newList = [...invoiceNamesList, { id: 'invname-'+Date.now(), name: newInvoiceName.trim() }];
-                    setInvoiceNamesList(newList);
-                    setInStorage('invoice_names_data', newList);
+                    addInvoiceNameSync({ id: 'invname-'+Date.now(), name: newInvoiceName.trim() });
                     setNewInvoiceName('');
                     toast.success('İsim eklendi');
                  }} className="px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl flex items-center gap-2">
@@ -871,9 +879,7 @@ export function FaturaPage() {
                    <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-border">
                      <span className="text-sm font-medium">{item.name}</span>
                      <button onClick={() => {
-                        const newList = invoiceNamesList.filter(x => x.id !== item.id);
-                        setInvoiceNamesList(newList);
-                        setInStorage('invoice_names_data', newList);
+                        delInvoiceNameSync(item.id);
                      }} className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg">
                        <Trash2 className="w-4 h-4" />
                      </button>

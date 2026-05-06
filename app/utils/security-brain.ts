@@ -1,5 +1,6 @@
 import { ActivityLogEntry } from './activityLogger';
 import { getFromStorage, setInStorage } from './storage';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface SecurityThreat {
   id: string;
@@ -40,7 +41,7 @@ export function analyzeUserBehavior(logs: ActivityLogEntry[], userId: string, us
   });
   if (nightLogs.length > 5) {
     threats.push({
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       userId,
       userEmail,
       type: 'ANOMALOUS_HOURS',
@@ -60,7 +61,7 @@ export function analyzeUserBehavior(logs: ActivityLogEntry[], userId: string, us
   );
   if (recentVoidLogs.length >= 5) {
     threats.push({
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       userId,
       userEmail,
       type: 'RAPID_VOID_OPERATIONS',

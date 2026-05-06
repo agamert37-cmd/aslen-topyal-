@@ -271,7 +271,23 @@ export function useTableSync<T extends { id: string }>(
       }
 
       applyPagination(sorted);
-      if (foundConflicts.length > 0) setConflicts(foundConflicts);
+      if (foundConflicts.length > 0) {
+        setConflicts(foundConflicts);
+        
+        // Sadece daha önce denenmemiş çakışmaları çöz
+        if (!(window as any).__resolvedConflicts) (window as any).__resolvedConflicts = new Set<string>();
+        const toResolve = foundConflicts.filter(c => !(window as any).__resolvedConflicts.has(c.id));
+        
+        if (toResolve.length > 0) {
+          toResolve.forEach(c => (window as any).__resolvedConflicts.add(c.id));
+          import('../lib/db-conflicts').then(m => {
+            Promise.all(toResolve.map(c => m.autoResolveConflict(tableName, c.id, 'lww')))
+              .then(() => {
+                setTimeout(() => fetchData(true), 1500);
+              });
+          });
+        }
+      }
       setSyncState('synced');
       setLastSync(new Date());
       setConsecutiveFailures(0);
@@ -305,12 +321,25 @@ export function useTableSync<T extends { id: string }>(
         since: 'now',
         live: true,
         include_docs: true,
+        conflicts: true,
       });
 
-      changes.on('change', (change: any) => {
+      changes.on('change', async (change: any) => {
         if (change.deleted) {
           mutateData(prev => prev.filter(i => i.id !== change.id));
         } else if (change.doc) {
+          // Çakışma tespiti (Sync ile gelen)
+          if (change.doc._conflicts && change.doc._conflicts.length > 0) {
+            console.warn(`[useTableSync] Çakışma tespit edildi: ${tableName}/${change.id}`);
+            // autoResolveConflict dinamik / statik import ile çağrılır
+            // Conflict stratejisi 'lww' (Last Write Wins) olarak ayarlanır.
+            import('../lib/db-conflicts').then(m => {
+              m.autoResolveConflict(tableName, change.id, 'lww').then(() => {
+                fetchData(true); // Çözüldükten sonra tabloyu tazele
+              });
+            });
+          }
+
           const cleaned = cleanDoc(change.doc);
           const item = fromDbRef.current ? fromDbRef.current(cleaned) : cleaned as T;
 

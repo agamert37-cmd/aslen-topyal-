@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, Notification, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { exec } = require('child_process');
+const { exec, fork } = require('child_process');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 // Arka plan dayanıklılık mekanizması: Uygulamanın kesinlikle çökmemesini sağlamak
@@ -16,6 +16,38 @@ process.on('unhandledRejection', (reason, promise) => {
 let mainWindow;
 let appTray = null;
 let isQuitting = false;
+let serverProcess = null;
+
+function startBackgroundServer() {
+  const isDev = process.env.NODE_ENV !== 'production' && !app.isPackaged;
+  const projectRoot = path.join(__dirname, '..');
+  
+  // If in production, ensure there's a way to start the server or it might just be static in Electron
+  // We'll use tsx to run server.ts or node server.js if it exists
+  let serverScript = 'server.ts';
+  if (!isDev) {
+     if (fs.existsSync(path.join(projectRoot, 'server.js'))) {
+       serverScript = 'server.js';
+     } else if (fs.existsSync(path.join(projectRoot, 'server.cjs'))) {
+       serverScript = 'server.cjs';
+     }
+  }
+
+  // Use npx tsx in dev, node in prod
+  try {
+    if (isDev) {
+      serverProcess = exec('npx tsx server.ts', { cwd: projectRoot });
+    } else {
+      serverProcess = exec(`node ${serverScript}`, { cwd: projectRoot });
+    }
+    
+    serverProcess.stdout.on('data', data => console.log(`[SERVER]: ${data}`));
+    serverProcess.stderr.on('data', data => console.error(`[SERVER ERR]: ${data}`));
+    serverProcess.on('exit', code => console.log(`Background server exited with code ${code}`));
+  } catch(e) {
+    console.error("Failed to start background server", e);
+  }
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -61,6 +93,10 @@ function createWindow() {
 
 app.whenReady().then(() => {
   app.setAppUserModelId('com.isleyenet.karargah');
+  
+  // Start the backend server for Public Site and Express endpoints
+  startBackgroundServer();
+  
   createWindow();
 
   // ----- TRAY (Arka Planda Çalışma & Boğa İkonu) BAŞLANGIÇ -----
@@ -128,6 +164,9 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   isQuitting = true;
+  if (serverProcess) {
+    serverProcess.kill();
+  }
 });
 
 app.on('window-all-closed', function () {

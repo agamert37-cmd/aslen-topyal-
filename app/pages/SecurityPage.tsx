@@ -542,7 +542,7 @@ export function SecurityPage() {
                 </div>
               ) : (
                 activeSessions.map(session => {
-                  const isMobile = /Mobile|Android|iPhone/i.test(session.userAgent);
+                  const isMobile = /Mobile|Android|iPhone/i.test(session.userAgent || '');
                   const DeviceIcon = isMobile ? MonitorSmartphone : Laptop;
                   const isStale = Date.now() - new Date(session.lastActivity).getTime() > 10 * 60 * 1000;
 

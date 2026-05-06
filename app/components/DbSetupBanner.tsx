@@ -1,13 +1,13 @@
 /**
- * Veritabanı Kurulum Banner'ı
+ * Veritabanı Kurulum Sihirbazı (Gelişmiş Arayüz)
  *
- * Uygulama açılışında CouchDB durumunu kullanıcıya bildirir.
- * Bağlantı hatası durumunda inline yapılandırma formu gösterir.
+ * Uygulama açılışında CouchDB durumunu kontrol eder, bağlantı var ise otomatik başlar.
+ * Bağlantı hatası durumunda detaylı, şık bir kurulum sihirbazı arayüzü sunar.
  */
 
 import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Database, CheckCircle2, Loader2, AlertTriangle, RefreshCw, X, Settings, Eye, EyeOff, Save } from 'lucide-react';
+import { Database, CheckCircle2, Loader2, AlertTriangle, RefreshCw, X, Settings, Eye, EyeOff, Save, ShieldCheck, ChevronRight, Server } from 'lucide-react';
 import { testCouchDbConnection } from '../lib/pouchdb';
 import { getCouchDbConfig, setCouchDbConfig } from '../lib/db-config';
 
@@ -29,11 +29,12 @@ interface DbSetupBannerProps {
 
 export function DbSetupBanner({ onReady }: DbSetupBannerProps) {
   const [status, setStatus] = useState<DbInitStatus>('checking');
-  const [message, setMessage] = useState('Veritabanı kontrol ediliyor...');
+  const [message, setMessage] = useState('Güvenli bağlantı kuruluyor...');
   const [visible, setVisible] = useState(true);
   const [dismissed, setDismissed] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(15);
 
-  // Inline CouchDB config form
+  // Configuration Form
   const [showConfig, setShowConfig] = useState(false);
   const [cfgUrl, setCfgUrl] = useState('');
   const [cfgUser, setCfgUser] = useState('');
@@ -43,29 +44,36 @@ export function DbSetupBanner({ onReady }: DbSetupBannerProps) {
 
   const runInit = async () => {
     setStatus('checking');
-    setMessage('Veritabanı kontrol ediliyor...');
+    setMessage('Sistem ağ bileşenlerini kontrol ediyor...');
     setVisible(true);
     setDismissed(false);
     setShowConfig(false);
+    setLoadingProgress(25);
+
+    setTimeout(() => setLoadingProgress(65), 600);
 
     const checkResult = await checkDatabaseStatus();
 
     if (checkResult.status === 'ready') {
+      setLoadingProgress(100);
       setStatus('ready');
-      setMessage('Veritabanı bağlantısı başarılı ✓');
-      onReady?.();
-      setTimeout(() => setVisible(false), 3000);
+      setMessage('Veritabanı bağlantısı başarılı. Sistem başlatılıyor.');
+      setTimeout(() => {
+        onReady?.();
+        setVisible(false);
+      }, 1500);
       return;
     }
 
+    setLoadingProgress(30);
     setStatus('error');
-    setMessage(checkResult.message || 'Bağlantı hatası');
+    setMessage(checkResult.message || 'Sunucuya ulaşılamadı. Manuel yapılandırma gerekiyor.');
 
-    // Mevcut config'i forma doldur
     const cfg = getCouchDbConfig();
     setCfgUrl(cfg.url || '');
     setCfgUser(cfg.user || '');
     setCfgPass(cfg.password || '');
+    setShowConfig(true);
   };
 
   useEffect(() => { queueMicrotask(() => runInit()); }, []);
@@ -73,142 +81,166 @@ export function DbSetupBanner({ onReady }: DbSetupBannerProps) {
   const handleSaveConfig = async () => {
     if (!cfgUrl.trim()) return;
     setCfgSaving(true);
+    setLoadingProgress(50);
     setCouchDbConfig({ url: cfgUrl.trim(), user: cfgUser.trim(), password: cfgPass });
-    // Bağlantıyı test et
-    const result = await testCouchDbConnection();
-    setCfgSaving(false);
-    if (result.ok) {
-      setStatus('ready');
-      setMessage('Veritabanı bağlantısı başarılı ✓');
-      setShowConfig(false);
-      onReady?.();
-      // Sayfayı yenile — yeni config ile sync başlasın
-      setTimeout(() => location.reload(), 1200);
-    } else {
-      setMessage(result.error || 'Bağlantı kurulamadı');
-    }
+    
+    setTimeout(async () => {
+      const result = await testCouchDbConnection();
+      setCfgSaving(false);
+      if (result.ok) {
+        setLoadingProgress(100);
+        setStatus('ready');
+        setMessage('Bağlantı kuruldu! Sistem ayağa kalkıyor.');
+        setShowConfig(false);
+        onReady?.();
+        setTimeout(() => location.reload(), 1200);
+      } else {
+        setLoadingProgress(30);
+        setMessage(result.error || 'Girdiğiniz bilgilerle bağlantı kurulamadı.');
+      }
+    }, 800);
   };
 
   if (dismissed || !visible) return null;
 
-  const colorMap: Record<DbInitStatus, { bg: string; border: string; icon: React.ReactNode; textColor: string }> = {
-    idle:        { bg: 'bg-secondary/60',      border: 'border-border/30',       icon: <Database className="w-4 h-4 text-muted-foreground" />,           textColor: 'text-muted-foreground' },
-    checking:    { bg: 'bg-blue-500/10',        border: 'border-blue-500/20',     icon: <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />,       textColor: 'text-blue-400' },
-    setup_needed:{ bg: 'bg-amber-500/10',       border: 'border-amber-500/20',    icon: <Database className="w-4 h-4 text-amber-400" />,                  textColor: 'text-amber-400' },
-    setting_up:  { bg: 'bg-amber-500/10',       border: 'border-amber-500/20',    icon: <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />,      textColor: 'text-amber-400' },
-    ready:       { bg: 'bg-emerald-500/10',     border: 'border-emerald-500/20',  icon: <CheckCircle2 className="w-4 h-4 text-emerald-400" />,            textColor: 'text-emerald-400' },
-    error:       { bg: 'bg-red-500/10',         border: 'border-red-500/20',      icon: <AlertTriangle className="w-4 h-4 text-red-400" />,               textColor: 'text-red-400' },
-  };
-
-  const c = colorMap[status];
-
   return (
     <AnimatePresence>
       <motion.div
-        key="db-setup-banner"
-        initial={{ opacity: 0, y: -12 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -12 }}
-        transition={{ duration: 0.25 }}
-        className={`fixed top-0 left-0 right-0 z-[200] ${c.bg} border-b ${c.border}`}
+        key="db-setup-wizard"
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 1.05, filter: 'blur(10px)' }}
+        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/80 backdrop-blur-xl p-4 sm:p-6"
       >
-        {/* Ana satır */}
-        <div className="px-4 py-2 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            {c.icon}
-            <span className={`text-xs font-medium ${c.textColor} truncate`}>
-              {message}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            {status === 'error' && (
-              <>
-                <button
-                  onClick={() => setShowConfig(v => !v)}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/20 transition-all active:scale-95"
-                >
-                  <Settings className="w-3 h-3" />
-                  {showConfig ? 'Kapat' : 'Ayarla'}
-                </button>
-                <button
-                  onClick={runInit}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium bg-white/5 hover:bg-white/10 text-foreground/60 border border-border transition-all active:scale-95"
-                >
-                  <RefreshCw className="w-3 h-3" />
-                  Tekrar Dene
-                </button>
-              </>
-            )}
-            {(status === 'ready' || status === 'error') && (
-              <button
-                onClick={() => setDismissed(true)}
-                className="p-1 rounded-lg hover:bg-white/10 text-muted-foreground/50 transition-all active:scale-95"
-                title="Kapat"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Inline CouchDB yapılandırma formu */}
-        <AnimatePresence>
-          {showConfig && status === 'error' && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden border-t border-red-500/20 bg-black/40 px-4 py-3"
-            >
-              <p className="text-[10px] text-red-400/80 mb-2 font-semibold uppercase tracking-wider">CouchDB Bağlantı Ayarları</p>
-              <div className="flex flex-wrap gap-2 items-end">
-                <div className="flex-1 min-w-[180px]">
-                  <input
-                    type="text"
-                    value={cfgUrl}
-                    onChange={e => setCfgUrl(e.target.value)}
-                    placeholder="http://localhost:5984"
-                    className="w-full bg-black/60 text-foreground text-xs px-3 py-2 rounded-lg border border-border focus:outline-none focus:border-red-500/50"
-                  />
+        <motion.div className="relative w-full max-w-2xl bg-black border border-white/10 rounded-3xl shadow-2xl overflow-hidden ring-1 ring-white/5">
+          {/* Arka plan parıltısı */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[300px] bg-blue-500/20 blur-[120px] rounded-full pointer-events-none" />
+          
+          <div className="relative p-8 sm:p-10 flex flex-col gap-6">
+            
+            {/* Üst Kısım: İkon ve Durum */}
+            <div className="flex items-center gap-5">
+              <div className="relative">
+                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center border shadow-inner transition-colors duration-500 ${
+                  status === 'checking' ? 'bg-blue-500/10 border-blue-500/20 shadow-blue-500/20' :
+                  status === 'error' ? 'bg-red-500/10 border-red-500/20 shadow-red-500/20' :
+                  'bg-emerald-500/10 border-emerald-500/20 shadow-emerald-500/20'
+                }`}>
+                  {status === 'checking' && <Server className="w-8 h-8 text-blue-400 animate-pulse" />}
+                  {status === 'error' && <AlertTriangle className="w-8 h-8 text-red-500" />}
+                  {status === 'ready' && <ShieldCheck className="w-8 h-8 text-emerald-400" />}
                 </div>
-                <div className="w-28">
-                  <input
-                    type="text"
-                    value={cfgUser}
-                    onChange={e => setCfgUser(e.target.value)}
-                    placeholder="Kullanıcı"
-                    className="w-full bg-black/60 text-foreground text-xs px-3 py-2 rounded-lg border border-border focus:outline-none focus:border-red-500/50"
-                  />
-                </div>
-                <div className="w-32 relative">
-                  <input
-                    type={showPass ? 'text' : 'password'}
-                    value={cfgPass}
-                    onChange={e => setCfgPass(e.target.value)}
-                    placeholder="Şifre"
-                    className="w-full bg-black/60 text-foreground text-xs px-3 py-2 pr-8 rounded-lg border border-border focus:outline-none focus:border-red-500/50"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPass(v => !v)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground/70"
-                  >
-                    {showPass ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                  </button>
-                </div>
-                <button
-                  onClick={handleSaveConfig}
-                  disabled={cfgSaving || !cfgUrl.trim()}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-foreground text-xs font-bold rounded-lg transition-colors disabled:opacity-50"
-                >
-                  {cfgSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-                  Kaydet & Test Et
-                </button>
+                {status === 'checking' && (
+                  <div className="absolute -inset-1 rounded-2xl border-2 border-blue-500/30 animate-[spin_3s_linear_infinite]" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 10%, 0 10%)' }} />
+                )}
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              <div className="flex-1">
+                <h2 className="text-2xl font-black text-white tracking-tight">Sistem Başlatılıyor</h2>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <span className={`text-sm font-medium ${status === 'error' ? 'text-red-400' : 'text-blue-300'}`}>{message}</span>
+                </div>
+              </div>
+              {(status === 'error' && !showConfig) && (
+                <button onClick={() => setDismissed(true)} className="p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-all"><X className="w-5 h-5 text-muted-foreground hover:text-white" /></button>
+              )}
+            </div>
+
+            {/* İlerleme Çubuğu */}
+            <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden relative">
+              <motion.div 
+                className={`absolute top-0 left-0 h-full rounded-full transition-all duration-700 ease-out ${
+                  status === 'error' ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' :
+                  status === 'ready' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' :
+                  'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]'
+                }`}
+                initial={{ width: 0 }}
+                animate={{ width: `${loadingProgress}%` }}
+              />
+            </div>
+
+            {/* Hata Durumu & Konfigürasyon Modülü */}
+            <AnimatePresence mode="popLayout">
+              {showConfig && status === 'error' && (
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 15 }}
+                  className="bg-white/[0.03] rounded-2xl p-6 border border-white/10 mt-2 relative overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-red-500/5 pointer-events-none" />
+                  
+                  <h3 className="text-sm font-bold text-gray-200 mb-5 flex items-center gap-2">
+                    <Settings className="w-4 h-4 text-red-400" /> Bağlantı Ayarları
+                  </h3>
+                  
+                  <div className="space-y-4 relative z-10">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-1">Sunucu URL</label>
+                      <input
+                        type="text"
+                        value={cfgUrl}
+                        onChange={e => setCfgUrl(e.target.value)}
+                        placeholder="Örn: http://localhost:5984"
+                        className="w-full bg-black/60 text-white text-sm px-4 py-3 rounded-xl border border-white/10 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-mono"
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-1">Kullanıcı Adı</label>
+                        <input
+                          type="text"
+                          value={cfgUser}
+                          onChange={e => setCfgUser(e.target.value)}
+                          placeholder="admin"
+                          className="w-full bg-black/60 text-white text-sm px-4 py-3 rounded-xl border border-white/10 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-mono"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-1">Şifre</label>
+                        <div className="relative">
+                          <input
+                            type={showPass ? 'text' : 'password'}
+                            value={cfgPass}
+                            onChange={e => setCfgPass(e.target.value)}
+                            placeholder="******"
+                            className="w-full bg-black/60 text-white text-sm px-4 py-3 pr-10 rounded-xl border border-white/10 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-mono"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPass(v => !v)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-gray-300 transition-colors"
+                          >
+                            {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex justify-end gap-3 relative z-10">
+                    <button 
+                      onClick={runInit} 
+                      className="px-5 py-2.5 text-sm font-bold text-gray-400 hover:text-white transition-colors"
+                    >
+                      Yeniden Dene
+                    </button>
+                    <button
+                      onClick={handleSaveConfig}
+                      disabled={cfgSaving || !cfgUrl.trim()}
+                      className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-xl transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)] disabled:opacity-50 disabled:shadow-none active:scale-95"
+                    >
+                      {cfgSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />}
+                      Bağlan ve Test Et
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+          </div>
+        </motion.div>
       </motion.div>
     </AnimatePresence>
   );

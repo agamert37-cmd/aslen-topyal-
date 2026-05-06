@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid';
 /**
  * UBL-TR 1.2 XML Üretici — GİB e-Fatura / e-Arşiv standardı
  *
@@ -17,7 +18,7 @@
  */
 
 export interface UBLFaturaData {
-  faturaUUID: string;       // UUID v4 (e.g. crypto.randomUUID())
+  faturaUUID: string;       // UUID v4 (e.g. uuidv4())
   faturaNo: string;         // e.g. "EAF2026000001234"
   tarih: string;            // "2026-03-20"
   saat: string;             // "14:30:00"
