@@ -74,7 +74,7 @@ export function IcebergPage() {
 
   const generateId = () => {
     try {
-      if (crypto && crypto.randomUUID) return uuidv4();
+      if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return uuidv4();
     } catch(e) {}
     return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).substr(2, 9);
   };

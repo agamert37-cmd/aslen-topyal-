@@ -20,6 +20,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getDb } from '../lib/pouchdb';
+import { validateDoc } from '../lib/schemas';
+import { restoreRevision } from '../lib/db-revisions';
 import { setInStorage } from '../utils/storage';
 import { toast } from 'sonner';
 import { broadcastTableChange, onBroadcastMessage } from '../lib/broadcast-sync';
@@ -387,7 +389,8 @@ export function useTableSync<T extends { id: string }>(
 
   // ─── CRUD — Optimistik güncelleme ──────────────────────────────────────────
 
-  const addItem = useCallback(async (item: T): Promise<T> => {
+  const addItem = useCallback(async (rawItem: T): Promise<T> => {
+    const item = validateDoc<T>(tableName, rawItem);
     // Optimistik ekleme
     mutateData(prev => [item, ...prev]);
 
@@ -442,7 +445,7 @@ export function useTableSync<T extends { id: string }>(
           existing = await db.get(id);
         } catch {
           // Doc yok — oluştur (oldItem zorunlu değil, updates'ten oluştur)
-          const merged = { ...(oldItem ?? {}), ...(updates as any), id };
+          const merged = validateDoc<T>(tableName, { ...(oldItem ?? {}), ...(updates as any), id });
           const dbRow = toDbRef.current ? toDbRef.current(merged as T) : merged;
           await db.put({ ...dbRow, _id: id });
           return;
@@ -450,7 +453,8 @@ export function useTableSync<T extends { id: string }>(
 
         const cleaned = cleanDoc(existing);
         const currentItem = fromDbRef.current ? fromDbRef.current(cleaned) : cleaned as T;
-        const merged = { ...currentItem, ...updates };
+        const rawMerged = { ...currentItem, ...updates };
+        const merged = validateDoc<T>(tableName, rawMerged);
         const dbRow = toDbRef.current ? toDbRef.current(merged) : merged;
         await db.put({ ...dbRow, _id: id, _rev: existing._rev });
         broadcastTableChange(tableName, 'update');
@@ -489,9 +493,23 @@ export function useTableSync<T extends { id: string }>(
     try {
       const db = getDb(tableName);
       const doc = await db.get(id);
+      const revBeforeDelete = doc._rev; // Geri alabilmek için
       await db.remove(doc);
       broadcastTableChange(tableName, 'delete');
       logChange(tableName, id, 'delete', 'system').catch(() => {});
+      
+      // Geri Alma Toast
+      toast('Kayıt silindi', {
+        duration: 8000,
+        action: {
+          label: 'Geri Al (Undo)',
+          onClick: () => {
+            restoreRevision(tableName, id, revBeforeDelete).then(success => {
+              if (success) fetchData(true);
+            });
+          }
+        }
+      });
     } catch (e: any) {
       if (e.status !== 404) {
         console.error(`[deleteItem] ${tableName}:`, e.message);
@@ -501,7 +519,7 @@ export function useTableSync<T extends { id: string }>(
         }
       }
     }
-  }, [tableName, mutateData]);
+  }, [tableName, mutateData, fetchData]);
 
   const batchUpdate = useCallback(async (
     updates: Array<{ id: string; changes: Partial<T> }>
@@ -531,7 +549,8 @@ export function useTableSync<T extends { id: string }>(
       const docs = updates.map(u => {
         const row = existing.rows.find((r: any) => r.id === u.id && !r.error) as any;
         const old = oldItems.get(u.id) || {} as any;
-        const merged = { ...old, ...u.changes };
+        const mergedRaw = { ...old, ...u.changes };
+        const merged = validateDoc<T>(tableName, mergedRaw);
         const dbRow = toDbRef.current ? toDbRef.current(merged) : merged;
         // _rev sadece mevcut doc varsa eklenir — yoksa insert olarak davranılır (conflict önleme)
         return {

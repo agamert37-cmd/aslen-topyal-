@@ -189,26 +189,8 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    
-    // Serve static files with standard headers, but tell the browser NOT to cache index.html
-    const setCustomCacheControl = (res: any, path: string) => {
-      if (path.endsWith("index.html") || path.endsWith("sw.js")) {
-        // Prevent caching for index.html and service worker
-        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-        res.setHeader("Pragma", "no-cache");
-        res.setHeader("Expires", "0");
-      } else {
-        // Cache assets (js, css, etc.) for a long time since they have hash in filenames
-        res.setHeader("Cache-Control", "public, max-age=31536000");
-      }
-    };
-
-    app.use(express.static(distPath, { setHeaders: setCustomCacheControl }));
-    
+    app.use(express.static(distPath));
     app.get("*", (req, res) => {
-      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-      res.setHeader("Pragma", "no-cache");
-      res.setHeader("Expires", "0");
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
@@ -219,7 +201,7 @@ async function startServer() {
     res.status(500).json({ error: "Sunucu içi bir hata oluştu, ancak sunucu çalışmaya devam ediyor." });
   });
 
-  app.listen(PORT, "0.0.0.0", () => {
+  app.listen(Number(PORT), "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }

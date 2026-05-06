@@ -120,7 +120,7 @@ export async function autoResolveConflict(
         Object.keys(d).forEach(k => {
           if (k.startsWith('_')) return; // Dahili alanları geç
           if (d[k] !== undefined && d[k] !== null && d[k] !== '') {
-            baseDoc[k] = d[k];
+            (baseDoc as any)[k] = d[k];
           }
         });
       });

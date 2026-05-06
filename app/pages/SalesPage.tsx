@@ -2002,7 +2002,7 @@ export function SalesPage() {
                         return stock;
                       });
                       
-                      setBaseProductList(updatedStokList);
+                      console.log(updatedStokList);
 
                       // Cari bakiyesini ve işlem geçmişini güncelle
                       if (selectedCari) {

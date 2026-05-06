@@ -1509,7 +1509,7 @@ export function UretimPage() {
     }
 
     setInStorage(StorageKey.STOK_DATA, updatedStok);
-    setStokList(updatedStok);
+    console.log(updatedStok);
 
     // ─── KAYIT KAYDET ──────────────────────────────────────────
     const updatedKayitlar = [newKayit, ...kayitlar];
@@ -1782,7 +1782,7 @@ export function UretimPage() {
       }
 
       setInStorage(StorageKey.STOK_DATA, updatedStok);
-      setStokList(updatedStok);
+      console.log(updatedStok);
       addKayit(newKayit);
       emit('uretim:completed', { kayitId: newKayit.id, inputKg: newKayit.cigKg, outputKg: newKayit.ciktiKg, productName: newKayit.ciktiUrunAdi });
 
@@ -1949,7 +1949,7 @@ export function UretimPage() {
       }
 
       setInStorage(StorageKey.STOK_DATA, updatedStok);
-      setStokList(updatedStok);
+      console.log(updatedStok);
       addKayit(newKayit);
       emit('uretim:completed', { kayitId: newKayit.id, inputKg: newKayit.cigKg, outputKg: newKayit.ciktiKg, productName: newKayit.ciktiUrunAdi });
 

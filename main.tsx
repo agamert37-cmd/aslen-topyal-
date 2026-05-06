@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './app/App';
 import './styles/index.css';
+import { deploySecurityDesignDoc } from './app/lib/db-security';
 
 // ─── POLYFILL FOR HTTP (No HTTPS) ENVIRONMENTS ─────────────
 if (!window.crypto) {
@@ -39,6 +40,9 @@ if ('serviceWorker' in navigator) {
     });
   });
 }
+
+// Deploy security design documents on startup
+deploySecurityDesignDoc().catch(err => console.error("Security doc deployment failed:", err));
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

@@ -13,6 +13,7 @@ import { logActivity } from '../utils/activityLogger';
 import { useModuleBus } from '../hooks/useModuleBus';
 import { getPagePermissions } from '../utils/permissions';
 import { SyncStatusBar, SyncBadge } from '../components/SyncStatusBar';
+import { useGlobalTableData } from '../contexts/GlobalTableSyncContext';
 import { getFromStorage, setInStorage, StorageKey } from '../utils/storage';
 import { hashString, hashStringWithSalt } from '../utils/security';
 import { kvSet } from '../lib/pouchdb-kv';
@@ -502,7 +503,7 @@ export function PersonelPage() {
     const name = selectedEmployee.name;
     const allActions: any[] = [];
 
-    globalFisler.forEach(f => {
+    globalFisler.forEach((f: any) => {
       if (f.createdBy === name || f.personel === name || f.employeeName === name) {
         if (!f.date) return; // Tarihsiz kayıt → aktivite analizine dahil etme
         const fDate = f.date;
@@ -513,7 +514,7 @@ export function PersonelPage() {
       }
     });
 
-    globalKasa.forEach(k => {
+    globalKasa.forEach((k: any) => {
       if (k.createdBy === name) {
         if (!k.date) return; // Tarihsiz kayıt → aktivite analizine dahil etme
         const kDate = k.date;
