@@ -53,6 +53,7 @@ import {
   HelpCircle,
   ShieldAlert,
   Wand2,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router";
@@ -228,7 +229,7 @@ export function OpsCenterPage() {
     });
   };
 
-  const [showFastLogin, setShowFastLogin] = useState(false);
+  const [showFastLogin, setShowFastLogin] = useState(() => !!localStorage.getItem("ops_system_pin"));
   const [fastPin, setFastPin] = useState("");
 
   const handleFastLogin = (e: React.FormEvent) => {
@@ -494,37 +495,10 @@ Eğer kod çalıştırmana gerek yoksa (sadece cevap veriyorsan), repair_action 
     if (buildLogRef.current) buildLogRef.current.scrollTop = buildLogRef.current.scrollHeight;
   }, [buildLogs]);
 
-  const simulateBuild = () => {
-    if(isBuilding) return;
-    setIsBuilding(true);
-    setBuildLogs(['> vite build', '> info Derleme süreci başlatıldı...']);
-    
-    setTimeout(() => setBuildLogs(p => [...p, "➜ NPM paketleri kontrol ediliyor..."]), 800);
-    setTimeout(() => setBuildLogs(p => [...p, "✔ NPM modülleri güncel."]), 1500);
-    setTimeout(() => setBuildLogs(p => [...p, "➜ TypeScript tipi kontrolü yapılıyor (tsc --noEmit)..."]), 2000);
-    setTimeout(() => setBuildLogs(p => [...p, "✔ TS analizi başarılı."]), 2800);
-    setTimeout(() => setBuildLogs(p => [...p, "➜ Vite ile production bundle oluşturuluyor..."]), 3100);
-    
-    setTimeout(() => setBuildLogs(p => [...p, "dist/index.html                     0.50 kB │ gzip:  0.31 kB", "dist/assets/index-Bf_r-QyV.css       35.40 kB │ gzip:  7.45 kB", "dist/assets/index-DYM8Z_qY.js     1,061.21 kB │ gzip: 338.99 kB"]), 5000);
-    
-    setTimeout(() => {
-      setBuildLogs(p => [...p, "✔ Build başarılı! Yeni sürüm yayına hazır.", "Sunucuya (Docker/Host) restart sinyali gönderiliyor..."]);
-      setTimeout(() => {
-         toast.success("Derleme Başarılı! Sistem güncellendi.");
-         setIsBuilding(false);
-      }, 500);
-    }, 6000);
-  };
+
 
   const simulateDockerRestart = () => {
-     setDockerStatus("Yeniden Başlatılıyor...");
-     setDockerLogs(p => [...p, "> docker-compose restart api web", "Restarting api ...", "Restarting web ..."]);
-     
-     setTimeout(() => setDockerLogs(p => [...p, "api restarted", "web restarted", "Konteynerler hizmete alındı."]), 2000);
-     setTimeout(() => {
-        setDockerStatus("Aktif");
-        toast.success("Docker servisleri yeniden başlatıldı.");
-     }, 2200);
+    handleUpdateStart();
   };
 
   const [sysConfig, setSysConfig] = useState({
@@ -592,7 +566,6 @@ Eğer kod çalıştırmana gerek yoksa (sadece cevap veriyorsan), repair_action 
   }, [aiHistory, activeTab]);
 
   const executeAiCommand = async (command: string) => {
-     if (!window.electronAPI?.isElectron) return;
      toast.info("Komut çalıştırılıyor...");
      const res = await runHostCommand(command);
      if (res.success) {
@@ -615,29 +588,33 @@ Eğer kod çalıştırmana gerek yoksa (sadece cevap veriyorsan), repair_action 
     setAiHistory(prev => [...prev, { role: "user", text: userPrompt }]);
 
     try {
-      if (!window.electronAPI?.isElectron) {
-         setAiHistory(prev => [...prev, { role: "ass", text: "Hata: Karargah uygulaması sadece Electron altyapısında çalışır. Web üzerinde AI özelliklerini çağıramazsınız." }]);
-         return;
-      }
       setAiHistory(prev => [...prev, { role: "ass", text: "Düşünüyor..." }]);
-      const systemPrompt = `Sen Karargah Operasyon Merkezi AI asistanısın. Kullanıcının bilgisayarında "Electron" masaüstü uygulaması olarak çalışıyorsun. \
+      const systemPrompt = `Sen Karargah Operasyon Merkezi AI asistanısın. Kullanıcının bilgisayarında "Electron" masaüstü VEYA güçlü bir full-stack web ortamında çalışıyorsun. \
 Eğer kullanıcı sistem hakkında, veriler hakkında veya makineyi yönetecek komutlar (sh, bash vb.) isterse, sen açıklama yapabilirsin. \
 GEREKTİĞİNDE LÜTFEN BİR SHELL KOMUTUNU \`\`\`bash veya \`\`\`cmd bloğu içinde ver. Uygulama bu bloğu arayüze ÇALIŞTIR butonu olarak çizecek. \
 Kullanıcı sorusu: ${userPrompt}`;
-      const res = await window.electronAPI.askAi(systemPrompt);
-      if (res.success) {
-         setAiHistory(prev => {
-           const newHist = [...prev];
-           newHist[newHist.length - 1] = { role: "ass", text: res.text || "" };
-           return newHist;
-         });
+      
+      let aiResponseText = "";
+      
+      if (window.electronAPI?.isElectron) {
+          const res = await window.electronAPI.askAi(systemPrompt);
+          if (res.success) { aiResponseText = res.text || ""; }
+          else { throw new Error(res.message); }
       } else {
-         setAiHistory(prev => {
-           const newHist = [...prev];
-           newHist[newHist.length - 1] = { role: "ass", text: `Hata: ${res.message}` };
-           return newHist;
-         });
+          try {
+             const chatgpt = await import("../../lib/chatgpt-assistant");
+             aiResponseText = await chatgpt.chatWithGemini([], systemPrompt);
+          } catch(e:any) {
+             throw new Error("AI Modülü yüklenemedi: " + e.message);
+          }
       }
+
+      setAiHistory(prev => {
+        const newHist = [...prev];
+        newHist[newHist.length - 1] = { role: "ass", text: aiResponseText };
+        return newHist;
+      });
+
     } catch (err: any) {
          setAiHistory(prev => {
            const newHist = [...prev];
@@ -867,15 +844,7 @@ Kullanıcı sorusu: ${userPrompt}`;
   }, []);
 
   const handleUpdateStart = () => {
-    // Electron API kontrolü
-    if (window.electronAPI?.isElectron) {
-      (window.electronAPI as any).send("run-update");
-      setShowUpdateOverlay(true);
-    } else {
-      toast.error(
-        "Güncelleme özelliği şu an sadece Masaüstü (Electron) uygulamasında aktiftir.",
-      );
-    }
+    setShowUpdateOverlay(true);
   };
 
   const handleSaveMessages = async () => {
@@ -986,32 +955,12 @@ Kullanıcı sorusu: ${userPrompt}`;
     if (!isLocked) checkUpdates();
   }, [isLocked]);
 
-  const handleDockerUpdate = async () => {
-    if (
-      !confirm(
-        "Sistem GitHub üzerinden çekilip, servisler baştan derlenecek (Kısa bir kesinti yaşanabilir). Onaylıyor musunuz?",
-      )
-    )
-      return;
-    setMachineLoading(true);
-    setDockerLog(
-      "Git pull ve kurulum çalıştırılıyor... Lütfen bekleyin...",
-    );
-    try {
-      const res = await runHostUpdate((opsConfig as any).githubUrl || '');
-      if (res.success) {
-        toast.success("Güncelleme ve Yeniden Başlatma başarılı.");
-        setDockerLog(res.log);
-      } else {
-        toast.error("İşlem sırasında hata oluştu!");
-        setDockerLog("HATA: " + res.log);
-      }
-    } catch (e: any) {
-      toast.error("Beklenmeyen Hata: " + e.message);
-      setDockerLog(e.message);
-    } finally {
-      setMachineLoading(false);
-    }
+  const handleDockerUpdate = () => {
+    handleUpdateStart();
+  };
+
+  const simulateBuild = () => {
+    handleUpdateStart();
   };
 
   const handleTestConnection = useCallback(async () => {
@@ -1066,22 +1015,31 @@ Kullanıcı sorusu: ${userPrompt}`;
     }
   };
 
+  const [isTestingTelegram, setIsTestingTelegram] = useState(false);
+
   const testTelegram = async () => {
     if (!telCfg.token || !telCfg.chatId) {
       toast.error("Önce token ve chat ID girin");
       return;
     }
+    setIsTestingTelegram(true);
     const msg = encodeURIComponent(
-      `🤖 Operasyon Merkezi\nTest başarılı!\nZaman: ${new Date().toLocaleString("tr-TR")}`,
+      `🤖 Karargah Operasyon Merkezi\n\n✅ Sistem yapılandırması doğrulandı.\nZaman: ${new Date().toLocaleString("tr-TR")}`
     );
     try {
       const res = await fetch(
-        `https://api.telegram.org/bot${telCfg.token}/sendMessage?chat_id=${telCfg.chatId}&text=${msg}`,
+        `https://api.telegram.org/bot${telCfg.token}/sendMessage?chat_id=${telCfg.chatId}&text=${msg}`
       );
-      if (res.ok) toast.success("Test mesajı gönderildi!");
-      else toast.error("Telegram Hatası: " + res.statusText);
+      if (res.ok) {
+        toast.success("Bağlantı başarılı! Telegram test mesajı gönderildi.", { duration: 4000 });
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        toast.error(`Telegram Hatası: ${errorData.description || res.statusText || 'Bilinmeyen hata'}`);
+      }
     } catch (e) {
-      toast.error("Ağ hatası: " + e);
+      toast.error("Ağ hatası veya Telegram APISi engellendi: " + e);
+    } finally {
+      setIsTestingTelegram(false);
     }
   };
 
@@ -1119,24 +1077,82 @@ Kullanıcı sorusu: ${userPrompt}`;
   };
 
   const TABS = [
-    { key: "dashboard", label: "Genel Bakış", icon: Activity },
-    { key: "updates", label: "Sistem", icon: Sparkles },
-    { key: "sessions", label: "Canlı Ağ", icon: Eye },
-    { key: "users", label: "Loglar", icon: Users },
-    { key: "server", label: "Veritabanı", icon: Database },
-    { key: "admin", label: "Yönetim", icon: Shield },
-    { key: "terminal", label: "Terminal", icon: Terminal },
-    { key: "site", label: "Site İzleme", icon: Globe },
-    { key: "docker", label: "Docker & Build", icon: Server },
-    { key: "ai", label: "AI Asistan", icon: Wand2 },
+    { key: "dashboard", label: "GENEL BAKIŞ", icon: Activity },
+    { key: "sessions", label: "CANLI AĞ", icon: Eye },
+    { key: "users", label: "OLAY LOGLARI", icon: Users },
+    { key: "server", label: "VERİTABANI", icon: Database },
+    { key: "updates", label: "SİSTEM", icon: Sparkles },
+    { key: "docker", label: "DOCKER & BUILD", icon: Server },
+    { key: "site", label: "SİTE İZLEME", icon: Globe },
+    { key: "terminal", label: "TERMİNAL", icon: Terminal },
+    { key: "ai", label: "YAPAY ZEKA", icon: Wand2 },
+    { key: "admin", label: "YÖNETİM", icon: Shield },
   ] as const;
   type TabKey = typeof TABS[number]["key"];
 
   if (isLocked) {
+    const isFirstSetup = !localStorage.getItem("ops_system_pin");
+
+    if (isFirstSetup) {
+      return (
+        <div className="fixed inset-0 z-50 bg-[#0f172a] text-emerald-400 font-mono flex flex-col items-center justify-center p-4">
+           {/* FIRST SETUP SCREEN */}
+           <div className="bg-black/50 p-6 rounded-xl border border-blue-500/30 w-full max-w-md backdrop-blur-sm shadow-2xl relative overflow-hidden z-20">
+              <div className="absolute top-0 left-0 w-full h-1 bg-blue-500/50 blur-sm"></div>
+              
+              <div className="flex flex-col items-center justify-center mb-6">
+                 <Shield className="w-16 h-16 text-blue-500 mb-2" />
+                 <h2 className="text-blue-500 font-bold text-center text-lg uppercase tracking-widest">Karargah İlk Kurulum</h2>
+                 <p className="text-xs text-blue-100/80 text-center mt-3 leading-relaxed border border-blue-500/30 p-3 rounded-lg bg-blue-500/5">
+                   <strong className="text-blue-400">Hoş geldiniz.</strong> Karargah, sisteminizin kalbidir. 
+                   <br/><br/>
+                   <span className="opacity-90 text-[11px]">
+                     1. Devam edebilmek için <strong className="text-blue-300">Hızlı Giriş Şifresi (PIN)</strong> belirlemeniz zorunludur.
+                     <br/>
+                     2. Telegram entegrasyonu tamamen opsiyoneldir. Dilerseniz sonradan Ayarlar sekmesinden yapabilirsiniz.
+                   </span>
+                 </p>
+              </div>
+
+              <div className="flex flex-col gap-5">
+                 <div className="flex flex-col gap-1">
+                   <label className="text-xs text-blue-400/70 ml-1 font-bold">Yeni Hızlı Giriş PIN Belirle</label>
+                   <input 
+                     type="password" 
+                     autoComplete="off"
+                     autoFocus
+                     value={fastPin}
+                     onChange={e => setFastPin(e.target.value)}
+                     className="bg-black/80 text-blue-400 border border-blue-500/50 p-3 rounded-lg focus:outline-none focus:border-blue-500 placeholder-blue-500/20 tracking-widest font-bold font-mono text-center text-2xl"
+                     placeholder="****"
+                     maxLength={8}
+                   />
+                 </div>
+                 
+                 <div className="flex gap-3 mt-2">
+                   <button 
+                     onClick={() => {
+                       if(fastPin.length < 4) { toast.error("Şifre en az 4 haneli olmalıdır."); return; }
+                       localStorage.setItem("ops_system_pin", fastPin);
+                       setIsLocked(false);
+                       sessionStorage.setItem("ops_center_verified", "true");
+                       toast.success("İlk kurulum tamamlandı! Karargaha giriş yapıldı.");
+                       setShowFastLogin(true); // default to fast login on next locked session
+                     }} 
+                     className="flex-1 w-full bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/50 p-3 rounded-xl font-bold transition-all uppercase tracking-widest text-xs"
+                   >
+                     KURULUMU TAMAMLA VE GİRİŞ YAP
+                   </button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      );
+    }
+
     return (
         <div className="fixed inset-0 z-50 bg-[#0f172a] text-emerald-400 font-mono flex flex-col items-center justify-center p-4">
-           
-           {/* Invisible button for Fast Pin Login */}
+           {/* Invisible button to switch to Fast Pin Login if they navigated away */}
            <div 
              className="fixed bottom-0 right-0 w-24 h-24 cursor-default z-[60]"
              onClick={() => {
@@ -1151,9 +1167,11 @@ Kullanıcı sorusu: ${userPrompt}`;
               
               <div className="flex flex-col items-center justify-center mb-6">
                  <ShieldAlert className="w-16 h-16 text-red-500 mb-2" />
-                 <h2 className="text-red-500 font-bold text-center text-lg uppercase tracking-widest">Çoklu Güvenlik Duvarı</h2>
+                 <h2 className="text-red-500 font-bold text-center text-lg uppercase tracking-widest">GÜVENLİK DUVARI</h2>
                  <p className="text-xs text-red-400/80 text-center mt-2">
-                   Karargah kontrol paneline erişim için 3 farklı 16 haneli kod gereklidir. Veya tanımlı ise yetkili PIN ile hızlı giriş yapılabilir.
+                   {showFastLogin 
+                     ? "Karargah terminaline erişmek için Hızlı Giriş Şifrenizi (PIN) girin."
+                     : "Karargah kontrol paneline erişim için Sabit Kod ve Opsiyonel Telegram Kodları gerekir."}
                  </p>
                  {!showFastLogin && (
                    <button onClick={handleSimulateTelegram} className="mt-3 text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30 px-3 py-1.5 rounded-lg flex items-center gap-2 hover:bg-blue-500/30 transition-colors z-30">
@@ -1179,11 +1197,14 @@ Kullanıcı sorusu: ${userPrompt}`;
                    </div>
                    
                    <div className="flex gap-3 mt-2">
-                     <button type="button" onClick={() => setShowFastLogin(false)} className="flex-1 bg-white/5 hover:bg-white/10 text-white border border-white/10 p-3 rounded-lg font-bold transition-all uppercase tracking-widest text-xs">
-                       Geri Dön
+                     <button type="button" onClick={() => setShowFastLogin(false)} className="flex-1 bg-white/5 hover:bg-white/10 text-white border border-white/10 p-3 rounded-lg font-bold transition-all uppercase tracking-widest text-xs hidden">
+                       {/* Hiding the Fallback to 3FA button to make PIN primary */}
+                     </button>
+                     <button type="button" onClick={() => setShowFastLogin(false)} className="w-1/3 bg-white/5 hover:bg-white/10 text-white border border-white/10 p-3 rounded-lg font-bold transition-all uppercase tracking-widest text-[10px]">
+                       3FA İle Gir
                      </button>
                      <button type="submit" className="flex-1 bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-500/50 p-3 rounded-lg font-bold transition-all uppercase tracking-widest text-xs">
-                       GİRİŞ
+                       GİRİŞ YAP
                      </button>
                    </div>
                 </form>
@@ -1203,7 +1224,7 @@ Kullanıcı sorusu: ${userPrompt}`;
                    </div>
                    
                    <div className="flex flex-col gap-1">
-                     <label className="text-xs text-red-400/70 ml-1 font-bold">2. Telegram Kodu (Dinamik)</label>
+                     <label className="text-xs text-red-400/70 ml-1 font-bold">2. Telegram Kodu (Dinamik - Seçmeli)</label>
                      <input 
                        type="password"
                        autoComplete="off" 
@@ -1218,6 +1239,10 @@ Kullanıcı sorusu: ${userPrompt}`;
                    <button type="submit" className="mt-2 bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-500/50 p-4 rounded-lg font-bold transition-all uppercase tracking-widest">
                      DOĞRULA VE GİRİŞ YAP
                    </button>
+                   
+                   <button type="button" onClick={() => setShowFastLogin(true)} className="text-xs text-zinc-500 hover:text-white underline mt-1 text-center">
+                     Hızlı PIN ile giriş yap
+                   </button>
                 </form>
               )}
            </div>
@@ -1226,19 +1251,19 @@ Kullanıcı sorusu: ${userPrompt}`;
   }
 
   return (
-    <div className="h-full flex flex-col bg-zinc-950 text-zinc-100 overflow-hidden font-sans selection:bg-indigo-500/30">
+    <div className="h-full flex flex-col bg-[#050505] text-zinc-100 overflow-hidden font-sans selection:bg-indigo-500/30">
       {/* HEADER & TABS */}
-      <div className="shrink-0 px-8 pt-6 pb-0 border-b border-white/5 bg-zinc-950 flex flex-col gap-6 z-10">
+      <div className="shrink-0 px-8 pt-6 pb-0 border-b border-white/5 bg-[#0a0a0a] flex flex-col gap-6 z-10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              <Command className="w-6 h-6 text-white" />
+            <div className="w-12 h-12 rounded-none bg-gradient-to-br from-indigo-600 to-indigo-900 border border-indigo-500/30 flex items-center justify-center shadow-lg shadow-indigo-500/10">
+              <Command className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white tracking-tight">
+              <h1 className="text-xl font-bold text-white tracking-widest uppercase">
                 KARARGAH GÖSTERGE PANELİ
               </h1>
-              <p className="text-xs text-indigo-400 uppercase font-semibold tracking-widest leading-none mt-1">
+              <p className="text-[10px] text-indigo-400/80 uppercase font-bold tracking-[0.2em] mt-1">
                 Sistem İzleme & Yönetim Merkezi
               </p>
             </div>
@@ -1252,17 +1277,17 @@ Kullanıcı sorusu: ${userPrompt}`;
                  sessionStorage.removeItem("ops_center_verified");
                  toast.success("Sistem başarıyla kilitlendi.");
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-xl hover:bg-rose-500/20 transition-all font-bold text-xs uppercase shadow-[0_0_15px_rgba(244,63,94,0.15)]"
+              className="flex items-center gap-2 px-4 py-2 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-sm hover:bg-rose-500/20 transition-all font-bold text-xs uppercase"
             >
               <Lock className="w-4 h-4" /> Sistemi Kilitle
             </button>
-            <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-white/5 border border-white/10 backdrop-blur-md">
+            <div className="flex items-center gap-2.5 px-4 py-2 rounded-sm bg-white/5 border border-white/10">
               <span className="relative flex h-2.5 w-2.5">
                 <span
-                  className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${connStatus?.ok ? "bg-emerald-400" : "bg-rose-400"}`}
+                  className={`animate-ping absolute inline-flex h-full w-full opacity-75 ${connStatus?.ok ? "bg-emerald-400" : "bg-rose-400"}`}
                 />
                 <span
-                  className={`relative inline-flex rounded-full h-2.5 w-2.5 ${connStatus?.ok ? "bg-emerald-500" : "bg-rose-500"}`}
+                  className={`relative inline-flex h-2.5 w-2.5 ${connStatus?.ok ? "bg-emerald-500" : "bg-rose-500"}`}
                 />
               </span>
               <span className={`text-xs font-bold font-mono tracking-wider ${connStatus?.ok ? 'text-emerald-400' : 'text-rose-400'}`}>
@@ -1273,21 +1298,21 @@ Kullanıcı sorusu: ${userPrompt}`;
         </div>
 
         {/* HORIZONTAL TABS */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-4 scrollbar-hide">
+        <div className="flex items-center gap-1 overflow-x-auto pb-4 scrollbar-hide">
           {TABS.map((t) => {
             const active = activeTab === t.key;
             return (
               <button
                 key={t.key}
                 onClick={() => setActiveTab(t.key as TabKey)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap outline-none ${
+                className={`flex items-center gap-2 px-5 py-2 text-xs font-bold transition-all whitespace-nowrap outline-none uppercase tracking-widest ${
                   active
-                    ? "bg-white text-zinc-950 shadow-md transform scale-[1.02]"
-                    : "bg-transparent text-zinc-400 hover:text-white hover:bg-white/5"
+                    ? "bg-indigo-500/10 text-indigo-400 border-b-2 border-indigo-500"
+                    : "bg-transparent text-zinc-500 hover:text-zinc-300 border-b-2 border-transparent hover:border-white/10 hover:bg-white/5"
                 }`}
               >
                 <t.icon
-                  className={`w-4 h-4 ${active ? "text-indigo-600" : "text-zinc-500"}`}
+                  className={`w-3.5 h-3.5 ${active ? "text-indigo-400" : "text-zinc-600"}`}
                 />
                 {t.label}
               </button>
@@ -1297,16 +1322,16 @@ Kullanıcı sorusu: ${userPrompt}`;
       </div>
 
       {/* BODY */}
-      <div className="flex-1 overflow-y-auto p-8 scrollbar-hide relative bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-fixed" style={{ backgroundColor: '#09090b', backgroundImage: 'radial-gradient(ellipse at top, rgba(79, 70, 229, 0.05), transparent 80%)' }}>
+      <div className="flex-1 overflow-y-auto p-8 scrollbar-hide relative bg-[#050505]">
         <AnimatePresence mode="wait">
           {/* TAB: SESSIONS (LIVE MONITOR) */}
           {activeTab === "sessions" && (
             <motion.div
               key="sessions"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.3 }}
+              initial={{ opacity: 0, y: 10, scale: 0.99 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.99 }}
+              transition={{ duration: 0.2, ease: "circOut" }}
               className="max-w-7xl mx-auto space-y-6"
             >
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1540,10 +1565,10 @@ Kullanıcı sorusu: ${userPrompt}`;
           {activeTab === "admin" && (
             <motion.div
               key="admin"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.3 }}
+              initial={{ opacity: 0, y: 10, scale: 0.99 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.99 }}
+              transition={{ duration: 0.2, ease: "circOut" }}
               className="max-w-7xl mx-auto space-y-6"
             >
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1750,9 +1775,10 @@ Kullanıcı sorusu: ${userPrompt}`;
                       </button>
                       <button
                         onClick={testTelegram}
-                        className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-zinc-100 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2"
+                        disabled={isTestingTelegram}
+                        className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-zinc-100 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2"
                       >
-                        <Play className="w-4 h-4" /> Test
+                        {isTestingTelegram ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />} Test
                       </button>
                     </div>
                   </div>
@@ -1860,10 +1886,10 @@ Kullanıcı sorusu: ${userPrompt}`;
           {activeTab === "updates" && (
             <motion.div
               key="updates"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.3 }}
+              initial={{ opacity: 0, y: 10, scale: 0.99 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.99 }}
+              transition={{ duration: 0.2, ease: "circOut" }}
               className="max-w-5xl mx-auto space-y-6"
             >
               {/* SYSTEM UPDATE CONTROL CARD */}
@@ -2095,10 +2121,10 @@ Kullanıcı sorusu: ${userPrompt}`;
           {activeTab === "dashboard" && (
             <motion.div
               key="dashboard"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.3 }}
+              initial={{ opacity: 0, y: 10, scale: 0.99 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.99 }}
+              transition={{ duration: 0.2, ease: "circOut" }}
               className="max-w-7xl mx-auto space-y-6"
             >
               <div className="flex justify-between items-center mb-2">
@@ -2307,10 +2333,10 @@ Kullanıcı sorusu: ${userPrompt}`;
           {activeTab === "users" && (
             <motion.div
               key="users"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.3 }}
+              initial={{ opacity: 0, y: 10, scale: 0.99 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.99 }}
+              transition={{ duration: 0.2, ease: "circOut" }}
               className="max-w-7xl mx-auto space-y-4"
             >
               <div className="p-8 rounded-3xl bg-zinc-900/50 backdrop-blur-xl border border-white/5 shadow-xl">
@@ -2376,10 +2402,10 @@ Kullanıcı sorusu: ${userPrompt}`;
           {activeTab === "terminal" && (
             <motion.div
               key="terminal"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.3 }}
+              initial={{ opacity: 0, y: 10, scale: 0.99 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.99 }}
+              transition={{ duration: 0.2, ease: "circOut" }}
               className="max-w-4xl mx-auto space-y-6"
             >
               <div className="p-8 rounded-3xl bg-zinc-900/50 backdrop-blur-xl border border-emerald-500/10 shadow-2xl relative overflow-hidden">
@@ -2553,10 +2579,10 @@ Kullanıcı sorusu: ${userPrompt}`;
           {activeTab === "ai" && (
              <motion.div
               key="ai"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.3 }}
+              initial={{ opacity: 0, y: 10, scale: 0.99 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.99 }}
+              transition={{ duration: 0.2, ease: "circOut" }}
               className="w-full flex-1 flex flex-col min-h-0 bg-black/40 rounded-2xl border border-white/5 overflow-hidden font-mono"
             >
                <div className="flex-1 overflow-y-auto p-4 space-y-6" ref={scrollRef}>
@@ -2653,10 +2679,10 @@ Kullanıcı sorusu: ${userPrompt}`;
           {activeTab === "server" && (
             <motion.div
               key="server"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.3 }}
+              initial={{ opacity: 0, y: 10, scale: 0.99 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.99 }}
+              transition={{ duration: 0.2, ease: "circOut" }}
               className="max-w-7xl mx-auto space-y-6"
             >
               {/* DATABASE HEALTH SUMMARY */}
@@ -2715,30 +2741,51 @@ Kullanıcı sorusu: ${userPrompt}`;
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* COUCHDB TEST */}
+                {/* COUCHDB AYARLARI */}
                 <motion.div
                   whileHover={{ scale: 1.01 }}
                   className="p-8 rounded-3xl bg-zinc-900/50 backdrop-blur-xl border border-white/5 shadow-xl"
                 >
                   <h2 className="text-sm font-bold text-zinc-100 mb-4 flex items-center gap-2">
                     <HardDrive className="w-4 h-4 text-emerald-400" /> CouchDB
-                    Bağlantı Testi
+                    Ayarları ve Testi
                   </h2>
                   <div className="space-y-4">
-                    <div className="p-4 rounded-xl bg-black/40 border border-white/5 font-mono text-xs text-zinc-400 shadow-inner">
-                      <p>
-                        <span className="text-zinc-400">URL:</span>{" "}
-                        {couchCfg.url || "Ayarlanmadı"}
-                      </p>
-                      <p>
-                        <span className="text-zinc-400">Kullanıcı:</span>{" "}
-                        {couchCfg.user || "Ayarlanmadı"}
-                      </p>
-                      <p>
-                        <span className="text-zinc-400">Durum:</span>{" "}
+                    <div className="p-4 rounded-xl bg-black/40 border border-white/5 space-y-3 font-mono text-xs text-zinc-400 shadow-inner">
+                      <div>
+                        <label className="text-zinc-500 block mb-1">URL (örn: http://192.168.1.100:5984):</label>
+                        <input 
+                          type="text" 
+                          value={couchCfg.url} 
+                          onChange={(e) => setCouchCfg({ ...couchCfg, url: e.target.value })}
+                          className="w-full bg-black border border-white/10 rounded p-1.5 text-zinc-300 focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <label className="text-zinc-500 block mb-1">Kullanıcı (User):</label>
+                          <input 
+                            type="text" 
+                            value={couchCfg.user} 
+                            onChange={(e) => setCouchCfg({ ...couchCfg, user: e.target.value })}
+                            className="w-full bg-black border border-white/10 rounded p-1.5 text-zinc-300 focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <label className="text-zinc-500 block mb-1">Şifre (Password):</label>
+                          <input 
+                            type="password" 
+                            value={couchCfg.password} 
+                            onChange={(e) => setCouchCfg({ ...couchCfg, password: e.target.value })}
+                            className="w-full bg-black border border-white/10 rounded p-1.5 text-zinc-300 focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                      </div>
+                      <p className="pt-2 border-t border-white/5 mt-2">
+                        <span className="text-zinc-400 font-bold">Durum:</span>{" "}
                         <span
                           className={
-                            connStatus?.ok ? "text-emerald-400" : "text-red-400"
+                            connStatus?.ok ? "text-emerald-400 font-bold" : "text-red-400 font-bold"
                           }
                         >
                           {connStatus?.ok
@@ -2748,6 +2795,15 @@ Kullanıcı sorusu: ${userPrompt}`;
                       </p>
                     </div>
                     <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setCouchDbConfig(couchCfg);
+                          toast.success("CouchDB ayarları kaydedildi. Lütfen sayfayı yenileyiniz veya test ediniz.");
+                        }}
+                        className="px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-500/30 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                      >
+                        <Shield className="w-3.5 h-3.5" /> Kaydet
+                      </button>
                       <button
                         onClick={handleTestConnection}
                         disabled={connTesting}
@@ -2762,6 +2818,7 @@ Kullanıcı sorusu: ${userPrompt}`;
                       </button>
                       <button
                         onClick={handleReSyncAll}
+
                         className="px-4 py-2 bg-white/5 hover:bg-white/10 text-zinc-100 text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
                       >
                         <RefreshCw className="w-3.5 h-3.5" /> Tümünü Yeniden
@@ -3006,10 +3063,10 @@ Kullanıcı sorusu: ${userPrompt}`;
           {activeTab === "site" && (
             <motion.div
               key="site"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.3 }}
+              initial={{ opacity: 0, y: 10, scale: 0.99 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.99 }}
+              transition={{ duration: 0.2, ease: "circOut" }}
               className="w-full h-[calc(100vh-180px)] flex flex-col gap-4"
             >
               <div className="flex bg-zinc-900/50 backdrop-blur-xl border border-white/5 rounded-xl p-4 flex-col overflow-hidden h-full shadow-lg">
@@ -3106,10 +3163,10 @@ Kullanıcı sorusu: ${userPrompt}`;
           {activeTab === "docker" && (
             <motion.div
               key="docker"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.3 }}
+              initial={{ opacity: 0, y: 10, scale: 0.99 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.99 }}
+              transition={{ duration: 0.2, ease: "circOut" }}
               className="w-full"
             >
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

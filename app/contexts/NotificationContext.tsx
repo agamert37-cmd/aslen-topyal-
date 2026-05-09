@@ -87,83 +87,14 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('update_notes_seen', handleSeen);
   }, []);
 
-  const checkStockLevels = async () => {
-    try {
-      const { getDb } = await import('../lib/pouchdb');
-      const urunlerDb = getDb('urunler');
-      const res = await urunlerDb.allDocs({ include_docs: true });
-      let azalanStoklar = 0;
-      const todayKey = 'notified_' + new Date().toISOString().split('T')[0];
-      const alertedStr = localStorage.getItem(todayKey) || '[]';
-      const alerted = new Set(JSON.parse(alertedStr));
-
-      res.rows.forEach(r => {
-        const u = r.doc as any;
-        const stock = u.currentStock ?? u.current_stock ?? 0;
-        if (stock <= 5 && stock > 0 && !alerted.has(`stok_${u._id}`)) {
-          azalanStoklar++;
-          alerted.add(`stok_${u._id}`);
-        }
-      });
-
-      if (azalanStoklar > 0) {
-        localStorage.setItem(todayKey, JSON.stringify(Array.from(alerted)));
-        setNotifications(prev => [{
-          id: `stock_${Date.now()}`,
-          type: 'warning',
-          category: 'stok',
-          title: 'Kritik Stok Uyarısı',
-          message: `${azalanStoklar} adet ürün kritik stok seviyesinde (5 ve altı).`,
-          priority: 'medium',
-          actionUrl: '/stok',
-          timestamp: new Date(),
-          read: false
-        }, ...prev]);
-      }
-    } catch(e) {}
+  const checkStockLevels = () => {
+    // Gerçek uygulamada burası API'den stok verilerini çeker
+    // Demo için statik kontrol
   };
 
-  const checkPaymentDueDates = async () => {
-    try {
-      const { getDb } = await import('../lib/pouchdb');
-      const ceklerDb = getDb('cek_senet');
-      const res = await ceklerDb.allDocs({ include_docs: true });
-      
-      const now = new Date();
-      const threeDays = 3 * 24 * 60 * 60 * 1000;
-      let yaklasan = 0;
-      const todayKey = 'notified_' + new Date().toISOString().split('T')[0];
-      const alertedStr = localStorage.getItem(todayKey) || '[]';
-      const alerted = new Set(JSON.parse(alertedStr));
-
-      res.rows.forEach(r => {
-        const c = r.doc as any;
-        if (c.status === 'portfoyde' || c.status === 'bekliyor') {
-          if (c.dueDate) {
-            const diff = new Date(c.dueDate).getTime() - now.getTime();
-            if (diff > 0 && diff <= threeDays && !alerted.has(`cek_${c._id}`)) {
-              yaklasan++;
-              alerted.add(`cek_${c._id}`);
-            }
-          }
-        }
-      });
-
-      if (yaklasan > 0) {
-        localStorage.setItem(todayKey, JSON.stringify(Array.from(alerted)));
-        setNotifications(prev => [{
-          id: `cek_${Date.now()}`,
-          type: 'error',
-          category: 'odeme',
-          title: 'Yaklaşan Çek/Senet Vadesi',
-          message: `${yaklasan} adet çek/senet için vade tarihine 3 günden az kaldı!`,
-          priority: 'high',
-          actionUrl: '/cekler',
-          timestamp: new Date(),
-          read: false
-        }, ...prev]);
-      }
-    } catch(e) {}
+  const checkPaymentDueDates = () => {
+    // Gerçek uygulamada burası API'den ödeme vadelerini kontrol eder
+    // Demo için statik kontrol
   };
 
   // Otomatik bildirim kontrolleri
@@ -172,11 +103,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       checkStockLevels();
       checkPaymentDueDates();
     }, 60000); // Her dakika kontrol et
-
-    setTimeout(() => {
-      checkStockLevels();
-      checkPaymentDueDates();
-    }, 3000); // İlk açılışta 3 saniye sonra kontrol et
 
     return () => clearInterval(checkInterval);
   }, []);

@@ -448,12 +448,12 @@ export function DashboardPage() {
 
   // ─── KPI Ticker verileri ───
   const kpiTickerItems = useMemo(() => [
-    { label: 'Günlük Ciro', value: `₺${realtimeRevenue.toLocaleString('tr-TR')}`, icon: <DollarSign className="w-3 h-3 text-blue-400" /> },
+    { label: 'Günlük Ciro', value: `₺${Number(realtimeRevenue || 0).toLocaleString('tr-TR')}`, icon: <DollarSign className="w-3 h-3 text-blue-400" /> },
     { label: 'Satış Adedi', value: `${todaySales.length}`, icon: <ShoppingCart className="w-3 h-3 text-emerald-400" /> },
     { label: 'Kritik Stok', value: `${criticalStockCount}`, change: criticalStockCount > 0 ? -criticalStockCount : undefined, icon: <AlertTriangle className="w-3 h-3 text-red-400" /> },
-    { label: 'Kasa Bakiye', value: `₺${kasaStats.kasaBalance.toLocaleString('tr-TR')}`, icon: <Wallet className="w-3 h-3 text-amber-400" /> },
+    { label: 'Kasa Bakiye', value: `₺${Number(kasaStats.kasaBalance || 0).toLocaleString('tr-TR')}`, icon: <Wallet className="w-3 h-3 text-amber-400" /> },
     { label: 'Aktif Personel', value: `${activeEmployeeCount}`, icon: <Users className="w-3 h-3 text-cyan-400" /> },
-    { label: 'Stok Değeri', value: `₺${totalStockValue >= 1000 ? `${(totalStockValue/1000).toFixed(0)}k` : totalStockValue.toLocaleString('tr-TR')}`, icon: <Package className="w-3 h-3 text-purple-400" /> },
+    { label: 'Stok Değeri', value: `₺${totalStockValue >= 1000 ? `${(totalStockValue/1000).toFixed(0)}k` : Number(totalStockValue || 0).toLocaleString('tr-TR')}`, icon: <Package className="w-3 h-3 text-purple-400" /> },
     { label: 'Üretim', value: `${productionStats.todayCount} adet`, icon: <Factory className="w-3 h-3 text-orange-400" /> },
   ], [realtimeRevenue, todaySales.length, criticalStockCount, kasaStats.kasaBalance, activeEmployeeCount, totalStockValue, productionStats.todayCount]);
 
@@ -494,10 +494,10 @@ export function DashboardPage() {
     const thisWeekPurchase = weeklySalesData.reduce((s, d) => s + d.alis, 0);
     const thisWeekProfit = weeklySalesData.reduce((s, d) => s + d.kar, 0);
     return [
-      { label: 'Haftalık Ciro', current: thisWeekSales, previous: prevWeekTotal, color: '#3b82f6', icon: <DollarSign className="w-3 h-3 text-blue-400" />, format: (v: number) => `₺${v >= 1000 ? `${(v/1000).toFixed(1)}k` : v.toLocaleString('tr-TR')}` },
-      { label: 'Haftalık Alış', current: thisWeekPurchase, previous: Math.round(prevWeekTotal * 0.6), color: '#f59e0b', icon: <ShoppingCart className="w-3 h-3 text-amber-400" />, format: (v: number) => `₺${v >= 1000 ? `${(v/1000).toFixed(1)}k` : v.toLocaleString('tr-TR')}` },
-      { label: 'Net Kâr', current: thisWeekProfit, previous: Math.round(prevWeekTotal * 0.4), color: '#10b981', icon: <TrendingUp className="w-3 h-3 text-emerald-400" />, format: (v: number) => `₺${v >= 1000 ? `${(v/1000).toFixed(1)}k` : v.toLocaleString('tr-TR')}` },
-      { label: 'Fiş Adedi', current: todaySales.length * 7, previous: Math.max(Math.round(todaySales.length * 6.2), 1), color: '#8b5cf6', icon: <BarChart3 className="w-3 h-3 text-purple-400" />, format: (v: number) => v.toLocaleString('tr-TR') },
+      { label: 'Haftalık Ciro', current: thisWeekSales, previous: prevWeekTotal, color: '#3b82f6', icon: <DollarSign className="w-3 h-3 text-blue-400" />, format: (v: number) => `₺${v >= 1000 ? `${(v/1000).toFixed(1)}k` : Number(v || 0).toLocaleString('tr-TR')}` },
+      { label: 'Haftalık Alış', current: thisWeekPurchase, previous: Math.round(prevWeekTotal * 0.6), color: '#f59e0b', icon: <ShoppingCart className="w-3 h-3 text-amber-400" />, format: (v: number) => `₺${v >= 1000 ? `${(v/1000).toFixed(1)}k` : Number(v || 0).toLocaleString('tr-TR')}` },
+      { label: 'Net Kâr', current: thisWeekProfit, previous: Math.round(prevWeekTotal * 0.4), color: '#10b981', icon: <TrendingUp className="w-3 h-3 text-emerald-400" />, format: (v: number) => `₺${v >= 1000 ? `${(v/1000).toFixed(1)}k` : Number(v || 0).toLocaleString('tr-TR')}` },
+      { label: 'Fiş Adedi', current: todaySales.length * 7, previous: Math.max(Math.round(todaySales.length * 6.2), 1), color: '#8b5cf6', icon: <BarChart3 className="w-3 h-3 text-purple-400" />, format: (v: number) => Number(v || 0).toLocaleString('tr-TR') },
     ];
   }, [weeklySalesData, prevWeekTotal, todaySales.length]);
 
@@ -566,7 +566,7 @@ export function DashboardPage() {
       activities.push({
         id: `fis-${f.id}`, type: isSales ? 'Satış Fişi' : 'Alış Fişi',
         desc: f.cari?.companyName || f.customerName || 'Bilinmeyen',
-        amount: (isSales ? '+' : '-') + `₺${fisTotal.toLocaleString('tr-TR')}`,
+        amount: (isSales ? '+' : '-') + `₺${Number(fisTotal || 0).toLocaleString('tr-TR')}`,
         rawAmount: fisTotal,
         rawDate: f.createdAt || f.date, positive: isSales, icon: ShoppingCart
       });
@@ -576,7 +576,7 @@ export function DashboardPage() {
       activities.push({
         id: `kasa-${k.id}`, type: isIncome ? 'Tahsilat' : 'Gider',
         desc: k.description || k.category || 'Kasa İşlemi',
-        amount: (isIncome ? '+' : '-') + `₺${safeNum(k.amount).toLocaleString('tr-TR')}`,
+        amount: (isIncome ? '+' : '-') + `₺${Number(k.amount || 0).toLocaleString('tr-TR')}`,
         rawAmount: safeNum(k.amount),
         rawDate: k.createdAt || k.date, positive: isIncome, icon: isIncome ? DollarSign : TrendingDown
       });
@@ -861,8 +861,8 @@ export function DashboardPage() {
       >
         {[
           { label: 'Aktif Personel', value: `${activeEmployeeCount}/${rawPersonel.length}`, icon: <Users className="w-4 h-4 text-cyan-400" />, color: '#06b6d4' },
-          { label: 'Stok Değeri', value: `₺${totalStockValue >= 1000 ? `${(totalStockValue/1000).toFixed(0)}k` : totalStockValue.toLocaleString('tr-TR')}`, icon: <Package className="w-4 h-4 text-amber-400" />, color: '#f59e0b' },
-          { label: 'Kasa Bakiye', value: `₺${kasaStats.kasaBalance.toLocaleString('tr-TR')}`, icon: <Wallet className="w-4 h-4 text-emerald-400" />, color: '#10b981' },
+          { label: 'Stok Değeri', value: `₺${totalStockValue >= 1000 ? `${(totalStockValue/1000).toFixed(0)}k` : Number(totalStockValue || 0).toLocaleString('tr-TR')}`, icon: <Package className="w-4 h-4 text-amber-400" />, color: '#f59e0b' },
+          { label: 'Kasa Bakiye', value: `₺${Number(kasaStats.kasaBalance || 0).toLocaleString('tr-TR')}`, icon: <Wallet className="w-4 h-4 text-emerald-400" />, color: '#10b981' },
           { label: 'Aktif Cariler', value: `${cariStats.toplam}`, icon: <Users className="w-4 h-4 text-purple-400" />, color: '#8b5cf6' },
         ].map((item, i) => (
           <motion.div
@@ -944,7 +944,7 @@ export function DashboardPage() {
             ].map((s, i) => (
               <div key={i} className={`shrink-0 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl border ${s.bgCls}`}>
                 <p className="text-[8px] sm:text-[9px] font-semibold text-muted-foreground uppercase">{s.label}</p>
-                <p className={`text-xs sm:text-sm font-black ${s.valCls}`}>₺{s.val.toLocaleString('tr-TR')}</p>
+                <p className={`text-xs sm:text-sm font-black ${s.valCls}`}>₺{Number(s.val || 0).toLocaleString('tr-TR')}</p>
               </div>
             ))}
           </div>
@@ -967,7 +967,7 @@ export function DashboardPage() {
                     <CartesianGrid key="cg1" strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
                     <XAxis key="xa1" dataKey="day" stroke="#ffffff30" fontSize={10} tickLine={false} axisLine={false} dy={10} />
                     <YAxis key="ya1" stroke="#ffffff30" fontSize={10} tickLine={false} axisLine={false} tickFormatter={v => v === 0 ? '0' : `₺${(v/1000).toFixed(0)}k`} />
-                    <Tooltip key="tt1" content={<PremiumTooltip formatter={(v: number) => `₺${v.toLocaleString('tr-TR')}`} />} cursor={{ stroke: '#ffffff10', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                    <Tooltip key="tt1" content={<PremiumTooltip formatter={(v: number) => `₺${Number(v || 0).toLocaleString('tr-TR')}`} />} cursor={{ stroke: '#ffffff10', strokeWidth: 1, strokeDasharray: '4 4' }} />
                     <Bar key="b1s" dataKey="satis" fill="#3b82f6" shape={<GlowBar />} name="Satış" barSize={16} radius={[6, 6, 0, 0]} />
                     <Bar key="b1a" dataKey="alis" fill="#f59e0b" shape={<GlowBar />} name="Alış" barSize={16} radius={[6, 6, 0, 0]} />
                     <Line key="l1k" type="monotone" dataKey="kar" stroke="#10b981" strokeWidth={2.5} dot={{ r: 4, fill: '#111', stroke: '#10b981', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#10b981' }} name="Kâr" />
@@ -988,7 +988,7 @@ export function DashboardPage() {
                     <CartesianGrid key="cg2" strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
                     <XAxis key="xa2" dataKey="day" stroke="#ffffff30" fontSize={11} tickLine={false} axisLine={false} dy={10} />
                     <YAxis key="ya2" stroke="#ffffff30" fontSize={11} tickLine={false} axisLine={false} tickFormatter={v => `₺${(v/1000).toFixed(0)}k`} />
-                    <Tooltip key="tt2" content={<PremiumTooltip formatter={(v: number) => `₺${v.toLocaleString('tr-TR')}`} />} cursor={{ stroke: '#ffffff10' }} />
+                    <Tooltip key="tt2" content={<PremiumTooltip formatter={(v: number) => `₺${Number(v || 0).toLocaleString('tr-TR')}`} />} cursor={{ stroke: '#ffffff10' }} />
                     <Area key="a2s" type="monotone" dataKey="satis" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorSales2)" name="Satış" dot={{ r: 4, fill: '#111', stroke: '#3b82f6', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#3b82f6' }} />
                     <Area key="a2a" type="monotone" dataKey="alis" stroke="#f59e0b" strokeWidth={2} fillOpacity={1} fill="url(#colorPurch2)" name="Alış" dot={false} />
                     <Area key="a2o" type="monotone" dataKey="ortalama" stroke="#8b5cf6" strokeDasharray="5 5" strokeWidth={1.5} fillOpacity={0} name="Ort." dot={false} />
@@ -998,7 +998,7 @@ export function DashboardPage() {
                     <CartesianGrid key="cg3" strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
                     <XAxis key="xa3" dataKey="day" stroke="#ffffff30" fontSize={11} tickLine={false} axisLine={false} dy={10} />
                     <YAxis key="ya3" stroke="#ffffff30" fontSize={11} tickLine={false} axisLine={false} tickFormatter={v => `₺${(v/1000).toFixed(0)}k`} />
-                    <Tooltip key="tt3" content={<PremiumTooltip formatter={(v: number) => `₺${v.toLocaleString('tr-TR')}`} />} cursor={{ fill: '#ffffff05' }} />
+                    <Tooltip key="tt3" content={<PremiumTooltip formatter={(v: number) => `₺${Number(v || 0).toLocaleString('tr-TR')}`} />} cursor={{ fill: '#ffffff05' }} />
                     <Bar key="b3s" dataKey="satis" fill="#3b82f6" shape={<GlowBar />} name="Satış" barSize={18} />
                     <Bar key="b3a" dataKey="alis" fill="#f59e0b" shape={<GlowBar />} name="Alış" barSize={18} />
                     <Bar key="b3k" dataKey="kar" fill="#10b981" shape={<GlowBar />} name="Kâr" barSize={18} />
@@ -1029,7 +1029,7 @@ export function DashboardPage() {
                       <Pie key="pie1" data={categoryPieData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value" nameKey="name" stroke="none">
                         {categoryPieData.map((e, i) => <Cell key={`pie-cell-${i}-${e.name}`} fill={e.color} />)}
                       </Pie>
-                      <Tooltip key="pie1-tt" contentStyle={{ backgroundColor: "var(--popover)", borderColor: "var(--border)", borderRadius: '12px', fontSize: '12px' }} formatter={(v: any) => `₺${Number(v).toLocaleString('tr-TR')}`} />
+                      <Tooltip key="pie1-tt" contentStyle={{ backgroundColor: "var(--popover)", borderColor: "var(--border)", borderRadius: '12px', fontSize: '12px' }} formatter={(v: any) => `₺${Number(v || 0).toLocaleString('tr-TR')}`} />
                     </RePieChart>
                   </ResponsiveContainer>
                 </div>
@@ -1040,7 +1040,7 @@ export function DashboardPage() {
                         <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shrink-0" style={{ backgroundColor: e.color, boxShadow: `0 0 6px ${e.color}40` }} />
                         <span className="text-[10px] sm:text-[11px] text-muted-foreground truncate">{e.name}</span>
                       </div>
-                      <span className="text-[10px] sm:text-[11px] font-bold text-foreground shrink-0">₺{e.value >= 1000 ? `${(e.value/1000).toFixed(1)}k` : e.value.toLocaleString('tr-TR')}</span>
+                      <span className="text-[10px] sm:text-[11px] font-bold text-foreground shrink-0">₺{e.value >= 1000 ? `${(e.value/1000).toFixed(1)}k` : Number(e.value || 0).toLocaleString('tr-TR')}</span>
                     </div>
                   ))}
                 </div>
@@ -1065,7 +1065,7 @@ export function DashboardPage() {
               strokeWidth={8}
               color="#8b5cf6"
               label="Hedefe Ulaşım"
-              sublabel={`₺${realtimeRevenue.toLocaleString('tr-TR')}`}
+              sublabel={`₺${Number(realtimeRevenue || 0).toLocaleString('tr-TR')}`}
             />
             <div className="grid grid-cols-2 gap-3 mt-4 w-full">
               <div className="text-center p-2 rounded-lg bg-white/[0.03]">
@@ -1116,7 +1116,7 @@ export function DashboardPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" vertical={false} horizontal={!isMobile} />
                   <XAxis dataKey="saat" stroke="#ffffff25" fontSize={9} tickLine={false} axisLine={false} tick={{fill: '#888'}} />
                   <YAxis stroke="#ffffff25" fontSize={9} tickLine={false} axisLine={false} tickFormatter={v => v === 0 ? '0' : `₺${(v/1000).toFixed(0)}k`} hide={isMobile} />
-                  <Tooltip content={<PremiumTooltip formatter={(v: number) => `₺${v.toLocaleString('tr-TR')}`} />} />
+                  <Tooltip content={<PremiumTooltip formatter={(v: number) => `₺${Number(v || 0).toLocaleString('tr-TR')}`} />} />
                   <Area type="monotone" dataKey="ciro" stroke="#3b82f6" strokeWidth={isMobile ? 1.5 : 2.5} fillOpacity={1} fill="url(#liveFlowGrad)" name="Ciro"
                     dot={isMobile ? false : { r: 3, fill: '#111', stroke: '#3b82f6', strokeWidth: 2 }}
                     activeDot={{ r: 6, fill: '#3b82f6', stroke: '#111', strokeWidth: 2 }} />
@@ -1157,7 +1157,7 @@ export function DashboardPage() {
                   <XAxis dataKey="gun" stroke="#ffffff25" fontSize={9} tickLine={false} axisLine={false} />
                   <YAxis yAxisId="left" stroke="#ffffff25" fontSize={9} tickLine={false} axisLine={false} tickFormatter={v => v === 0 ? '0' : `₺${(v/1000).toFixed(0)}k`} hide={isMobile} />
                   <YAxis yAxisId="right" orientation="right" stroke="#ffffff10" fontSize={8} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`} />
-                  <Tooltip content={<PremiumTooltip formatter={(v: number) => v > 100 ? `₺${v.toLocaleString('tr-TR')}` : `%${v}`} />} />
+                  <Tooltip content={<PremiumTooltip formatter={(v: number) => v > 100 ? `₺${Number(v || 0).toLocaleString('tr-TR')}` : `%${v}`} />} />
                   <Area yAxisId="left" type="monotone" dataKey="kar" stroke="#10b981" strokeWidth={isMobile ? 1.5 : 2.5} fillOpacity={1} fill="url(#profitGrad)" name="Net Kâr"
                     dot={isMobile ? false : { r: 4, fill: '#111', stroke: '#10b981', strokeWidth: 2 }}
                     activeDot={{ r: 6, fill: '#10b981' }} />
@@ -1174,7 +1174,7 @@ export function DashboardPage() {
               <div key={i} className={`shrink-0 px-2.5 py-1.5 rounded-lg border ${d.kar >= 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
                 <p className="text-[8px] font-bold text-muted-foreground uppercase">{d.gun}</p>
                 <p className={`text-xs font-black ${d.kar >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {d.kar >= 0 ? '+' : ''}₺{d.kar.toLocaleString('tr-TR')}
+                  {d.kar >= 0 ? '+' : ''}₺{Number(d.kar || 0).toLocaleString('tr-TR')}
                 </p>
                 <p className="text-[8px] text-muted-foreground">%{d.oran}</p>
               </div>
@@ -1210,7 +1210,7 @@ export function DashboardPage() {
                   <CartesianGrid key="cg4" strokeDasharray="3 3" stroke="#ffffff06" vertical={false} />
                   <XAxis key="xa4" dataKey="month" stroke="#ffffff30" fontSize={11} tickLine={false} axisLine={false} />
                   <YAxis key="ya4" stroke="#ffffff30" fontSize={11} tickLine={false} axisLine={false} tickFormatter={v => `₺${(v/1000).toFixed(0)}k`} />
-                  <Tooltip key="tt4" content={<PremiumTooltip formatter={(v: number) => `₺${v.toLocaleString('tr-TR')}`} />} cursor={{ fill: '#ffffff03' }} />
+                  <Tooltip key="tt4" content={<PremiumTooltip formatter={(v: number) => `₺${Number(v || 0).toLocaleString('tr-TR')}`} />} cursor={{ fill: '#ffffff03' }} />
                   <Bar key="b4g" dataKey="gelir" fill="#10b981" shape={<GlowBar />} name="Gelir" barSize={16} />
                   <Bar key="b4x" dataKey="gider" fill="#ef4444" shape={<GlowBar />} name="Gider" barSize={16} />
                 </BarChart>
@@ -1224,15 +1224,15 @@ export function DashboardPage() {
           <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-3 sm:mt-4">
             <div className="p-2 sm:p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
               <p className="text-[8px] sm:text-[9px] text-emerald-400/70 font-bold uppercase">Toplam Gelir</p>
-              <p className="text-xs sm:text-sm font-black text-emerald-400">₺{kasaStats.totalIncome.toLocaleString('tr-TR')}</p>
+              <p className="text-xs sm:text-sm font-black text-emerald-400">₺{Number(kasaStats.totalIncome || 0).toLocaleString('tr-TR')}</p>
             </div>
             <div className="p-2 sm:p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-center">
               <p className="text-[8px] sm:text-[9px] text-red-400/70 font-bold uppercase">Toplam Gider</p>
-              <p className="text-xs sm:text-sm font-black text-red-400">₺{kasaStats.totalExpense.toLocaleString('tr-TR')}</p>
+              <p className="text-xs sm:text-sm font-black text-red-400">₺{Number(kasaStats.totalExpense || 0).toLocaleString('tr-TR')}</p>
             </div>
             <div className={`p-2 sm:p-3 rounded-xl text-center ${kasaStats.kasaBalance >= 0 ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-orange-500/10 border border-orange-500/20'}`}>
               <p className={`text-[8px] sm:text-[9px] font-bold uppercase ${kasaStats.kasaBalance >= 0 ? 'text-blue-400/70' : 'text-orange-400/70'}`}>Net Bakiye</p>
-              <p className={`text-xs sm:text-sm font-black ${kasaStats.kasaBalance >= 0 ? 'text-blue-400' : 'text-orange-400'}`}>₺{kasaStats.kasaBalance.toLocaleString('tr-TR')}</p>
+              <p className={`text-xs sm:text-sm font-black ${kasaStats.kasaBalance >= 0 ? 'text-blue-400' : 'text-orange-400'}`}>₺{Number(kasaStats.kasaBalance || 0).toLocaleString('tr-TR')}</p>
             </div>
           </div>
         </motion.div>
@@ -1274,7 +1274,7 @@ export function DashboardPage() {
                             <p className="text-[9px] sm:text-[10px] text-muted-foreground">{p.sales} adet satış</p>
                           </div>
                         </div>
-                        <p className="text-xs sm:text-sm font-black text-foreground shrink-0">₺{p.revenue.toLocaleString('tr-TR')}</p>
+                        <p className="text-xs sm:text-sm font-black text-foreground shrink-0">₺{Number(p.revenue || 0).toLocaleString('tr-TR')}</p>
                       </div>
                       <div className="h-1.5 rounded-full bg-secondary overflow-hidden ml-8 sm:ml-10">
                         <motion.div
@@ -1595,7 +1595,7 @@ export function DashboardPage() {
             </div>
             <div className="p-3 sm:p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center">
               <p className="text-[8px] sm:text-[9px] font-bold text-amber-400/70 uppercase mb-1">Toplam Borç</p>
-              <p className="text-lg sm:text-xl font-black text-amber-400">₺{cariStats.toplamBorc.toLocaleString('tr-TR')}</p>
+              <p className="text-lg sm:text-xl font-black text-amber-400">₺{Number(cariStats.toplamBorc || 0).toLocaleString('tr-TR')}</p>
             </div>
           </div>
 

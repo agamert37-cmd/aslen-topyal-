@@ -684,7 +684,7 @@ function AnalyticsView<T extends Record<string, any>>({
               </div>
               <div>
                 <p className="text-[9px] text-muted-foreground/60 uppercase">Max</p>
-                <p className="text-sm font-bold text-foreground/80">{max.toLocaleString('tr-TR')}</p>
+                <p className="text-sm font-bold text-foreground/80">{(Number.isFinite(max) ? max : 0).toLocaleString('tr-TR')}</p>
               </div>
               <div>
                 <p className="text-[9px] text-muted-foreground/60 uppercase">Kayıt</p>

@@ -16,7 +16,6 @@ import { SyncStatusBar, SyncBadge } from '../components/SyncStatusBar';
 import { SwipeToDelete } from '../components/MobileHelpers';
 import { DataIssueBadge } from '../components/DataIssueBadge';
 import { useTableSync } from '../hooks/useTableSync';
-import { useGlobalTableData } from '../contexts/GlobalTableSyncContext';
 import { validateStokItem } from '../utils/data-integrity';
 import { getFromStorage, setInStorage, StorageKey } from '../utils/storage';
 import { logActivity } from '../utils/activityLogger';
@@ -38,7 +37,6 @@ import { kvGet, kvSet } from '../lib/pouchdb-kv';
 import { BarcodeScanner } from '../components/BarcodeScanner';
 import { ChangeLogModal } from '../components/ChangeLogModal';
 import { DuplicateFinderModal } from '../components/DuplicateFinderModal';
-import { v4 as uuidv4 } from 'uuid';
 
 export type MovementType = 'ALIS' | 'SATIS' | 'MUSTERI_IADE' | 'TOPTANCI_IADE' | 'FIRE' | 'URETIM_CIKIS' | 'URETIM_GIRIS' | 'FATURA_ALIS' | 'FATURA_SATIS' | 'FATURA_IPTAL' | 'ONCEKI_BAKIYE' | 'TRANSFER';
 export type ProductCategory = string;
@@ -123,7 +121,7 @@ export function productFromDb(row: any): Product {
       const data = JSON.parse(row.supplier_entries);
       if (Array.isArray(data)) {
         parsed.movements = data.map((entry: any) => ({
-          id: entry.id || uuidv4(),
+          id: entry.id || crypto.randomUUID(),
           type: 'ALIS',
           partyName: entry.supplierName || 'Bilinmeyen Toptanci',
           date: entry.date || new Date().toISOString(),
@@ -141,7 +139,7 @@ export function productFromDb(row: any): Product {
       }
     } else if (Array.isArray(row.supplier_entries)) {
        parsed.movements = row.supplier_entries.map((entry: any) => ({
-          id: entry.id || uuidv4(),
+          id: entry.id || crypto.randomUUID(),
           type: 'ALIS',
           partyName: entry.supplierName || 'Bilinmeyen Toptanci',
           date: entry.date || new Date().toISOString(),
@@ -589,12 +587,16 @@ export function StokPage() {
     // Sistem verisi yenilendiginde stok yenile
     const unsub3 = on('system:data_refreshed', () => {
       refreshProducts();
+      setIcebergCages(getFromStorage<IcebergCage[]>('iceberg_cages_data') || []);
+      setTransporters(getFromStorage<{id: string, name: string}[]>('transporters_data') || []);
     });
 
     // Backup restore sonrasi yenile
     const unsub4 = on('system:backup_restored', () => {
       console.log('[StokPage] Backup restore algılandi, stok yenileniyor');
       refreshProducts();
+      setIcebergCages(getFromStorage<IcebergCage[]>('iceberg_cages_data') || []);
+      setTransporters(getFromStorage<{id: string, name: string}[]>('transporters_data') || []);
     });
 
     // Fatura eklendi/iptal edildi — stok etkisi olabilir
@@ -642,7 +644,7 @@ export function StokPage() {
     const delta = reverse ? -effect.delta : effect.delta;
     const txType = reverse ? (effect.txType === 'debit' ? 'credit' : 'debit') : effect.txType as 'debit' | 'credit';
     const newTransaction = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       date: new Date().toISOString(),
       description: reverse
         ? `[IPTAL] ${productName} — ${movement.quantity} stok hareketi iptal edildi`
@@ -872,11 +874,24 @@ export function StokPage() {
   const [editingCatName, setEditingCatName] = useState('');
 
   // Iceberg Cages & Transporters
-  const icebergCagesData = useGlobalTableData<IcebergCage>('iceberg_cages');
-  const icebergCages = useMemo(() => Array.isArray(icebergCagesData) ? icebergCagesData : [], [icebergCagesData]);
+  const [icebergCages, setIcebergCages] = useState<IcebergCage[]>(() => 
+    getFromStorage<IcebergCage[]>('iceberg_cages_data') || []
+  );
+  const [transporters, setTransporters] = useState<{id: string, name: string}[]>(() => 
+    getFromStorage<{id: string, name: string}[]>('transporters_data') || []
+  );
 
-  const transportersData = useGlobalTableData<{id: string, name: string}>('transporters');
-  const transporters = useMemo(() => Array.isArray(transportersData) ? transportersData : [], [transportersData]);
+  const saveIcebergCages = (updated: IcebergCage[]) => {
+    setIcebergCages(updated);
+    setInStorage('iceberg_cages_data', updated);
+    emit('system:data_refreshed', { source: 'StokPage' });
+  };
+  
+  const saveTransporters = (updated: {id: string, name: string}[]) => {
+    setTransporters(updated);
+    setInStorage('transporters_data', updated);
+    emit('system:data_refreshed', { source: 'StokPage' });
+  };
 
   const partyInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -1008,7 +1023,7 @@ export function StokPage() {
     const name = fd.get('name') as string;
     if (!sec.preCheck('add', { name })) return;
     const newProduct: Product = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       name: sec.sanitize(name),
       category: addFormCategory as ProductCategory,
       unit: addFormUnit as 'KG' | 'Adet' | 'Koli',
@@ -1074,7 +1089,7 @@ export function StokPage() {
         };
       } else {
         updatedMovements.push({
-          id: uuidv4(),
+          id: crypto.randomUUID(),
           type: 'ONCEKI_BAKIYE',
           partyName: 'Önceki Bakiye',
           date: new Date().toISOString(),
@@ -1205,7 +1220,7 @@ export function StokPage() {
 
     if (!sec.preCheck(editingMovement ? 'edit' : 'add', { partyName: partyName || (isTransfer ? 'İç Transfer' : 'Önceki Bakiye'), description: desc })) return;
 
-    const movementId = editingMovement ? editingMovement.id : uuidv4();
+    const movementId = editingMovement ? editingMovement.id : crypto.randomUUID();
     const mvDate = editingMovement ? editingMovement.date : new Date().toISOString();
 
     const newMv: StockMovement = {

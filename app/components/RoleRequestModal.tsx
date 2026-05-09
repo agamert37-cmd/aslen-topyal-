@@ -5,7 +5,6 @@ import { useEmployee } from '../contexts/EmployeeContext';
 import { toast } from 'sonner';
 import { getFromStorage, setInStorage } from '../utils/storage';
 import { kvSet } from '../lib/pouchdb-kv';
-import { v4 as uuidv4 } from 'uuid';
 
 interface RoleRequestModalProps {
   isOpen: boolean;
@@ -47,7 +46,7 @@ export function RoleRequestModal({ isOpen, onClose }: RoleRequestModalProps) {
     }
 
     const newRequest = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       employeeId: currentEmployee.id,
       employeeName: currentEmployee.name,
       panel: selectedPanel,

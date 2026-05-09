@@ -222,6 +222,23 @@ export function LoginPage() {
 
   const currentPrimaryColor = colorMap[pazarlamaContent?.theme?.primaryColor || 'blue'] || '#2563eb';
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: 0.1
+      }
+    },
+    exit: { opacity: 0, scale: 0.95, transition: { duration: 0.2 } }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+  };
+
   return (
     <div 
       className="min-h-[100dvh] text-white flex flex-col font-sans"
@@ -284,19 +301,24 @@ export function LoginPage() {
           />
 
           {/* Marketing Content */}
-          <div className="relative z-10 flex flex-col mt-auto pb-4">
-            <span className="text-cyan-400 font-bold tracking-widest text-xs uppercase mb-3 drop-shadow-md">
+          <motion.div 
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+            className="relative z-10 flex flex-col mt-auto pb-4"
+          >
+            <motion.span variants={itemVariants} className="text-cyan-400 font-bold tracking-widest text-xs uppercase mb-3 drop-shadow-md">
               {loginConfig.tagline || companyInfo.slogan}
-            </span>
-            <h2 className="text-4xl lg:text-5xl font-black text-white leading-[1.1] tracking-tight mb-4 whitespace-pre-wrap drop-shadow-xl">
+            </motion.span>
+            <motion.h2 variants={itemVariants} className="text-4xl lg:text-5xl font-black text-white leading-[1.1] tracking-tight mb-4 whitespace-pre-wrap drop-shadow-xl">
               {loginConfig.headline || 'Kalite ve Güven'}
-            </h2>
-            <p className="text-gray-300 text-sm leading-relaxed mb-8 max-w-sm drop-shadow-md">
+            </motion.h2>
+            <motion.p variants={itemVariants} className="text-gray-300 text-sm leading-relaxed mb-8 max-w-sm drop-shadow-md">
               {loginConfig.description || 'Gıda sektöründe güvenilir iş ortağınız.'}
-            </p>
+            </motion.p>
 
             {loginConfig.trustBar && loginConfig.trustBar.length > 0 && (
-              <div className="flex flex-col gap-3 border-t border-white/10 pt-6">
+              <motion.div variants={itemVariants} className="flex flex-col gap-3 border-t border-white/10 pt-6">
                 {loginConfig.trustBar.map((item: any, idx: number) => (
                   <div key={idx} className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center backdrop-blur-sm">
@@ -305,22 +327,22 @@ export function LoginPage() {
                     <span className="text-sm font-semibold text-gray-200">{item.text}</span>
                   </div>
                 ))}
-              </div>
+              </motion.div>
             )}
             
             {activeHero?.title && (
-              <div className="mt-8 bg-black/40 backdrop-blur-md rounded-xl p-4 border border-white/10">
+              <motion.div variants={itemVariants} className="mt-8 bg-black/40 backdrop-blur-md rounded-xl p-4 border border-white/10">
                 <p className="text-white font-bold text-sm">{activeHero.title}</p>
                 <p className="text-gray-400 text-xs mt-1">{activeHero.subtitle}</p>
-              </div>
+              </motion.div>
             )}
             
             {loginConfig?.leftExtraText && (
-              <div className="mt-4 bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10">
+              <motion.div variants={itemVariants} className="mt-4 bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10">
                 <p className="text-gray-300 text-xs leading-relaxed">{loginConfig.leftExtraText}</p>
-              </div>
+              </motion.div>
             )}
-          </div>
+          </motion.div>
         </div>
 
         {/* Right Panel: Active Screen Configuration */}
@@ -342,9 +364,16 @@ export function LoginPage() {
 
           <AnimatePresence mode="wait">
             {viewMode === 'portal' ? (
-              <motion.div key="portal" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="p-4 sm:p-8 w-full max-w-5xl mx-auto min-h-full flex flex-col relative z-10">
+              <motion.div 
+                key="portal" 
+                variants={containerVariants}
+                initial="hidden"
+                animate="show"
+                exit="exit"
+                className="p-4 sm:p-8 w-full max-w-5xl mx-auto min-h-full flex flex-col relative z-10"
+              >
                 {/* Portal Navigation */}
-                <div className="flex justify-start sm:justify-center gap-2 mb-8 overflow-x-auto pb-4 scrollbar-hide">
+                <motion.div variants={itemVariants} className="flex justify-start sm:justify-center gap-2 mb-8 overflow-x-auto pb-4 scrollbar-hide">
                   {[
                     { id: 'urunler', icon: ShoppingBag, label: 'Ürünlerimiz' },
                     { id: 'haberler', icon: Newspaper, label: 'Haberler & Kampanyalar' },
@@ -355,10 +384,10 @@ export function LoginPage() {
                       <tab.icon className="w-4 h-4" /> <span>{tab.label}</span>
                     </button>
                   ))}
-                </div>
+                </motion.div>
 
                 {/* Tab Contents */}
-                <motion.div key={portalTab} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }} className="flex-1">
+                <motion.div variants={itemVariants} key={portalTab} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }} className="flex-1">
                   {portalTab === 'urunler' && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 auto-rows-fr">
                       {products.length === 0 && <p className="text-gray-500 col-span-full text-center py-10 w-full">Henüz yayınlanan ürün bulunmuyor.</p>}
@@ -445,36 +474,52 @@ export function LoginPage() {
                 </motion.div>
               </motion.div>
             ) : (
-              <motion.div key="login" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="flex-1 flex items-center justify-center p-4 w-full min-h-full">
+              <motion.div 
+                key="login" 
+                variants={containerVariants}
+                initial="hidden"
+                animate="show"
+                exit="exit"
+                className="flex-1 flex items-center justify-center p-4 w-full min-h-full"
+              >
                 <div className="w-full max-w-md bg-[#111522] rounded-3xl border border-gray-800 p-6 sm:p-8 shadow-2xl relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
                   
-                  <div className="text-center mb-8 relative z-10">
+                  <motion.div variants={itemVariants} className="text-center mb-8 relative z-10">
                     <div className="w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mx-auto mb-4">
                       <User className="w-7 h-7 text-blue-400" />
                     </div>
                     <h2 className="text-2xl font-black mb-1 text-white">{loginConfig?.formTitle || 'Sisteme Giriş'}</h2>
                     <p className="text-gray-400 text-sm">{loginConfig?.formSubtitle || 'Personel veya yönetici paneline erişim'}</p>
-                  </div>
+                  </motion.div>
 
                   {loginConfig?.rightExtraText && (
-                    <div className="mb-6 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-100/80 text-[13px] leading-relaxed relative z-10 shadow-lg">
+                    <motion.div variants={itemVariants} className="mb-6 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-100/80 text-[13px] leading-relaxed relative z-10 shadow-lg">
                       {loginConfig.rightExtraText}
-                    </div>
+                    </motion.div>
                   )}
 
-                  <div className="flex bg-[#0a0d14] p-1 rounded-xl mb-6 border border-gray-800 relative z-10">
+                  <motion.div variants={itemVariants} className="flex bg-[#0a0d14] p-1 rounded-xl mb-6 border border-gray-800 relative z-10">
                     <button onClick={() => { setAdminTab('user'); setError(''); }} className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-colors ${adminTab === 'user' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}>Personel</button>
                     <button onClick={() => { setAdminTab('admin'); setError(''); }} className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-colors ${adminTab === 'admin' ? 'bg-red-700 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}>Yönetici</button>
-                  </div>
+                  </motion.div>
 
-                  {error && (
-                    <div className="mb-5 p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2 relative z-10 font-medium">
-                      <AlertCircle className="w-5 h-5 flex-shrink-0" /> {error}
-                    </div>
-                  )}
+                  <AnimatePresence>
+                    {error && (
+                      <motion.div 
+                        initial={{ opacity: 0, height: 0 }} 
+                        animate={{ opacity: 1, height: 'auto' }} 
+                        exit={{ opacity: 0, height: 0 }} 
+                        className="mb-5 overflow-hidden"
+                      >
+                        <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2 relative z-10 font-medium">
+                          <AlertCircle className="w-5 h-5 flex-shrink-0" /> {error}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
-                  <form onSubmit={handleLogin} className="space-y-4 relative z-10">
+                  <motion.form variants={itemVariants} onSubmit={handleLogin} className="space-y-4 relative z-10">
                     {adminTab === 'user' ? (
                       <>
                         <div>
@@ -523,12 +568,12 @@ export function LoginPage() {
                         </button>
                       </>
                     )}
-                  </form>
+                  </motion.form>
 
-                  <div className="mt-8 pt-4 border-t border-gray-800 flex justify-between items-center text-[10px] sm:text-xs text-gray-500 relative z-10">
+                  <motion.div variants={itemVariants} className="mt-8 pt-4 border-t border-gray-800 flex justify-between items-center text-[10px] sm:text-xs text-gray-500 relative z-10">
                     <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"/> Güvenli Bağlantı</div>
                     <button onClick={() => setShowChangelog(true)} className="hover:text-gray-300 font-bold hover:underline">v{CURRENT_VERSION.version}</button>
-                  </div>
+                  </motion.div>
                 </div>
               </motion.div>
             )}

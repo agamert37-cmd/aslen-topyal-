@@ -12,7 +12,6 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useModuleBus } from '../hooks/useModuleBus';
 import { getPagePermissions } from '../utils/permissions';
 import { usePageSecurity } from '../hooks/usePageSecurity';
-import { v4 as uuidv4 } from 'uuid';
 
 interface Vehicle {
   id: string;
@@ -86,7 +85,7 @@ export function AracPage() {
     if (!sec.preCheck('add', { plate, model, driver })) return;
 
     const newVehicle: Vehicle = {
-      id: uuidv4(), plate: sec.sanitize(plate), model: sec.sanitize(model),
+      id: crypto.randomUUID(), plate: sec.sanitize(plate), model: sec.sanitize(model),
       driver: sec.sanitize(driver), km: Number(formData.get('km') || 0),
       lastMaintenance: formData.get('lastMaintenance') as string || '-', nextInspection: formData.get('nextInspection') as string || '-',
       insurance: formData.get('insurance') as string || '-', status: 'active',

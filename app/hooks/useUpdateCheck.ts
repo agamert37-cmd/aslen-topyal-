@@ -25,9 +25,7 @@ export function useUpdateCheck() {
           action: {
             label: 'Detaylar',
             onClick: () => {
-              import('../routes').then(({ router }) => {
-                router.navigate('/guncelleme-notlari');
-              });
+              window.location.href = '/guncelleme-notlari';
             },
           },
         }

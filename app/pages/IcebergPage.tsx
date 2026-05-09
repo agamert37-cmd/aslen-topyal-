@@ -6,7 +6,6 @@ import { useTableSync } from '../hooks/useTableSync';
 import { getFromStorage, setInStorage } from '../utils/storage';
 import { Product, productFromDb, productToDb, IcebergCage, StockMovement } from './StokPage';
 import { useModuleBus } from '../hooks/useModuleBus';
-import { v4 as uuidv4 } from 'uuid';
 
 export function IcebergPage() {
   const { on, emit } = useModuleBus();
@@ -31,6 +30,8 @@ export function IcebergPage() {
   useEffect(() => {
     const unsub = on('system:data_refreshed', () => {
       refreshProducts();
+      setIcebergCages(getFromStorage<IcebergCage[]>('iceberg_cages_data') || []);
+      setTransporters(getFromStorage<{id: string, name: string}[]>('transporters_data') || []);
     });
     return () => unsub();
   }, [refreshProducts, on]);
@@ -43,21 +44,24 @@ export function IcebergPage() {
       };
     }), [products]);
 
-  const { data: icebergCagesData, addItem: addCageItem, deleteItem: removeCageItem } = useTableSync<IcebergCage>({
-    tableName: 'iceberg_cages',
-    storageKey: 'iceberg_cages_data',
-    initialData: [],
-  });
-  
-  const icebergCages = useMemo(() => Array.isArray(icebergCagesData) ? icebergCagesData : [], [icebergCagesData]);
+  const [icebergCages, setIcebergCages] = useState<IcebergCage[]>(() => 
+    getFromStorage<IcebergCage[]>('iceberg_cages_data') || []
+  );
+  const [transporters, setTransporters] = useState<{id: string, name: string}[]>(() => 
+    getFromStorage<{id: string, name: string}[]>('transporters_data') || []
+  );
 
-  const { data: transportersData, addItem: addTransporterItem, deleteItem: removeTransporterItem } = useTableSync<{id: string, name: string}>({
-    tableName: 'transporters',
-    storageKey: 'transporters_data',
-    initialData: [],
-  });
-  
-  const transporters = useMemo(() => Array.isArray(transportersData) ? transportersData : [], [transportersData]);
+  const saveIcebergCages = (updated: IcebergCage[]) => {
+    setIcebergCages(updated);
+    setInStorage('iceberg_cages_data', updated);
+    emit('system:data_refreshed', { source: 'IcebergPage' });
+  };
+
+  const saveTransporters = (updated: {id: string, name: string}[]) => {
+    setTransporters(updated);
+    setInStorage('transporters_data', updated);
+    emit('system:data_refreshed', { source: 'IcebergPage' });
+  };
   
   const [showAddCage, setShowAddCage] = useState(false);
   const [newCageName, setNewCageName] = useState('');
@@ -72,24 +76,17 @@ export function IcebergPage() {
 
   const [selectedCage, setSelectedCage] = useState<IcebergCage | null>(null);
 
-  const generateId = () => {
-    try {
-      if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return uuidv4();
-    } catch(e) {}
-    return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).substr(2, 9);
-  };
-
   const handleAddCage = () => {
     if (newCageName.trim()) {
-      addCageItem({ 
-        id: generateId(), 
+      saveIcebergCages([...icebergCages, { 
+        id: crypto.randomUUID(), 
         name: newCageName, 
         capacityKg: newCageCapacity ? Number(newCageCapacity) : undefined,
         pricePerKg: newCagePrice ? Number(newCagePrice) : undefined,
         billingDay: newCageBillingDay ? Number(newCageBillingDay) : undefined,
         tareKg: newCageTare ? Number(newCageTare) : undefined,
         photoUrl: newCagePhoto || undefined,
-      });
+      }]);
       setShowAddCage(false);
       setNewCageName('');
       setNewCageCapacity('');
@@ -103,7 +100,7 @@ export function IcebergPage() {
 
   const handleAddTransporter = () => {
     if (newTransporterName.trim()) {
-      addTransporterItem({ id: generateId(), name: newTransporterName });
+      saveTransporters([...transporters, { id: crypto.randomUUID(), name: newTransporterName }]);
       setShowAddTransporter(false);
       setNewTransporterName('');
       toast.success("Nakliyeci başarıyla eklendi.");
@@ -390,7 +387,7 @@ export function IcebergPage() {
                     onClick={(e) => {
                       e.stopPropagation();
                       if(confirm(`"${cage.name}" kafesini silmek istediğinize emin misiniz?\nUyarı: Mevcut stokları transfer ettiğinizden emin olun.`)) {
-                        removeCageItem(cage.id);
+                        saveIcebergCages(icebergCages.filter(c => c.id !== cage.id));
                         toast.success("Kafes başarıyla silindi");
                       }
                     }}
@@ -502,7 +499,7 @@ export function IcebergPage() {
                     onClick={(e) => {
                       e.stopPropagation();
                       if(confirm('Kafesi silmek istediğinize emin misiniz?')) {
-                        removeCageItem(cage.id);
+                        saveIcebergCages(icebergCages.filter(c => c.id !== cage.id));
                         toast.success("Kafes silindi");
                       }
                     }}
@@ -550,7 +547,7 @@ export function IcebergPage() {
                 <button 
                   onClick={() => {
                       if(confirm(`"${t.name}" adlı nakliyeciyi silmek istediğinize emin misiniz?`)) {
-                          removeTransporterItem(t.id);
+                          saveTransporters(transporters.filter(tr => tr.id !== t.id))
                       }
                   }}
                   className="p-1 hover:bg-red-500/20 rounded-md opacity-0 group-hover:opacity-100 transition-all sm:ml-2"

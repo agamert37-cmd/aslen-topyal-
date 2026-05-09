@@ -354,7 +354,7 @@ export function RaporlarPage() {
   const securityLogs = useMemo(() => {
     const logs = getFromStorage<any[]>('ISLEYEN_ET_ACTIVITY_LOG' as any) || [];
     return logs.filter(l => isWithinRange(l.timestamp || l.date)).slice(0, 100).map(l => ({
-      time: l.timestamp ? new Date(l.timestamp).toLocaleString('tr-TR') : '-',
+      time: l.timestamp ? new Date(l.timestamp || 0).toLocaleString('tr-TR') : '-',
       user: l.employeeName || l.user || '-',
       action: l.action || l.type || '-',
       detail: l.description || l.detail || '-',
@@ -438,7 +438,7 @@ export function RaporlarPage() {
                   <Pie data={categoryPieData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4} dataKey="value" stroke="none">
                     {categoryPieData.map((e, i) => <Cell key={i} fill={e.color} />)}
                   </Pie>
-                  <Tooltip contentStyle={{ backgroundColor: "var(--popover)", borderColor: "var(--border)", borderRadius: '12px' }} formatter={v => `₺${Number(v).toLocaleString('tr-TR')}`} />
+                  <Tooltip contentStyle={{ backgroundColor: "var(--popover)", borderColor: "var(--border)", borderRadius: '12px' }} formatter={v => `₺${Number(v || 0).toLocaleString('tr-TR')}`} />
                 </RePieChart>
               </ResponsiveContainer>
             </div>
@@ -446,7 +446,7 @@ export function RaporlarPage() {
               {categoryPieData.slice(0,4).map((e,i) => (
                 <div key={i} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full" style={{backgroundColor: e.color}}/> <span className="text-muted-foreground">{e.name}</span></div>
-                  <span className="font-bold text-foreground">₺{e.value.toLocaleString('tr-TR')}</span>
+                  <span className="font-bold text-foreground">₺{Number(e.value || 0).toLocaleString('tr-TR')}</span>
                 </div>
               ))}
             </div>
@@ -472,7 +472,7 @@ export function RaporlarPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#1a1a2e" vertical={false} />
                 <XAxis dataKey="month" stroke="#555" tick={{fill:'#666', fontSize: 11}} tickLine={false} axisLine={false} />
                 <YAxis stroke="#555" tick={{fill:'#666', fontSize: 11}} tickLine={false} axisLine={false} tickFormatter={v => `₺${(v/1000).toFixed(0)}k`} />
-                <Tooltip content={<PremiumTooltip formatter={v => `₺${v.toLocaleString('tr-TR')}`} />} />
+                <Tooltip content={<PremiumTooltip formatter={v => `₺${Number(v || 0).toLocaleString('tr-TR')}`} />} />
                 <Bar dataKey="satis" name={t('reports.sales')} fill="url(#barSatis)" radius={[4,4,0,0]} barSize={20} />
                 <Bar dataKey="alis" name={t('reports.purchase')} fill="url(#barAlis)" radius={[4,4,0,0]} barSize={20} />
                 <Line type="monotone" dataKey="kar" name="Kâr" stroke="#10b981" strokeWidth={2.5} dot={{ r: 4, fill: '#111', stroke: '#10b981', strokeWidth: 2 }} />
@@ -500,7 +500,7 @@ export function RaporlarPage() {
                         <span className="text-sm">{i < 3 ? medals[i] : `#${i+1}`}</span>
                         <span className="text-sm text-muted-foreground truncate max-w-[140px]">{p.name}</span>
                       </div>
-                      <span className="text-sm font-bold text-foreground">₺{p.amount.toLocaleString('tr-TR')}</span>
+                      <span className="text-sm font-bold text-foreground">₺{Number(p.amount || 0).toLocaleString('tr-TR')}</span>
                     </div>
                     <div className="h-2 bg-white/5 rounded-full overflow-hidden">
                       <motion.div
@@ -536,7 +536,7 @@ export function RaporlarPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#1a1a2e" horizontal={false} />
                 <XAxis type="number" stroke="#555" tick={{fill:'#666', fontSize: 10}} tickLine={false} axisLine={false} tickFormatter={v => `₺${(v/1000).toFixed(0)}k`} />
                 <YAxis type="category" dataKey="name" stroke="#555" tick={{fill:'#999', fontSize: 11}} tickLine={false} axisLine={false} width={100} />
-                <Tooltip content={<PremiumTooltip formatter={v => `₺${v.toLocaleString('tr-TR')}`} />} />
+                <Tooltip content={<PremiumTooltip formatter={v => `₺${Number(v || 0).toLocaleString('tr-TR')}`} />} />
                 <Bar dataKey="value" name="Ciro" fill="url(#barCustomer)" radius={[0,6,6,0]} barSize={16} />
               </BarChart>
             </ResponsiveContainer>
@@ -567,9 +567,9 @@ export function RaporlarPage() {
             {/* Satış Özet Şeridi */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
-                { label: t('reports.totalSales'), value: `₺${totalSales.toLocaleString('tr-TR')}`, color: '#3b82f6' },
+                { label: t('reports.totalSales'), value: `₺${Number(totalSales || 0).toLocaleString('tr-TR')}`, color: '#3b82f6' },
                 { label: t('reports.totalTransactions'), value: `${filteredSales.length} Kalem`, color: '#8b5cf6' },
-                { label: t('reports.avgTransactionAmount'), value: `₺${filteredSales.length > 0 ? Math.round(totalSales / filteredSales.length).toLocaleString('tr-TR') : '0'}`, color: '#06b6d4' },
+                { label: t('reports.avgTransactionAmount'), value: `₺${filteredSales.length > 0 ? Math.round(totalSales / filteredSales.length || 0).toLocaleString('tr-TR') : '0'}`, color: '#06b6d4' },
                 { label: t('reports.return'), value: `₺${Math.abs(filteredSales.filter(s => s.amount < 0).reduce((s, i) => s + i.amount, 0)).toLocaleString('tr-TR')}`, color: '#ef4444' },
               ].map((s, i) => (
                 <div key={i} className="p-3 rounded-xl bg-black/30 border border-border">
@@ -601,10 +601,10 @@ export function RaporlarPage() {
                   { key: 'quantity', label: t('reports.quantity'), align: 'center', render: i => (
                     <span className="px-2 py-0.5 bg-white/5 rounded-md text-xs font-mono text-muted-foreground">{i.quantity} {i.unit}</span>
                   )},
-                  { key: 'amount', label: t('reports.amount'), align: 'right', render: i => (
+                  { key: 'amount', label: t('reports.amount'), align: 'right', render: i => Number(
                     <div className="flex flex-col items-end gap-1">
                       <span className={`font-black text-sm ${i.amount < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                        {i.amount < 0 ? '-' : ''}₺{Math.abs(i.amount).toLocaleString('tr-TR')}
+                        {i.amount < 0 ? '-' : ''}₺{Math.abs(i.amount || 0).toLocaleString('tr-TR')}
                       </span>
                       <div className="w-20"><InlineBar value={Math.abs(i.amount)} max={maxSaleAmount} color={i.amount < 0 ? '#ef4444' : '#10b981'} /></div>
                     </div>
@@ -660,9 +660,9 @@ export function RaporlarPage() {
                   { key: 'quantity', label: t('reports.quantity'), align: 'center', render: i => (
                     <span className="px-2 py-0.5 bg-white/5 rounded-md text-xs font-mono text-muted-foreground">{i.quantity} {i.unit}</span>
                   )},
-                  { key: 'amount', label: t('reports.amount'), align: 'right', render: i => (
+                  { key: 'amount', label: t('reports.amount'), align: 'right', render: i => Number(
                     <div className="flex flex-col items-end gap-1">
-                      <span className="font-black text-sm text-orange-400">₺{Math.abs(i.amount).toLocaleString('tr-TR')}</span>
+                      <span className="font-black text-sm text-orange-400">₺{Math.abs(i.amount || 0).toLocaleString('tr-TR')}</span>
                       <div className="w-20"><InlineBar value={Math.abs(i.amount)} max={maxSaleAmount} color="#f59e0b" /></div>
                     </div>
                   )},
@@ -710,7 +710,7 @@ export function RaporlarPage() {
                 <div key={i} className="text-center">
                   <MiniDonut value={item.value} max={Math.max(totalIncome, totalExpense) || 1} size={64} strokeWidth={6} color={item.color} label={`${item.value > 0 ? Math.round((item.value / (Math.max(totalIncome, totalExpense) || 1)) * 100) : 0}%`} />
                   <p className="text-xs text-muted-foreground mt-2">{item.name}</p>
-                  <p className="text-sm font-bold text-foreground">₺{item.value.toLocaleString('tr-TR')}</p>
+                  <p className="text-sm font-bold text-foreground">₺{Number(item.value || 0).toLocaleString('tr-TR')}</p>
                 </div>
               ))}
             </div>
@@ -721,7 +721,7 @@ export function RaporlarPage() {
               <div>
                 <p className="text-xs text-muted-foreground">{t('reports.periodResult')}</p>
                 <p className={`text-lg font-black ${netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {netProfit >= 0 ? '+' : '-'}₺{Math.abs(netProfit).toLocaleString('tr-TR')} {netProfit >= 0 ? t('reports.profit') : t('reports.loss')}
+                  {netProfit >= 0 ? '+' : '-'}₺{Math.abs(netProfit || 0).toLocaleString('tr-TR')} {netProfit >= 0 ? t('reports.profit') : t('reports.loss')}
                 </p>
               </div>
             </div>
@@ -734,7 +734,7 @@ export function RaporlarPage() {
                 { key: 'date', label: t('reports.date'), render: i => <span className="font-mono text-xs text-muted-foreground">{i.date}</span> },
                 { key: 'category', label: t('reports.category'), render: i => <StatusBadge status="success" label={i.category} /> },
                 { key: 'description', label: t('reports.description'), render: i => <span className="font-medium text-sm">{i.description}</span> },
-                { key: 'amount', label: t('reports.amount'), align: 'right', render: i => <span className="font-black text-emerald-400">+₺{i.amount.toLocaleString('tr-TR')}</span> },
+                { key: 'amount', label: t('reports.amount'), align: 'right', render: i => <span className="font-black text-emerald-400">+₺{Number(i.amount || 0).toLocaleString('tr-TR')}</span> },
               ]} pageSize={10} searchable searchPlaceholder="Gelir ara..." emptyMessage="Gelir kaydı yok." accentColor="#10b981"
                 footer={filteredIncome.length > 0 ? (
                   <tr className="border-t-2 border-emerald-500/30 bg-emerald-500/5">
@@ -753,7 +753,7 @@ export function RaporlarPage() {
                 { key: 'date', label: t('reports.date'), render: i => <span className="font-mono text-xs text-muted-foreground">{i.date}</span> },
                 { key: 'category', label: t('reports.category'), render: i => <StatusBadge status="danger" label={i.category} /> },
                 { key: 'description', label: t('reports.description'), render: i => <span className="font-medium text-sm">{i.description}</span> },
-                { key: 'amount', label: t('reports.amount'), align: 'right', render: i => <span className="font-black text-red-400">-₺{i.amount.toLocaleString('tr-TR')}</span> },
+                { key: 'amount', label: t('reports.amount'), align: 'right', render: i => <span className="font-black text-red-400">-₺{Number(i.amount || 0).toLocaleString('tr-TR')}</span> },
               ]} pageSize={10} searchable searchPlaceholder="Gider ara..." emptyMessage="Gider kaydı yok." accentColor="#ef4444"
                 footer={filteredExpense.length > 0 ? (
                   <tr className="border-t-2 border-red-500/30 bg-red-500/5">
@@ -775,7 +775,7 @@ export function RaporlarPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
                 { label: t('reports.totalProducts'), value: `${stockData.length} Çeşit`, color: '#8b5cf6' },
-                { label: t('reports.stockValue'), value: `₺${totalStockValue.toLocaleString('tr-TR')}`, color: '#3b82f6' },
+                { label: t('reports.stockValue'), value: `₺${Number(totalStockValue || 0).toLocaleString('tr-TR')}`, color: '#3b82f6' },
                 { label: t('reports.criticalStock'), value: `${stockData.filter(s => s.stock <= s.minStock).length} Ürün`, color: '#ef4444' },
                 { label: t('reports.normalStock'), value: `${stockData.filter(s => s.stock > s.minStock).length} Ürün`, color: '#10b981' },
               ].map((s, i) => (
@@ -826,15 +826,15 @@ export function RaporlarPage() {
                     : i.stock <= i.minStock ? <StatusBadge status="warning" label={t('reports.critical')} />
                     : <StatusBadge status="success" label={t('reports.sufficient')} />
                   )},
-                  { key: 'buyPrice', label: t('reports.buyPrice'), align: 'right', render: i => <span className="text-xs text-muted-foreground">₺{i.buyPrice.toLocaleString('tr-TR')}</span> },
-                  { key: 'price', label: t('reports.sellPrice'), align: 'right', render: i => <span className="text-xs font-bold text-muted-foreground">₺{i.price.toLocaleString('tr-TR')}</span> },
+                  { key: 'buyPrice', label: t('reports.buyPrice'), align: 'right', render: i => <span className="text-xs text-muted-foreground">₺{Number(i.buyPrice || 0).toLocaleString('tr-TR')}</span> },
+                  { key: 'price', label: t('reports.sellPrice'), align: 'right', render: i => <span className="text-xs font-bold text-muted-foreground">₺{Number(i.price || 0).toLocaleString('tr-TR')}</span> },
                   { key: 'margin', label: t('reports.profitMargin'), align: 'center', render: i => {
                     const m = i.price > 0 && i.buyPrice > 0 ? ((i.price - i.buyPrice) / i.price * 100) : 0;
                     return <span className={`text-xs font-bold ${m > 30 ? 'text-emerald-400' : m > 15 ? 'text-amber-400' : 'text-red-400'}`}>{m > 0 ? `%${m.toFixed(0)}` : '-'}</span>;
                   }},
-                  { key: 'value', label: t('reports.stockValue'), align: 'right', render: i => (
+                  { key: 'value', label: t('reports.stockValue'), align: 'right', render: i => Number(
                     <div className="flex flex-col items-end gap-1">
-                      <span className="font-black text-sm text-blue-400">₺{(i.stock * i.price).toLocaleString('tr-TR')}</span>
+                      <span className="font-black text-sm text-blue-400">₺{(i.stock * i.price || 0).toLocaleString('tr-TR')}</span>
                       <div className="w-16"><InlineBar value={i.stock * i.price} max={maxStockValue} color="#3b82f6" /></div>
                     </div>
                   )},
@@ -852,8 +852,8 @@ export function RaporlarPage() {
                         <div><p className="text-muted-foreground mb-1">Kategori</p><p className="font-bold text-foreground">{item.category}</p></div>
                         <div><p className="text-muted-foreground mb-1">Mevcut Stok</p><p className="font-bold text-emerald-400">{item.stock} {item.unit}</p></div>
                         <div><p className="text-muted-foreground mb-1">Min. Stok</p><p className="font-bold text-amber-400">{item.minStock} {item.unit}</p></div>
-                        <div><p className="text-muted-foreground mb-1">Alış Fiyatı</p><p className="font-bold text-muted-foreground">₺{item.buyPrice.toLocaleString('tr-TR')}</p></div>
-                        <div><p className="text-muted-foreground mb-1">Satış Fiyatı</p><p className="font-bold text-blue-400">₺{item.price.toLocaleString('tr-TR')}</p></div>
+                        <div><p className="text-muted-foreground mb-1">Alış Fiyatı</p><p className="font-bold text-muted-foreground">₺{Number(item.buyPrice || 0).toLocaleString('tr-TR')}</p></div>
+                        <div><p className="text-muted-foreground mb-1">Satış Fiyatı</p><p className="font-bold text-blue-400">₺{Number(item.price || 0).toLocaleString('tr-TR')}</p></div>
                       </div>
                       {recentMoves.length > 0 && (
                         <div>
@@ -940,14 +940,14 @@ export function RaporlarPage() {
                     <span className="px-2.5 py-1 bg-white/5 rounded-lg text-xs font-mono font-bold">{i.fisCount}</span>
                   )},
                   { key: 'salesTotal', label: t('reports.grossSales'), align: 'right', render: (i: any) => (
-                    <span className="text-emerald-400 font-bold text-sm">₺{i.salesTotal.toLocaleString('tr-TR')}</span>
+                    <span className="text-emerald-400 font-bold text-sm">₺{Number(i.salesTotal || 0).toLocaleString('tr-TR')}</span>
                   )},
                   { key: 'returnTotal', label: t('reports.return'), align: 'right', render: (i: any) => (
-                    <span className="text-orange-400 text-xs">-₺{i.returnTotal.toLocaleString('tr-TR')}</span>
+                    <span className="text-orange-400 text-xs">-₺{Number(i.returnTotal || 0).toLocaleString('tr-TR')}</span>
                   )},
                   { key: 'netSales', label: t('reports.netPerformance'), align: 'right', render: (i: any) => (
                     <div className="flex flex-col items-end gap-1">
-                      <span className="font-black text-sm text-blue-400">₺{i.netSales.toLocaleString('tr-TR')}</span>
+                      <span className="font-black text-sm text-blue-400">₺{Number(i.netSales || 0).toLocaleString('tr-TR')}</span>
                       <div className="w-20"><InlineBar value={Math.max(i.netSales, 0)} max={maxPersonelSales} color="#3b82f6" /></div>
                     </div>
                   )},
@@ -965,9 +965,9 @@ export function RaporlarPage() {
                 renderExpanded={(item: any) => (
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-xs">
                     <div><p className="text-muted-foreground mb-1">Toplam Fiş</p><p className="font-bold text-foreground">{item.fisCount}</p></div>
-                    <div><p className="text-muted-foreground mb-1">Brüt Satış</p><p className="font-bold text-emerald-400">₺{item.salesTotal.toLocaleString('tr-TR')}</p></div>
-                    <div><p className="text-muted-foreground mb-1">İadeler</p><p className="font-bold text-orange-400">₺{item.returnTotal.toLocaleString('tr-TR')}</p></div>
-                    <div><p className="text-muted-foreground mb-1">Alışlar</p><p className="font-bold text-purple-400">₺{item.purchaseTotal.toLocaleString('tr-TR')}</p></div>
+                    <div><p className="text-muted-foreground mb-1">Brüt Satış</p><p className="font-bold text-emerald-400">₺{Number(item.salesTotal || 0).toLocaleString('tr-TR')}</p></div>
+                    <div><p className="text-muted-foreground mb-1">İadeler</p><p className="font-bold text-orange-400">₺{Number(item.returnTotal || 0).toLocaleString('tr-TR')}</p></div>
+                    <div><p className="text-muted-foreground mb-1">Alışlar</p><p className="font-bold text-purple-400">₺{Number(item.purchaseTotal || 0).toLocaleString('tr-TR')}</p></div>
                     <div><p className="text-muted-foreground mb-1">Benzersiz Müşteri</p><p className="font-bold text-cyan-400">{item.customerCount}</p></div>
                   </div>
                 )}
@@ -1089,7 +1089,7 @@ export function RaporlarPage() {
                 {/* Özet kartlar */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {[
-                    { label: t('reports.estimatedTotalProfit'), value: `₺${totalEstProfit.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}`, color: '#10b981' },
+                    { label: t('reports.estimatedTotalProfit'), value: `₺${Number(totalEstProfit || 0).toLocaleString('tr-TR', { maximumFractionDigits: 0 })}`, color: '#10b981' },
                     { label: t('reports.avgProfitMargin'), value: `%${avgMargin.toFixed(1)}`, color: '#3b82f6' },
                     { label: t('reports.analyzedProducts'), value: `${karData.length}`, color: '#8b5cf6' },
                     { label: t('reports.unprofitableProducts'), value: `${karData.filter((p: any) => p.margin !== null && p.margin <= 0).length}`, color: '#ef4444' },
@@ -1168,7 +1168,7 @@ export function RaporlarPage() {
                                 </td>
                                 <td className="py-2.5 px-3 text-xs font-black tabular-nums">
                                   {p.totalProfit !== 0
-                                    ? <span className={p.totalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}>₺{Math.abs(p.totalProfit).toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</span>
+                                    ? <span className={p.totalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}>₺{Math.abs(p.totalProfit || 0).toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</span>
                                     : <span className="text-gray-600">—</span>}
                                 </td>
                               </tr>

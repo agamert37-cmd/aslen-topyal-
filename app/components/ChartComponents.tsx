@@ -272,7 +272,7 @@ export function AnimatedCounter({ value, prefix = '', suffix = '', duration = 15
 
   const formatted = decimals > 0
     ? display.toFixed(decimals)
-    : Math.round(display).toLocaleString('tr-TR');
+    : Math.round(display || 0).toLocaleString('tr-TR');
 
   return (
     <span className={`tabular-nums ${className}`}>
@@ -689,7 +689,7 @@ export function MetricBar({ label, value, maxValue, color, suffix = '', delay = 
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
-        <span className="text-[12px] font-bold text-foreground tabular-nums">{value.toLocaleString('tr-TR')}{suffix}</span>
+        <span className="text-[12px] font-bold text-foreground tabular-nums">{Number(value || 0).toLocaleString('tr-TR')}{suffix}</span>
       </div>
       <div className="h-2 rounded-full bg-[#131c30] overflow-hidden">
         <motion.div
@@ -821,7 +821,7 @@ export function HorizontalBarList({ items, maxValue: externalMax }: { items: HBa
             />
           </div>
           <span className="text-[12px] font-bold text-foreground tabular-nums w-16 text-right group-hover:text-blue-300 transition-colors">
-            ₺{item.value >= 1000 ? `${(item.value / 1000).toFixed(1)}k` : item.value.toLocaleString('tr-TR')}
+            ₺{item.value >= 1000 ? `${(item.value / 1000).toFixed(1)}k` : Number(item.value || 0).toLocaleString('tr-TR')}
           </span>
         </motion.div>
       ))}
@@ -1022,7 +1022,7 @@ export function WaterfallChart({ items, height = 220 }: WaterfallChartProps) {
                 x={cx} y={Math.max(top - 6, 12)}
                 textAnchor="middle" fill="#ffffffcc" fontSize={9} fontWeight="bold" fontFamily="monospace"
               >
-                {bar.end >= 0 ? '' : '-'}₺{Math.abs(bar.end).toLocaleString('tr-TR')}
+                {bar.end >= 0 ? '' : '-'}₺{Math.abs(bar.end || 0).toLocaleString('tr-TR')}
               </text>
               {/* Label */}
               <text
@@ -1138,7 +1138,7 @@ export function WeekCompareBar({ thisWeek, lastWeek, label = 'Bu Hafta', color =
         <div className="flex items-center justify-between gap-1">
           <span className="text-[9px] sm:text-[10px] font-semibold text-foreground/80 truncate">{label}</span>
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            <span className="text-[10px] sm:text-xs font-bold text-foreground tabular-nums">₺{thisWeek.toLocaleString('tr-TR')}</span>
+            <span className="text-[10px] sm:text-xs font-bold text-foreground tabular-nums">₺{Number(thisWeek || 0).toLocaleString('tr-TR')}</span>
             {change !== 0 && (
               <span className={`text-[8px] sm:text-[9px] font-bold px-1 sm:px-1.5 py-0.5 rounded ${change >= 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'}`}>
                 {change >= 0 ? '+' : ''}{change.toFixed(1)}%
@@ -1160,7 +1160,7 @@ export function WeekCompareBar({ thisWeek, lastWeek, label = 'Bu Hafta', color =
       <div className="space-y-1">
         <div className="flex items-center justify-between gap-1">
           <span className="text-[9px] sm:text-[10px] font-semibold text-foreground/40 truncate">Önceki Hafta</span>
-          <span className="text-[9px] sm:text-[11px] font-bold text-foreground/40 tabular-nums shrink-0">₺{lastWeek.toLocaleString('tr-TR')}</span>
+          <span className="text-[9px] sm:text-[11px] font-bold text-foreground/40 tabular-nums shrink-0">₺{Number(lastWeek || 0).toLocaleString('tr-TR')}</span>
         </div>
         <div className="h-2 rounded-full bg-[#131c30] overflow-hidden">
           <motion.div
@@ -1225,7 +1225,7 @@ export function PaymentDonut({ segments, size = 140 }: { segments: PaymentSegmen
           })}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-sm sm:text-lg font-black text-foreground">₺{total >= 1000 ? `${(total/1000).toFixed(0)}k` : total.toLocaleString('tr-TR')}</span>
+          <span className="text-sm sm:text-lg font-black text-foreground">₺{total >= 1000 ? `${(total/1000).toFixed(0)}k` : Number(total || 0).toLocaleString('tr-TR')}</span>
           <span className="text-[7px] sm:text-[8px] text-muted-foreground font-semibold uppercase">TOPLAM</span>
         </div>
       </div>
@@ -1452,7 +1452,7 @@ export function SalesFunnel({ steps, height = 220 }: { steps: FunnelStep[]; heig
               <div className="relative z-10 flex items-center justify-between gap-1 sm:gap-2">
                 <span className="text-[9px] sm:text-[10px] font-bold text-foreground/80 truncate">{step.label}</span>
                 <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-                  <span className="text-[10px] sm:text-xs font-black text-foreground">{step.value.toLocaleString('tr-TR')}</span>
+                  <span className="text-[10px] sm:text-xs font-black text-foreground">{Number(step.value || 0).toLocaleString('tr-TR')}</span>
                   {i > 0 && (
                     <span className="text-[8px] sm:text-[9px] font-bold px-1 sm:px-1.5 py-0.5 rounded-md bg-white/5 text-foreground/50">
                       {convRate}%
@@ -1496,7 +1496,7 @@ export function BulletGauge({ label, actual, target, max, color, suffix = '' }: 
         <span className="text-[9px] sm:text-[10px] font-semibold text-foreground/70 truncate">{label}</span>
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <span className="text-[9px] sm:text-[10px] font-bold text-foreground tabular-nums">
-            {actual.toLocaleString('tr-TR')}{suffix}
+            {Number(actual || 0).toLocaleString('tr-TR')}{suffix}
           </span>
           <span className={`text-[7px] sm:text-[8px] font-bold px-1 sm:px-1.5 py-0.5 rounded ${achieved >= 100 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/15 text-amber-400'}`}>
             {achieved.toFixed(0)}%
@@ -1531,9 +1531,9 @@ export function BulletGauge({ label, actual, target, max, color, suffix = '' }: 
       <div className="flex items-center justify-between text-[7px] sm:text-[8px] text-foreground/30">
         <span>0</span>
         <span className="flex items-center gap-1">
-          <span className="w-2.5 sm:w-3 h-0.5 bg-white/60 rounded" /> <span className="hidden sm:inline">Hedef: </span>{target.toLocaleString('tr-TR')}{suffix}
+          <span className="w-2.5 sm:w-3 h-0.5 bg-white/60 rounded" /> <span className="hidden sm:inline">Hedef: </span>{Number(target || 0).toLocaleString('tr-TR')}{suffix}
         </span>
-        <span>{max.toLocaleString('tr-TR')}{suffix}</span>
+        <span>{Number(max || 0).toLocaleString('tr-TR')}{suffix}</span>
       </div>
     </div>
   );
@@ -1555,7 +1555,7 @@ export function TrendComparison({ items }: { items: TrendItem[] }) {
       {items.map((item, i) => {
         const change = item.previous > 0 ? ((item.current - item.previous) / item.previous) * 100 : 0;
         const isUp = change >= 0;
-        const fmt = item.format || ((v: number) => v.toLocaleString('tr-TR'));
+        const fmt = item.format || ((v: number) => Number(v || 0).toLocaleString('tr-TR'));
         
         return (
           <motion.div
@@ -1703,7 +1703,7 @@ export function NumberRing({ value, label, color, size = 90, icon }: NumberRingP
             transition={{ delay: 0.5 }}
             className="text-base font-black text-foreground tabular-nums"
           >
-            {value.toLocaleString('tr-TR')}
+            {Number(value || 0).toLocaleString('tr-TR')}
           </motion.span>
         </div>
       </div>
@@ -1804,7 +1804,7 @@ export function BarRace({ items, suffix = '' }: { items: BarRaceItem[]; suffix?:
                   <span className="text-[9px] font-bold text-foreground/70 truncate">{item.label}</span>
                 </div>
                 <span className="text-[9px] font-black text-foreground/80 tabular-nums shrink-0">
-                  {item.value.toLocaleString('tr-TR')}{suffix}
+                  {Number(item.value || 0).toLocaleString('tr-TR')}{suffix}
                 </span>
               </div>
               <div className="h-4 rounded-lg bg-[#0d1117] overflow-hidden relative">
@@ -1843,7 +1843,7 @@ export function BarRace({ items, suffix = '' }: { items: BarRaceItem[]; suffix?:
                 </motion.div>
                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                   <span className="text-[9px] font-black text-foreground/80 tabular-nums">
-                    {item.value.toLocaleString('tr-TR')}{suffix}
+                    {Number(item.value || 0).toLocaleString('tr-TR')}{suffix}
                   </span>
                 </div>
               </div>

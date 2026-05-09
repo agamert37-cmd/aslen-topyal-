@@ -283,9 +283,10 @@ export function FisHistoryPage() {
     
     filteredFisler.forEach(fis => {
       const d = new Date(fis.date);
-      const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      const dayName = turkishDayNames[d.getDay()];
-      const dayLabel = `${d.getDate()} ${turkishMonthNames[d.getMonth()]} ${d.getFullYear()}, ${dayName}`;
+      const isValidDate = !isNaN(d.getTime());
+      const dateKey = isValidDate ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : 'Bilinmeyen-Tarih';
+      const dayName = isValidDate ? turkishDayNames[d.getDay()] : '---';
+      const dayLabel = isValidDate ? `${d.getDate()} ${turkishMonthNames[d.getMonth()]} ${d.getFullYear()}, ${dayName}` : 'Bilinmeyen Tarih';
       
       if (!groups[dateKey]) {
         groups[dateKey] = { dateKey, dayLabel, dayName, fisler: [], totalSatis: 0, totalGider: 0, totalAlis: 0, fisCount: 0 };
@@ -779,7 +780,7 @@ export function FisHistoryPage() {
     doc.text('Saat:', 20, 54);
     doc.setTextColor(15, 23, 42);
     doc.setFont('helvetica', 'bold');
-    doc.text(fis.id.substring(0, 12).toUpperCase(), 42, 42);
+    doc.text((fis.id || '').substring(0, 12).toUpperCase(), 42, 42);
     doc.setFont('helvetica', 'normal');
     doc.text(fis.date ? new Date(fis.date).toLocaleDateString('tr-TR') : '-', 42, 48);
     doc.text(fis.date ? new Date(fis.date).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '-', 42, 54);
@@ -1089,7 +1090,7 @@ export function FisHistoryPage() {
     doc.text(`${sanitizePDF(company.companyName)} ERP | ${new Date().toLocaleString('tr-TR')}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
     doc.text(`Sayfa 1 / 1`, pageWidth - 14, pageHeight - 5, { align: 'right' });
 
-    doc.save(`Fis_${isSatis ? 'Satis' : isAlis ? 'Alis' : 'Gider'}_${fis.id.substring(0, 8)}.pdf`);
+    doc.save(`Fis_${isSatis ? 'Satis' : isAlis ? 'Alis' : 'Gider'}_${(fis.id || '').substring(0, 8)}.pdf`);
     toast.success('PDF basariyla indirildi');
   };
 
@@ -1366,7 +1367,7 @@ export function FisHistoryPage() {
             isSale ? 'SATIS' : isAlis ? 'ALIS' : 'GIDER',
             sanitizePDF(fis.employeeName || '-'),
             sanitizePDF(((isSale || isAlis) ? (fis.cari?.companyName || 'Pesin') : (fis.category || '-')).substring(0, 20)),
-            urunSummary.substring(0, 40),
+            (urunSummary || '').substring(0, 40),
             (fis.total || fis.amount || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }),
             payMethod,
           ];
@@ -1804,8 +1805,8 @@ export function FisHistoryPage() {
                       isYesterday ? 'bg-gradient-to-br from-accent to-accent' :
                       'bg-gradient-to-br from-accent/60 to-secondary/60'
                     }`}>
-                      <span className="text-foreground text-lg font-bold leading-none">{new Date(dayGroup.dateKey + 'T00:00:00').getDate()}</span>
-                      <span className="text-foreground/60 text-[9px] font-medium uppercase">{dayGroup.dayName.substring(0, 3)}</span>
+                      <span className="text-foreground text-lg font-bold leading-none">{dayGroup.dateKey === 'Bilinmeyen-Tarih' ? '?' : new Date(dayGroup.dateKey + 'T00:00:00').getDate() || '?'}</span>
+                      <span className="text-foreground/60 text-[9px] font-medium uppercase">{dayGroup.dayName ? dayGroup.dayName.substring(0, 3) : '---'}</span>
                     </div>
 
                     <div className="flex-1 min-w-0">
@@ -2188,7 +2189,7 @@ export function FisHistoryPage() {
                   <div>
                     <Dialog.Title className="text-base sm:text-xl font-bold text-foreground">Fis Duzenle</Dialog.Title>
                     <Dialog.Description className="text-[10px] sm:text-xs text-muted-foreground/70 mt-0.5">
-                      {selectedFis && `#${selectedFis.id.substring(0, 8).toUpperCase()} - ${
+                      {selectedFis && `#${(selectedFis.id || '').substring(0, 8).toUpperCase()} - ${
                         (selectedFis.mode === 'satis' || selectedFis.mode === 'sale') ? 'Satis Fisi' :
                           selectedFis.mode === 'alis' ? 'Alis Fisi' : 'Gider Fisi'
                       }`}

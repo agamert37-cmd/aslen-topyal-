@@ -600,10 +600,6 @@ const TABLE_STORAGE_KEYS: Record<string, string> = {
   tahsilatlar:           'isleyen_et_tahsilatlar_data',
   guncelleme_notlari:    '', // localStorage'da yok — DB'ye doğrudan seed edilir
   stok_giris:            'isleyen_et_stok_giris_data',
-  nakliyeciler:          'isleyen_et_nakliyeciler',
-  iceberg_cages:         'iceberg_cages_data',
-  transporters:          'transporters_data',
-  invoice_names:         'invoice_names_data',
 };
 
 /** Tablo adının Türkçe görüntü adı */

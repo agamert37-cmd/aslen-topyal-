@@ -6,7 +6,6 @@ import { router } from './routes';
 import { Toaster } from 'sonner';
 import { useEffect } from 'react';
 import { useUpdateCheck } from './hooks/useUpdateCheck';
-import { useAutoReminders } from './hooks/useAutoReminders';
 import { StorageQuotaBanner } from './components/StorageQuotaBanner';
 import { AppLockScreen } from './components/AppLockScreen';
 import { AuthProvider } from './contexts/AuthContext';

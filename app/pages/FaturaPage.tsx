@@ -26,7 +26,6 @@ import { cariToDb, cariFromDb } from './CariPage';
 import { useGlobalTableData } from '../contexts/GlobalTableSyncContext';
 import { generateUBLXML, downloadXML, type UBLFaturaData } from '../utils/ublTr';
 import { getCompanyInfo } from './SettingsPage';
-import { v4 as uuidv4 } from 'uuid';
 
 // ─── Interfaces ────────────────────────────────────────────────
 export interface Fatura {
@@ -126,7 +125,7 @@ const AnimatedCounter = ({ value, prefix = '', suffix = '' }: { value: number; p
     };
     requestAnimationFrame(animate);
   }, [value]);
-  return <span>{prefix}{displayValue.toLocaleString('tr-TR')}{suffix}</span>;
+  return <span>{prefix}{(displayValue || 0).toLocaleString('tr-TR')}{suffix}</span>;
 };
 
 // ─── WhatsApp Paylaşım ──────────────────────────────────────────
@@ -209,21 +208,14 @@ export function FaturaPage() {
   const [activePageTab, setActivePageTab] = useState<'faturalar' | 'kdvRaporu' | 'stokEtki'>('faturalar');
 
   const [isInvoiceNamesModalOpen, setIsInvoiceNamesModalOpen] = useState(false);
-    const { data: invoiceNamesListData, addItem: addInvoiceNameSync, deleteItem: delInvoiceNameSync } = useTableSync<any>({
-    tableName: 'invoice_names',
-    storageKey: 'invoice_names_data',
-    initialData: [],
-    orderBy: 'name',
-    orderAsc: true
+  const [invoiceNamesList, setInvoiceNamesList] = useState<{id: string, name: string}[]>(() => {
+     return getFromStorage<{id: string, name: string}[]>('invoice_names_data') || [];
   });
-  const invoiceNamesList = React.useMemo(() => invoiceNamesListData || [], [invoiceNamesListData]);
-
-  const icebergCagesData = useGlobalTableData<any>('iceberg_cages');
-  const icebergCages = React.useMemo(() => icebergCagesData || [], [icebergCagesData]);
-
   const [newInvoiceName, setNewInvoiceName] = useState('');
   
-  
+  const [icebergCages, setIcebergCages] = useState<{id: string, name: string}[]>(() => {
+     return getFromStorage<{id: string, name: string}[]>('iceberg_cages_data') || [];
+  });
 
   // ─── useTableSync ENTEGRASYONU ──────────────────────────────────────
   const { data: syncFaturalar, addItem: addFaturaSync, updateItem: updateFaturaSync, deleteItem: deleteFaturaSync } = useTableSync<any>({
@@ -524,7 +516,7 @@ export function FaturaPage() {
       satirToplam: item.itemGrossTotal ?? (item.totalPrice * (1 + (item.itemKdvRate ?? fatura.kdvRate) / 100)),
     }));
     const ublData: UBLFaturaData = {
-      faturaUUID: fatura.id.replace(/[^a-f0-9-]/gi, '') || uuidv4(),
+      faturaUUID: fatura.id.replace(/[^a-f0-9-]/gi, '') || crypto.randomUUID(),
       faturaNo: fatura.faturaNo || `EAF${new Date().getFullYear()}${String(Date.now()).slice(-9)}`,
       tarih: fatura.date,
       saat: new Date(fatura.createdAt).toTimeString().slice(0, 8),
@@ -764,8 +756,8 @@ export function FaturaPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: t('fatura.totalInvoices'), value: stats.total, icon: FileText, color: 'blue' },
-          { label: t('fatura.purchaseInvoices'), value: stats.alisCount, sub: `₺${stats.alisToplam.toLocaleString('tr-TR')}`, icon: ArrowDownRight, color: 'orange' },
-          { label: t('fatura.salesInvoices'), value: stats.satisCount, sub: `₺${stats.satisToplam.toLocaleString('tr-TR')}`, icon: ArrowUpRight, color: 'emerald' },
+          { label: t('fatura.purchaseInvoices'), value: stats.alisCount, sub: `₺${(stats.alisToplam || 0).toLocaleString('tr-TR')}`, icon: ArrowDownRight, color: 'orange' },
+          { label: t('fatura.salesInvoices'), value: stats.satisCount, sub: `₺${(stats.satisToplam || 0).toLocaleString('tr-TR')}`, icon: ArrowUpRight, color: 'emerald' },
           { label: t('fatura.cancelled'), value: stats.iptal, icon: XCircle, color: 'red' },
         ].map((s, i) => (
           <motion.div
@@ -790,7 +782,7 @@ export function FaturaPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="p-3 rounded-xl bg-white/[0.03] border border-border flex items-center justify-between">
             <span className="text-xs text-muted-foreground">{t('fatura.totalKdv')}</span>
-            <span className="text-sm font-bold text-blue-400">₺{stats.toplamKdv.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+            <span className="text-sm font-bold text-blue-400">₺{(stats.toplamKdv || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
           </div>
           <div className="p-3 rounded-xl bg-white/[0.03] border border-border flex items-center justify-between">
             <span className="text-xs text-muted-foreground">{t('fatura.goodsLinked')}</span>
@@ -867,7 +859,9 @@ export function FaturaPage() {
                  />
                  <button onClick={() => {
                     if(!newInvoiceName.trim()) return;
-                    addInvoiceNameSync({ id: 'invname-'+Date.now(), name: newInvoiceName.trim() });
+                    const newList = [...invoiceNamesList, { id: 'invname-'+Date.now(), name: newInvoiceName.trim() }];
+                    setInvoiceNamesList(newList);
+                    setInStorage('invoice_names_data', newList);
                     setNewInvoiceName('');
                     toast.success('İsim eklendi');
                  }} className="px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl flex items-center gap-2">
@@ -879,7 +873,9 @@ export function FaturaPage() {
                    <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-border">
                      <span className="text-sm font-medium">{item.name}</span>
                      <button onClick={() => {
-                        delInvoiceNameSync(item.id);
+                        const newList = invoiceNamesList.filter(x => x.id !== item.id);
+                        setInvoiceNamesList(newList);
+                        setInStorage('invoice_names_data', newList);
                      }} className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg">
                        <Trash2 className="w-4 h-4" />
                      </button>
@@ -996,8 +992,8 @@ export function FaturaPage() {
 
                 {/* Amount */}
                 <div className="text-right">
-                  <p className="text-lg font-black text-foreground">₺{fatura.grossAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
-                  <p className="text-[10px] text-muted-foreground">KDV: ₺{fatura.kdvAmount.toFixed(2)}</p>
+                  <p className="text-lg font-black text-foreground">₺{(fatura.grossAmount || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+                  <p className="text-[10px] text-muted-foreground">KDV: ₺{(fatura.kdvAmount || 0).toFixed(2)}</p>
                 </div>
 
                 {/* Actions */}
@@ -1069,7 +1065,7 @@ export function FaturaPage() {
             ].map((s, i) => (
               <div key={i} className={`p-4 rounded-2xl bg-gradient-to-br from-${s.color}-500/10 via-[#111] to-[#111] border border-${s.color}-500/20`}>
                 <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">{s.label}</p>
-                <p className={`text-xl font-black text-${s.color}-400 mt-1`}>₺{Math.abs(s.value).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+                <p className={`text-xl font-black text-${s.color}-400 mt-1`}>₺{(Math.abs(s.value) || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
                 <p className="text-[10px] text-gray-600 mt-0.5">{s.desc}</p>
               </div>
             ))}
@@ -1087,10 +1083,10 @@ export function FaturaPage() {
                 {(Object.entries(kdvRaporu.kdvByRate) as [string, { alisNet: number; alisKdv: number; satisNet: number; satisKdv: number; count: number }][]).sort(([a], [b]) => Number(a) - Number(b)).map(([rate, data]) => (
                   <div key={rate} className="grid grid-cols-5 gap-2 text-xs px-3 py-2 rounded-xl bg-white/[0.02] hover:bg-white/[0.04] transition-all">
                     <span className="font-bold text-blue-400">%{rate}</span>
-                    <span className="text-orange-300">₺{data.alisNet.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
-                    <span className="text-orange-400 font-bold">₺{data.alisKdv.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
-                    <span className="text-emerald-300">₺{data.satisNet.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
-                    <span className="text-emerald-400 font-bold">₺{data.satisKdv.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+                    <span className="text-orange-300">₺{(data.alisNet || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+                    <span className="text-orange-400 font-bold">₺{(data.alisKdv || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+                    <span className="text-emerald-300">₺{(data.satisNet || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+                    <span className="text-emerald-400 font-bold">₺{(data.satisKdv || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
                   </div>
                 ))}
                 {Object.keys(kdvRaporu.kdvByRate).length === 0 && (
@@ -1113,9 +1109,9 @@ export function FaturaPage() {
                   <div key={month} className="grid grid-cols-5 gap-2 text-xs px-3 py-2 rounded-xl bg-white/[0.02] hover:bg-white/[0.04] transition-all">
                     <span className="font-bold text-foreground">{month}</span>
                     <span className="text-muted-foreground">{data.faturaCount}</span>
-                    <span className="text-orange-400">₺{data.alisKdv.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
-                    <span className="text-emerald-400">₺{data.satisKdv.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
-                    <span className={`font-bold ${data.net >= 0 ? 'text-blue-400' : 'text-red-400'}`}>₺{data.net.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+                    <span className="text-orange-400">₺{(data.alisKdv || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+                    <span className="text-emerald-400">₺{(data.satisKdv || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+                    <span className={`font-bold ${data.net >= 0 ? 'text-blue-400' : 'text-red-400'}`}>₺{(data.net || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
                   </div>
                 ))}
                 {Object.keys(kdvRaporu.monthlyKdv).length === 0 && (
@@ -1269,7 +1265,7 @@ export function FaturaPage() {
                             </div>
                             {c.balance !== undefined && c.balance !== 0 && (
                               <span className={`text-[10px] font-bold ${c.balance > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                                ₺{Math.abs(c.balance).toLocaleString('tr-TR')}
+                                ₺{(Math.abs(c.balance) || 0).toLocaleString('tr-TR')}
                               </span>
                             )}
                           </button>
@@ -1391,7 +1387,7 @@ export function FaturaPage() {
                           placeholder="Miktar" className="w-20 flex-shrink-0 px-3 py-2 bg-white/[0.04] border border-border rounded-lg text-foreground text-xs outline-none text-right" />
                         <input type="number" step="0.01" value={item.unitPrice || ''} onChange={e => updateFormItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
                           placeholder="B.Fiyat" className="w-24 flex-shrink-0 px-3 py-2 bg-white/[0.04] border border-border rounded-lg text-foreground text-xs outline-none text-right" />
-                        <span className="text-xs font-bold text-foreground w-20 flex-shrink-0 text-right">₺{item.totalPrice.toFixed(2)}</span>
+                        <span className="text-xs font-bold text-foreground w-20 flex-shrink-0 text-right">₺{(item.totalPrice || 0).toFixed(2)}</span>
                         <button onClick={() => removeFormItem(item.id)} className="p-2 hover:bg-red-500/10 rounded-lg transition-all flex-shrink-0">
                           <Trash2 className="w-3.5 h-3.5 text-red-400" />
                         </button>
@@ -1411,15 +1407,15 @@ export function FaturaPage() {
                 <div className="p-4 bg-indigo-500/5 border border-indigo-500/10 rounded-2xl space-y-2">
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>Net Tutar:</span>
-                    <span className="font-bold text-foreground">₺{formNetAmount.toFixed(2)}</span>
+                    <span className="font-bold text-foreground">₺{(formNetAmount || 0).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-xs text-blue-400">
                     <span>KDV (%{form.kdvRate}):</span>
-                    <span className="font-bold">₺{formKdvAmount.toFixed(2)}</span>
+                    <span className="font-bold">₺{(formKdvAmount || 0).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm font-bold text-foreground pt-2 border-t border-border">
                     <span>Genel Toplam (KDV Dahil):</span>
-                    <span className="text-lg">₺{formGrossAmount.toFixed(2)}</span>
+                    <span className="text-lg">₺{(formGrossAmount || 0).toFixed(2)}</span>
                   </div>
                 </div>
               )}
@@ -1491,8 +1487,8 @@ export function FaturaPage() {
                       <h2 className="text-2xl font-black text-foreground">{selectedFatura.counterParty}</h2>
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-black text-foreground">₺{selectedFatura.grossAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
-                      <p className="text-xs text-muted-foreground">KDV %{selectedFatura.kdvRate} — ₺{selectedFatura.kdvAmount.toFixed(2)}</p>
+                      <p className="text-2xl font-black text-foreground">₺{(selectedFatura.grossAmount || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+                      <p className="text-xs text-muted-foreground">KDV %{selectedFatura.kdvRate} — ₺{(selectedFatura.kdvAmount || 0).toFixed(2)}</p>
                     </div>
                   </div>
                 </div>
@@ -1530,15 +1526,15 @@ export function FaturaPage() {
                   <div className="p-4 bg-indigo-500/5 border border-indigo-500/10 rounded-2xl space-y-2">
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>Net Tutar (KDV Hariç):</span>
-                      <span className="font-bold text-foreground">₺{selectedFatura.netAmount.toFixed(2)}</span>
+                      <span className="font-bold text-foreground">₺{(selectedFatura.netAmount || 0).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-xs text-blue-400">
                       <span>KDV (%{selectedFatura.kdvRate}):</span>
-                      <span className="font-bold">₺{selectedFatura.kdvAmount.toFixed(2)}</span>
+                      <span className="font-bold">₺{(selectedFatura.kdvAmount || 0).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-sm font-bold text-foreground pt-2 border-t border-border">
                       <span>Toplam (KDV Dahil):</span>
-                      <span>₺{selectedFatura.grossAmount.toFixed(2)}</span>
+                      <span>₺{(selectedFatura.grossAmount || 0).toFixed(2)}</span>
                     </div>
                   </div>
 
@@ -1731,7 +1727,7 @@ export function FaturaPage() {
                           {u.linkedStockName && <span className="text-emerald-400"> → {u.linkedStockName}</span>}
                         </p>
                       </div>
-                      <span className="text-sm font-bold text-blue-400">₺{u.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+                      <span className="text-sm font-bold text-blue-400">₺{(u.totalAmount || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
                     </div>
                   ))}
                 </div>

@@ -119,21 +119,88 @@ async function startServer() {
     }
   });
 
-  // Execute update (pull & docker restart sim or actual)
   app.post("/api/update", (req, res) => {
-    const { repoUrl } = req.body;
-    // Hatalarda çökmeyi engelleyen, esnek npm ve git parametreleri
-    // GIT_TERMINAL_PROMPT=0 engeller password sorup asılı kalmasını.
-    const cmd = "env GIT_TERMINAL_PROMPT=0 git pull --no-edit || echo 'Git pull failed or skipped' && npm install --no-fund --no-audit --omit=optional && npm run build"; 
+    const { repoUrl, targetDir, branch = "main", clearCache = false, reBuild = true, restartService = true } = req.body;
+    const cwd = targetDir || process.cwd();
+
+    let cmdParts = [
+      "echo '>>> Güncelleme süreci başlatılıyor...'",
+      "git stash",
+      "git fetch --all",
+      `git reset --hard origin/${branch} || git reset --hard origin/master`
+    ];
+
+    if (clearCache) {
+      cmdParts.push("echo '>>> NPM önbelleği temizleniyor...'");
+      cmdParts.push("npm cache clean --force");
+      cmdParts.push("rm -rf node_modules/.vite || true");
+    }
+
+    cmdParts.push("echo '>>> Bağımlılıklar yükleniyor...'");
+    cmdParts.push("npm install --no-fund --no-audit --omit=optional");
+
+    if (reBuild) {
+      cmdParts.push("echo '>>> Uygulama derleniyor (Build)...'");
+      cmdParts.push("npm run build");
+    }
+
+    if (restartService) {
+      cmdParts.push("echo '>>> Servisler yeniden başlatılıyor...'");
+      cmdParts.push("(pm2 reload all || docker-compose restart || echo 'PM2/Docker bulunamadı, manuel restart gerekebilir')");
+    }
+
+    const cmd = cmdParts.join(" && ");
     
-    // Gelişmiş exec: 5 dakika timeout (300000ms), 50MB bellek (derleme için)
-    exec(cmd, { cwd: process.cwd(), timeout: 300000, maxBuffer: 50 * 1024 * 1024 }, (error, stdout, stderr) => {
-       res.json({
-         success: !error,
-         log: stdout ? stdout.toString() : (stderr ? stderr.toString() : ""),
-         error: error ? error.message : null
-       });
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Transfer-Encoding', 'chunked');
+    
+    res.write(`Hedef Dizin: ${cwd}\nAktif Dal (Branch): ${branch}\nÖnbellek Temizliği: ${clearCache ? 'Açık' : 'Kapalı'}\nDerleme (Build): ${reBuild ? 'Açık' : 'Kapalı'}\nServis Restart: ${restartService ? 'Açık' : 'Kapalı'}\n\n`);
+
+    const { spawn } = require('child_process');
+    
+    const child = spawn(cmd, { cwd, shell: true, timeout: 600000 }); // 10 dakika izin ver
+
+    child.stdout.on('data', (data: Buffer) => {
+      res.write(data.toString());
     });
+
+    child.stderr.on('data', (data: Buffer) => {
+      res.write(data.toString());
+    });
+
+    child.on('close', (code: number) => {
+      res.write(`\n--- İşlem tamamlandı. Çıkış kodu [${code}] ---`);
+      res.end();
+    });
+
+    child.on('error', (err: Error) => {
+      res.write(`\n--- KRİTİK HATA: ${err.message} ---`);
+      res.end();
+    });
+  });
+
+  // Get locally installed projects from C:\Proje or Desktop\Proje
+  app.get("/api/projects", (req, res) => {
+    try {
+      const baseDir1 = "C:\\Proje";
+      const baseDir2 = path.join(os.homedir(), "Desktop", "Proje");
+      const dirs: string[] = [];
+
+      [baseDir1, baseDir2].forEach(bd => {
+        if (fs.existsSync(bd)) {
+          const items = fs.readdirSync(bd);
+          items.forEach(item => {
+            const fullPath = path.join(bd, item);
+            if (fs.statSync(fullPath).isDirectory() && fs.existsSync(path.join(fullPath, "package.json"))) {
+              dirs.push(fullPath);
+            }
+          });
+        }
+      });
+      res.json({ success: true, projects: dirs });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
   });
 
   // System stats
@@ -201,7 +268,7 @@ async function startServer() {
     res.status(500).json({ error: "Sunucu içi bir hata oluştu, ancak sunucu çalışmaya devam ediyor." });
   });
 
-  app.listen(Number(PORT), "0.0.0.0", () => {
+  app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }

@@ -195,7 +195,7 @@ export function AIPendingApprovals() {
         <div className="text-center p-8 bg-secondary/50 rounded-xl border border-border">
           <p className="text-muted-foreground">Şu anda onay bekleyen işlem bulunmuyor.</p>
         </div>
-      ) : (
+      ) : Number(
         <div className="space-y-4">
           <AnimatePresence>
             {pendingItems.map(item => (

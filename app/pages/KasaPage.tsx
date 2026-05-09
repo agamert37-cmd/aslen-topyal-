@@ -36,7 +36,6 @@ import { getPagePermissions } from '../utils/permissions';
 import { usePageSecurity } from '../hooks/usePageSecurity';
 import { kvGet, kvSet } from '../lib/pouchdb-kv';
 import { useDayControl } from '../hooks/useDayControl';
-import { v4 as uuidv4 } from 'uuid';
 
 interface POSDevice {
   id: string;
@@ -91,14 +90,22 @@ export function KasaPage() {
     () => (sessionStorage.getItem('mert4_filter_kasa_type') as 'Tümü'|'Gelir'|'Gider') ?? 'Tümü'
   );
   
-  const { data: posDevicesRaw, addItem: addPosDevice, deleteItem: removePosDevice } = useTableSync<POSDevice>({
-    tableName: 'pos_devices',
-    storageKey: StorageKey.POS_DATA,
-    initialData: [],
+  const [posDevices, setPosDevices] = useState<POSDevice[]>(() => {
+    return getFromStorage<POSDevice[]>(StorageKey.POS_DATA) || [];
   });
-  const posDevices = useMemo(() => Array.isArray(posDevicesRaw) ? posDevicesRaw : [], [posDevicesRaw]);
 
-  // KV senkronizasyonu artık sistem tarafından yönetiliyor, lokal state silindi
+  // BUG FIX [AJAN-2]: localStorage boşsa KV store'dan POS cihazlarını yükle (mobil ilk açılış)
+  useEffect(() => {
+    const saved = getFromStorage<POSDevice[]>(StorageKey.POS_DATA);
+    if (!saved || saved.length === 0) {
+      kvGet<POSDevice[]>('pos_devices').then(remote => {
+        if (remote && remote.length > 0) {
+          setPosDevices(remote);
+          setInStorage(StorageKey.POS_DATA, remote);
+        }
+      }).catch(() => {});
+    }
+  }, []);
 
   const [isPosModalOpen, setIsPosModalOpen] = useState(false);
   const [newPosForm, setNewPosForm] = useState({
@@ -181,7 +188,7 @@ export function KasaPage() {
     }
     
     const newTransaction: Transaction = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       type: modalType,
       category,
       description,
@@ -229,7 +236,11 @@ export function KasaPage() {
       ...newPosForm,
       createdAt: new Date().toISOString().split('T')[0],
     };
-    addPosDevice(newDevice);
+    const updated = [newDevice, ...posDevices];
+    setPosDevices(updated);
+    setInStorage(StorageKey.POS_DATA, updated);
+    // BUG FIX [AJAN-2]: POS cihazını KV store'a da yaz
+    kvSet('pos_devices', updated).catch(e => console.error('[Kasa] POS kv sync:', e));
     toast.success('POS cihazı sisteme eklendi');
     setIsPosModalOpen(false);
     setNewPosForm({ name: '', bankName: '', serialNumber: '' });
@@ -327,7 +338,7 @@ export function KasaPage() {
               <div className="p-2 sm:p-3 bg-blue-500/20 rounded-xl text-blue-400 border border-blue-500/30"><Wallet className="w-4 h-4 sm:w-5 sm:h-5" /></div>
               <h3 className="font-bold text-[10px] sm:text-sm text-blue-300 uppercase tracking-wider">Toplam Kasa</h3>
             </div>
-            <p className="text-2xl sm:text-4xl lg:text-5xl font-extrabold text-foreground break-all">₺{totalAssets.toLocaleString()}</p>
+            <p className="text-2xl sm:text-4xl lg:text-5xl font-extrabold text-foreground break-all">₺{Number(totalAssets || 0).toLocaleString()}</p>
           </div>
           <div className="mt-4 sm:mt-6 flex items-center justify-between text-[10px] sm:text-xs font-medium text-blue-200/60 bg-blue-950/30 p-2 sm:p-3 rounded-xl border border-blue-500/20">
             <span>Net gelir/gider sonucu</span>
@@ -347,7 +358,7 @@ export function KasaPage() {
                 <h3 className="font-bold text-[10px] sm:text-sm text-muted-foreground uppercase tracking-wider">Bugün Giren</h3>
               </div>
             </div>
-            <p className="text-lg sm:text-3xl lg:text-4xl font-bold text-green-400 break-all">+₺{todayIncome.toLocaleString()}</p>
+            <p className="text-lg sm:text-3xl lg:text-4xl font-bold text-green-400 break-all">+₺{Number(todayIncome || 0).toLocaleString()}</p>
           </div>
           <div className="mt-4 sm:mt-6 h-1 w-full bg-white/10 rounded-full overflow-hidden">
             <div className="h-full bg-green-500 rounded-full" style={{ width: '100%' }} />
@@ -366,7 +377,7 @@ export function KasaPage() {
                 <h3 className="font-bold text-[10px] sm:text-sm text-muted-foreground uppercase tracking-wider">Bugün Çıkan</h3>
               </div>
             </div>
-            <p className="text-lg sm:text-3xl lg:text-4xl font-bold text-red-400 break-all">-₺{todayExpense.toLocaleString()}</p>
+            <p className="text-lg sm:text-3xl lg:text-4xl font-bold text-red-400 break-all">-₺{Number(todayExpense || 0).toLocaleString()}</p>
           </div>
           <div className="mt-4 sm:mt-6 h-1 w-full bg-white/10 rounded-full overflow-hidden">
             <div className="h-full bg-red-500 rounded-full" style={{ width: '100%' }} />
@@ -398,12 +409,12 @@ export function KasaPage() {
             <div className="flex justify-between items-center text-sm">
               <span className="text-muted-foreground">Günlük Net Durum:</span>
               <span className={`font-bold ${kasaGunSonuValidation.kasaNet >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {kasaGunSonuValidation.kasaNet >= 0 ? '+' : ''}₺{kasaGunSonuValidation.kasaNet.toLocaleString('tr-TR')}
+                {kasaGunSonuValidation.kasaNet >= 0 ? '+' : ''}₺{Number(kasaGunSonuValidation.kasaNet || 0).toLocaleString('tr-TR')}
               </span>
             </div>
             <div className="flex justify-between items-center text-sm border-t border-border pt-3">
               <span className="text-muted-foreground">Satış Modülü Mutabakatı:</span>
-              <span className="text-blue-400 font-bold">₺{kasaGunSonuValidation.gunSonuSalesTotal.toLocaleString('tr-TR')}</span>
+              <span className="text-blue-400 font-bold">₺{Number(kasaGunSonuValidation.gunSonuSalesTotal || 0).toLocaleString('tr-TR')}</span>
             </div>
           </div>
         </div>
@@ -519,7 +530,7 @@ export function KasaPage() {
                       
                       <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-4 sm:gap-6 pl-[52px] sm:pl-0 mt-1 sm:mt-0">
                         <p className={`text-lg sm:text-xl font-black tracking-tight ${transaction.type === 'Gelir' ? 'text-green-400' : 'text-red-400'}`}>
-                          {transaction.type === 'Gelir' ? '+' : '-'}₺{transaction.amount.toLocaleString('tr-TR')}
+                          {transaction.type === 'Gelir' ? '+' : '-'}₺{Number(transaction.amount || 0).toLocaleString('tr-TR')}
                         </p>
                         <button
                           onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(transaction.id); }}
@@ -560,7 +571,11 @@ export function KasaPage() {
                       <button
                         onClick={() => {
                           if(confirm('POS cihazını silmek istediğinize emin misiniz?')) {
-                            removePosDevice(device.id);
+                            const updated = posDevices.filter(d => d.id !== device.id);
+                            setPosDevices(updated);
+                            setInStorage(StorageKey.POS_DATA, updated);
+                            // BUG FIX [AJAN-2]: POS silme KV store'a da yaz
+                            kvSet('pos_devices', updated).catch(e => console.error('[Kasa] POS kv sync:', e));
                             toast.success('POS Cihazı silindi.');
                           }
                         }}

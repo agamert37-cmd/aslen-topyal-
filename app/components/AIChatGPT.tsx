@@ -432,7 +432,7 @@ function StatCard({ data }: { data: any }) {
             <p className="text-xs text-muted-foreground uppercase mb-1">{key}</p>
             <p className="text-2xl font-bold text-foreground">
               {typeof value === 'number'
-                ? value.toLocaleString('tr-TR', { maximumFractionDigits: 2 })
+                ? Number(value || 0).toLocaleString('tr-TR', { maximumFractionDigits: 2 })
                 : (value && typeof value === 'object') ? JSON.stringify(value) : String(value || '')}
             </p>
           </div>

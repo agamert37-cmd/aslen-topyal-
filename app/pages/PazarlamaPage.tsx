@@ -23,7 +23,6 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { getFromStorage, setInStorage, StorageKey } from '../utils/storage';
-import { useGlobalTableData } from '../contexts/GlobalTableSyncContext';
 import { kvSet } from '../lib/pouchdb-kv';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -34,7 +33,6 @@ import { getPagePermissions } from '../utils/permissions';
 import { usePageSecurity } from '../hooks/usePageSecurity';
 import { getVitrinAnalytics, getPopularProducts, getDailyStats, getVitrinEventsToday, clearVitrinAnalytics } from '../utils/vitrinAnalytics';
 import { getActiveSessions, forceLogoutSession } from '../utils/security';
-import { v4 as uuidv4 } from 'uuid';
 
 // ─── Interfaces ──────────────────────────────────────────────────
 interface HeroBanner {
@@ -286,16 +284,16 @@ function VitrinAnalyticsTab() {
                     <UserCheck className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-foreground">{s.userName || 'Bilinmeyen Kullanıcı'}</h4>
-                    <p className="text-[10px] text-muted-foreground truncate max-w-[200px] sm:max-w-[300px]">
-                      Platform: {(s.userAgent || '').slice(0, 40)}...
+                    <h4 className="text-sm font-bold text-foreground">{s.employeeName || 'Bilinmeyen Kullanıcı'}</h4>
+                    <p className="text-[10px] text-muted-foreground">
+                      IP: {s.ipAddress} • Platform: {s.userAgent.slice(0, 30)}...
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-right">
              <p className="text-xs text-emerald-400 font-bold flex items-center justify-end gap-1"><span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" /> Aktif</p>
-             <p className="text-[10px] text-muted-foreground mt-0.5">Son: {new Date(s.lastActivity).toLocaleTimeString('tr-TR')}</p>
+             <p className="text-[10px] text-muted-foreground mt-0.5">Son: {new Date(s.lastActiveAt).toLocaleTimeString('tr-TR')}</p>
                   </div>
                   <button 
                     onClick={() => {
@@ -497,20 +495,25 @@ function IletisimTalepleriTab() {
 
 // ─── Fiyat Listesi Tab ─────────────────────────────────────────
 function FiyatListesiTab() {
-  const cariler = useGlobalTableData<any>('cari_hesaplar') || [];
-  const products = useGlobalTableData<any>('urunler') || [];
+  const [cariler, setCariler] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   
   const [selectedCari, setSelectedCari] = useState<string>('');
   const [customTitle, setCustomTitle] = useState('');
   const [markupPercent, setMarkupPercent] = useState<number>(0);
   const [isGenerating, setIsGenerating] = useState(false);
 
+  useEffect(() => {
+    setCariler(getFromStorage<any[]>(StorageKey.CARI_DATA) || []);
+    setProducts(getFromStorage<any[]>(StorageKey.STOK_DATA) || []);
+  }, []);
+
   const handleGenerate = async () => {
     if (!selectedCari) {
       toast.error('Lütfen bir cari (müşteri) seçin.');
       return;
     }
-    const cariName = cariler.find((c: any) => c.id === selectedCari)?.companyName || 'Müşteri';
+    const cariName = cariler.find(c => c.id === selectedCari)?.companyName || 'Müşteri';
     
     if (products.length === 0) {
       toast.error('Sistemde hiç ürün bulunmuyor.');
@@ -520,7 +523,7 @@ function FiyatListesiTab() {
     setIsGenerating(true);
     try {
       const { generateFiyatListesiPDF } = await import('../utils/fiyatListesiPdf');
-      const plist = products.map((p: any) => ({
+      const plist = products.map(p => ({
         name: p.name,
         _basePrice: p.sellPrice || p.avgCost || 0
       }));
@@ -550,7 +553,7 @@ function FiyatListesiTab() {
             className="w-full px-3 py-2 border border-border rounded-xl bg-background text-sm"
           >
             <option value="">Seçiniz...</option>
-            {cariler.filter((c: any) => c.type !== 'toptanci').map((c: any) => (
+            {cariler.filter(c => c.type !== 'toptanci').map(c => (
               <option key={c.id} value={c.id}>{c.companyName}</option>
             ))}
           </select>
@@ -772,17 +775,17 @@ function ContentHealthScore({ content }: { content: PazarlamaContent }) {
       { label: 'Firma açıklaması', ok: content.companyAbout.length > 50, tip: 'Firma › Hakkımızda metnini en az 50 karakter yapın' },
       { label: 'Misyon & vizyon', ok: content.companyMission.length > 10 && content.companyVision.length > 10, tip: 'Firma › Misyon ve vizyon alanlarını doldurun' },
       { label: 'En az 2 haber', ok: content.announcements.filter(a => a.active).length >= 2, tip: 'Haberler sekmesinden güncel duyuru ekleyin' },
-      { label: 'Ürün vitrini dolu', ok: content.products.filter((p: any) => p.active).length >= 2, tip: 'Ürünler sekmesinden en az 2 vitrin ürünü ekleyin' },
+      { label: 'Ürün vitrini dolu', ok: content.products.filter(p => p.active).length >= 2, tip: 'Ürünler sekmesinden en az 2 vitrin ürünü ekleyin' },
     ];
     return items;
   }, [content]);
 
-  const score = Math.round((checks.filter((c: any) => c.ok).length / checks.length) * 100);
+  const score = Math.round((checks.filter(c => c.ok).length / checks.length) * 100);
   const scoreColor = score >= 80 ? 'text-emerald-400' : score >= 50 ? 'text-amber-400' : 'text-red-400';
   const ringColor = score >= 80 ? 'stroke-emerald-500' : score >= 50 ? 'stroke-amber-500' : 'stroke-red-500';
   const circumference = 2 * Math.PI * 38;
   const offset = circumference - (score / 100) * circumference;
-  const failedChecks = checks.filter((c: any) => !c.ok);
+  const failedChecks = checks.filter(c => !c.ok);
 
   return (
     <div className="bg-card rounded-3xl p-6 border border-border">
@@ -978,9 +981,9 @@ function StokImportPanel({ onImport, existingProductNames }: { onImport: (items:
   const [stokSearch, setStokSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  const rawStokData = useGlobalTableData<any>('urunler') || [];
   const stokData = useMemo(() => {
-    return rawStokData.filter((p: any) => p.name && p.name.trim().length > 0).map((p: any) => ({
+    const raw = getFromStorage<any[]>(StorageKey.STOK_DATA) || [];
+    return raw.filter((p: any) => p.name && p.name.trim().length > 0).map((p: any) => ({
       id: p.id,
       name: p.name,
       category: p.category || 'Diger',
@@ -989,12 +992,12 @@ function StokImportPanel({ onImport, existingProductNames }: { onImport: (items:
       sellPrice: p.sellPrice ?? p.sell_price ?? 0,
       alreadyInVitrine: existingProductNames.some(n => n.toLowerCase() === p.name.toLowerCase()),
     }));
-  }, [existingProductNames, rawStokData]);
+  }, [existingProductNames]);
 
   const filteredStok = useMemo(() => {
     if (!stokSearch.trim()) return stokData;
     const s = stokSearch.toLowerCase();
-    return stokData.filter((p: any) => String(p.name || '').toLowerCase().includes(s) || String(p.category || '').toLowerCase().includes(s));
+    return stokData.filter(p => String(p.name || '').toLowerCase().includes(s) || String(p.category || '').toLowerCase().includes(s));
   }, [stokData, stokSearch]);
 
   const toggleId = (id: string) => {
@@ -1004,7 +1007,7 @@ function StokImportPanel({ onImport, existingProductNames }: { onImport: (items:
   };
 
   const handleImport = () => {
-    const items = stokData.filter((p: any) => selectedIds.has(p.id)).map((p: any) => ({
+    const items = stokData.filter(p => selectedIds.has(p.id)).map(p => ({
       name: p.name,
       description: `${p.category} - Birim: ${p.unit}${p.currentStock > 0 ? ` - Stok: ${p.currentStock}` : ''}`,
       category: p.category,
@@ -1056,7 +1059,7 @@ function StokImportPanel({ onImport, existingProductNames }: { onImport: (items:
             {stokData.length === 0 ? 'Stokta urun bulunamadi. Oncelikle Stok sayfasindan urun ekleyin.' : 'Aramayla eslesen urun yok.'}
           </div>
         ) : (
-          filteredStok.map((p: any) => {
+          filteredStok.map(p => {
             const isSelected = selectedIds.has(p.id);
             return (
               <button key={p.id} type="button" onClick={() => !p.alreadyInVitrine && toggleId(p.id)}
@@ -1219,7 +1222,7 @@ export function PazarlamaPage() {
     const arr = content[key] as any[];
     const item = arr.find((i: any) => i.id === id);
     if (item) {
-      const copy = { ...item, id: uuidv4(), title: (item.title || item.name || item.question || '') + ' (Kopya)' };
+      const copy = { ...item, id: crypto.randomUUID(), title: (item.title || item.name || item.question || '') + ' (Kopya)' };
       if (copy.name) copy.name = copy.name + ' (Kopya)';
       updateContent({ [key]: [...arr, copy] } as any);
       toast.success('Öğe kopyalandı');
@@ -1235,7 +1238,7 @@ export function PazarlamaPage() {
       content.campaigns.filter(i => i.active).length + content.testimonials.filter(i => i.active).length +
       content.faq.filter(i => i.active).length;
     const activeSocial = content.socialLinks.filter(l => l.active && l.url).length;
-    const expiredCampaigns = content.campaigns.filter((c: any) => c.validUntil && new Date(c.validUntil) < new Date()).length;
+    const expiredCampaigns = content.campaigns.filter(c => c.validUntil && new Date(c.validUntil) < new Date()).length;
     return { totalItems, activeItems, inactiveItems: totalItems - activeItems, activeSocial, expiredCampaigns };
   }, [content]);
 
@@ -1502,7 +1505,7 @@ export function PazarlamaPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <TemplatePicker templates={ANNOUNCEMENT_TEMPLATES} label="Haber Sablonlari" color="cyan"
-                        onSelect={(t) => addItem('announcements', { id: uuidv4(), title: t.title, text: t.text, date: new Date().toISOString().split('T')[0], badge: t.badge, imageUrl: '', active: true })} />
+                        onSelect={(t) => addItem('announcements', { id: crypto.randomUUID(), title: t.title, text: t.text, date: new Date().toISOString().split('T')[0], badge: t.badge, imageUrl: '', active: true })} />
                       <span className="text-xs text-muted-foreground/70">{content.announcements.filter(a => a.active).length}/{content.announcements.length}</span>
                     </div>
                   </div>
@@ -1531,7 +1534,7 @@ export function PazarlamaPage() {
                       <ImageInputField value={item.imageUrl} onChange={(v) => updateItem<Announcement>('announcements', item.id, { imageUrl: v })} placeholder="Haber gorseli (opsiyonel)" />
 
                       {/* ─ İlgili Ürün Etiketleri ─────────────────────────────────── */}
-                      {content.products.filter((p: any) => p.active && p.name).length > 0 && (
+                      {content.products.filter(p => p.active && p.name).length > 0 && (
                         <div className="mt-3 pt-3 border-t border-border">
                           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">
                             İlgili Ürünler
@@ -1541,8 +1544,8 @@ export function PazarlamaPage() {
                           </p>
                           <div className="flex flex-wrap gap-1.5">
                             {content.products
-                              .filter((p: any) => p.active && p.name)
-                              .map((p: any) => {
+                              .filter(p => p.active && p.name)
+                              .map(p => {
                                 const selected = (item.relatedProducts || []).includes(p.name);
                                 return (
                                   <button
@@ -1574,14 +1577,14 @@ export function PazarlamaPage() {
                           )}
                         </div>
                       )}
-                      {content.products.filter((p: any) => p.active).length === 0 && (
+                      {content.products.filter(p => p.active).length === 0 && (
                         <p className="text-[10px] text-gray-600 mt-2 pl-1">
                           Ürün bağlamak için önce "Ürünler" sekmesinden vitrin ürünleri ekleyin.
                         </p>
                       )}
                     </motion.div>
                   ))}
-                  <AddButton label="Yeni Haber Ekle" onClick={() => addItem('announcements', { id: uuidv4(), title: '', text: '', date: new Date().toISOString().split('T')[0], badge: 'Duyuru', imageUrl: '', active: true, relatedProducts: [] })} color="cyan" />
+                  <AddButton label="Yeni Haber Ekle" onClick={() => addItem('announcements', { id: crypto.randomUUID(), title: '', text: '', date: new Date().toISOString().split('T')[0], badge: 'Duyuru', imageUrl: '', active: true, relatedProducts: [] })} color="cyan" />
                 </div>
               )}
 
@@ -1592,7 +1595,7 @@ export function PazarlamaPage() {
                   <StokImportPanel onImport={(items) => {
                     items.forEach(item => {
                       addItem('products', {
-                        id: uuidv4(),
+                        id: crypto.randomUUID(),
                         name: item.name,
                         description: item.description || `${item.category} - ${item.unit}`,
                         imageUrl: '',
@@ -1602,7 +1605,7 @@ export function PazarlamaPage() {
                       });
                     });
                     toast.success(`${items.length} urun vitrine aktarildi!`);
-                  }} existingProductNames={content.products.map((p: any) => p.name)} />
+                  }} existingProductNames={content.products.map(p => p.name)} />
 
                   <div className="bg-card rounded-3xl p-5 sm:p-8 space-y-6 border border-border">
                     <div className="flex items-center justify-between">
@@ -1615,8 +1618,8 @@ export function PazarlamaPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <TemplatePicker templates={PRODUCT_TEMPLATES} label="Urun Sablonlari" color="purple"
-                          onSelect={(t) => addItem('products', { id: uuidv4(), name: t.name, description: t.description, imageUrl: '', price: t.price, badge: t.badge, active: true })} />
-                        <span className="text-xs text-muted-foreground/50">{content.products.filter((p: any) => p.active).length}/{content.products.length}</span>
+                          onSelect={(t) => addItem('products', { id: crypto.randomUUID(), name: t.name, description: t.description, imageUrl: '', price: t.price, badge: t.badge, active: true })} />
+                        <span className="text-xs text-muted-foreground/50">{content.products.filter(p => p.active).length}/{content.products.length}</span>
                       </div>
                     </div>
 
@@ -1643,7 +1646,7 @@ export function PazarlamaPage() {
                         </motion.div>
                       ))}
                     </div>
-                    <AddButton label="Yeni Urun Ekle" onClick={() => addItem('products', { id: uuidv4(), name: '', description: '', imageUrl: '', price: '', badge: '', active: true })} color="purple" />
+                    <AddButton label="Yeni Urun Ekle" onClick={() => addItem('products', { id: crypto.randomUUID(), name: '', description: '', imageUrl: '', price: '', badge: '', active: true })} color="purple" />
                   </div>
                 </div>
               )}
@@ -1842,7 +1845,7 @@ export function PazarlamaPage() {
                       </motion.div>
                     ))}
                   </div>
-                  <AddButton label="Yeni Kart Ekle" onClick={() => addItem('stats', { id: uuidv4(), icon: 'star', value: '', label: '', color: 'blue' })} color="emerald" />
+                  <AddButton label="Yeni Kart Ekle" onClick={() => addItem('stats', { id: crypto.randomUUID(), icon: 'star', value: '', label: '', color: 'blue' })} color="emerald" />
                 </div>
               )}
 

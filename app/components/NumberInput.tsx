@@ -257,7 +257,7 @@ export function NumberInput({
           className="mt-1 text-xs text-muted-foreground flex items-center gap-1"
         >
           <span className="w-1 h-1 bg-primary rounded-full" />
-          {value.toLocaleString('tr-TR', { maximumFractionDigits: precision })} {unit}
+          {Number(value || 0).toLocaleString('tr-TR', { maximumFractionDigits: precision })} {unit}
         </motion.div>
       )}
     </div>

@@ -1,0 +1,430 @@
+app/utils/exportGenerator.ts:45:  return (amount || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+app/utils/exportGenerator.ts:410:    doc.text(`Olusturma: ${new Date().toLocaleString('tr-TR')} | Sayfa 1`, pageWidth / 2, pageHeight - 6, { align: 'center' });
+app/utils/reportGenerator.ts:115:      `${item.value.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} TL`,
+app/utils/reportGenerator.ts:220:  doc.text(`Olusturulma: ${new Date().toLocaleString('tr-TR')}`, pw - 14, 22, { align: 'right' });
+app/utils/reportGenerator.ts:263:    const timeStr = new Date().toLocaleString('tr-TR');
+app/utils/reportGenerator.ts:364:    { label: 'Toplam Ciro:', value: `${total.toLocaleString('tr-TR')} TL` }
+app/utils/reportGenerator.ts:369:    `Secilen donemde toplam ${data.length} kalem satis islemi gerceklesti. Toplam ciro: ${total.toLocaleString('tr-TR')} TL.`,
+app/utils/reportGenerator.ts:370:    `${uniqueCustomers} farkli musteriye ${uniqueProducts} cesit urun satildi. Ortalama islem tutari: ${avgPerItem.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} TL.`,
+app/utils/reportGenerator.ts:371:    iadeTotal > 0 ? `Toplam ${iadeTotal.toLocaleString('tr-TR')} TL tutarinda iade islemi bulunmaktadir.` : 'Donem icerisinde iade islemi kaydedilmemistir.',
+app/utils/reportGenerator.ts:379:    { label: 'Toplam Ciro', value: `${total.toLocaleString('tr-TR')} TL`, color: C.accentBlue },
+app/utils/reportGenerator.ts:382:    { label: 'Ort. Islem', value: `${avgPerItem.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} TL`, color: C.accentOrange },
+app/utils/reportGenerator.ts:438:      `${item.amount.toLocaleString('tr-TR')}`
+app/utils/reportGenerator.ts:470:    doc.text(`${(total + iadeTotal).toLocaleString('tr-TR')} TL`, pw - 18, boxY + 8, { align: 'right' });
+app/utils/reportGenerator.ts:476:    doc.text(`-${iadeTotal.toLocaleString('tr-TR')} TL`, pw - 18, boxY + 15, { align: 'right' });
+app/utils/reportGenerator.ts:485:    doc.text(`${netTotal.toLocaleString('tr-TR')} TL`, pw - 18, boxY + 25, { align: 'right' });
+app/utils/reportGenerator.ts:494:    doc.text(`${total.toLocaleString('tr-TR')} TL`, pw - 18, boxY + 10.5, { align: 'right' });
+app/utils/reportGenerator.ts:520:    `Toplam alis tutari: ${total.toLocaleString('tr-TR')} TL.${iadeTotal !== 0 ? ` Iade toplam: ${Math.abs(iadeTotal).toLocaleString('tr-TR')} TL.` : ''}`,
+app/utils/reportGenerator.ts:534:      `${item.amount.toLocaleString('tr-TR')}`
+app/utils/reportGenerator.ts:563:  doc.text(`${alisTotal.toLocaleString('tr-TR')} TL`, pageWidth - 18, finalY + 16, { align: 'right' });
+app/utils/reportGenerator.ts:571:    doc.text(`${Math.abs(iadeTotal).toLocaleString('tr-TR')} TL`, pageWidth - 18, finalY + 22, { align: 'right' });
+app/utils/reportGenerator.ts:580:  doc.text(`${total.toLocaleString('tr-TR')} TL`, pageWidth - 18, finalY + 32, { align: 'right' });
+app/utils/reportGenerator.ts:624:    `Donemde toplam ${incomeTotal.toLocaleString('tr-TR')} TL gelir, ${expenseTotal.toLocaleString('tr-TR')} TL gider kaydedildi.`,
+app/utils/reportGenerator.ts:625:    `Net ${isProfit ? 'kar' : 'zarar'}: ${Math.abs(netProfit).toLocaleString('tr-TR')} TL. Kar marji: %${profitMargin.toFixed(1)}.`,
+app/utils/reportGenerator.ts:626:    `En buyuk gelir kalemi: ${incCategories[0] ? `${sanitizeStr(incCategories[0][0])} (${incCategories[0][1].toLocaleString('tr-TR')} TL)` : '-'}`,
+app/utils/reportGenerator.ts:633:    { label: 'Toplam Gelir', value: `${incomeTotal.toLocaleString('tr-TR')} TL`, color: C.accentGreen },
+app/utils/reportGenerator.ts:634:    { label: 'Toplam Gider', value: `${expenseTotal.toLocaleString('tr-TR')} TL`, color: C.accentRed },
+app/utils/reportGenerator.ts:635:    { label: isProfit ? 'Net Kar' : 'Net Zarar', value: `${Math.abs(netProfit).toLocaleString('tr-TR')} TL`, color: isProfit ? C.accentBlue : C.accentOrange },
+app/utils/reportGenerator.ts:688:      `${item.amount.toLocaleString('tr-TR')}`
+app/utils/reportGenerator.ts:699:  doc.text(`Toplam Gelir: ${incomeTotal.toLocaleString('tr-TR')} TL`, pw - 14, finalY + 6, { align: 'right' });
+app/utils/reportGenerator.ts:717:      `${item.amount.toLocaleString('tr-TR')}`
+app/utils/reportGenerator.ts:728:  doc.text(`Toplam Gider: ${expenseTotal.toLocaleString('tr-TR')} TL`, pw - 14, finalY + 6, { align: 'right' });
+app/utils/reportGenerator.ts:751:  doc.text(`${isProfit ? 'NET KAR' : 'NET ZARAR'}: ${Math.abs(netProfit).toLocaleString('tr-TR')} TL`, 22, finalY + 17);
+app/utils/reportGenerator.ts:756:  doc.text(`Kar Marji: %${profitMargin.toFixed(1)} | Gelir: ${incomeTotal.toLocaleString('tr-TR')} TL | Gider: ${expenseTotal.toLocaleString('tr-TR')} TL`, pw - 18, finalY + 17, { align: 'right' });
+app/utils/reportGenerator.ts:785:    { label: 'Stok Degeri:', value: `${totalStockValue.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL` }
+app/utils/reportGenerator.ts:796:    `Depoda toplam ${totalProducts} cesit urun takip edilmektedir. Toplam stok degeri: ${totalStockValue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL.`,
+app/utils/reportGenerator.ts:846:        avgCost > 0 ? `${avgCost.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL` : '-',
+app/utils/reportGenerator.ts:847:        `${stockValue.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`,
+app/utils/reportGenerator.ts:929:        `${totalQty.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+app/utils/reportGenerator.ts:930:        `${totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`
+app/utils/reportGenerator.ts:963:    doc.text(`${grandTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`, pageWidth - 18, currentY + 8, { align: 'right' });
+app/utils/reportGenerator.ts:997:        `${supplier.items.length} alis | ${supplierQty.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} birim | ${supplierTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`,
+app/utils/reportGenerator.ts:1016:            `${item.quantity.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+app/utils/reportGenerator.ts:1018:            `${item.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`,
+app/utils/reportGenerator.ts:1019:            `${item.total.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`
+app/utils/reportGenerator.ts:1078:    `Toplam alacak: ${totalBorcTutar.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL | Toplam borc: ${totalAlacakTutar.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL.`,
+app/utils/reportGenerator.ts:1079:    `Net bakiye: ${Math.abs(netBakiye).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL ${netBakiye >= 0 ? '(alacak lehine)' : '(borc lehine)'}.`,
+app/utils/reportGenerator.ts:1098:    { label: 'Toplam Borc', value: `${totalBorcTutar.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, color: [220, 38, 38] },
+app/utils/reportGenerator.ts:1099:    { label: 'Toplam Alacak', value: `${totalAlacakTutar.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, color: [22, 163, 74] },
+app/utils/reportGenerator.ts:1100:    { label: 'Net Bakiye', value: `${(totalBorcTutar - totalAlacakTutar).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, color: totalBorcTutar >= totalAlacakTutar ? [220, 38, 38] : [22, 163, 74] },
+app/utils/reportGenerator.ts:1137:          `${bal.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`,
+app/utils/reportGenerator.ts:1252:  const balanceStr = `${Math.abs(cari.balance || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`;
+app/utils/reportGenerator.ts:1293:    { label: 'Toplam Siparis', value: `${totalSales.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`, color: [37, 99, 235] },
+app/utils/reportGenerator.ts:1294:    { label: 'Iade Toplam', value: `${totalReturn.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`, color: [234, 88, 12] },
+app/utils/reportGenerator.ts:1295:    { label: 'Odeme Toplam', value: `${totalPayment.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`, color: [22, 163, 74] },
+app/utils/reportGenerator.ts:1296:    { label: 'Veresiye', value: `${totalVeresiye.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`, color: [220, 38, 38] },
+app/utils/reportGenerator.ts:1402:      doc.text(`Siparis: ${dt.dayOrder.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, 80, currentY + 5);
+app/utils/reportGenerator.ts:1406:      doc.text(`Iade: -${dt.dayReturn.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, 80, currentY + 10);
+app/utils/reportGenerator.ts:1410:      doc.text(`Odeme: ${dt.dayPayment.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, 130, currentY + 5);
+app/utils/reportGenerator.ts:1421:    doc.text(`${dayBal.prevBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, pageWidth - 18, currentY + 5, { align: 'right' });
+app/utils/reportGenerator.ts:1423:    doc.text(`${dayBal.endBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, pageWidth - 18, currentY + 10, { align: 'right' });
+app/utils/reportGenerator.ts:1471:      doc.text(`${payMethod}${payAmount > 0 ? ': ' + payAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' TL' : ''}`, pageWidth - 22, currentY + 5.5, { align: 'right' });
+app/utils/reportGenerator.ts:1489:            `${qty.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ${sanitizeStr(unit)}`,
+app/utils/reportGenerator.ts:1490:            `${unitPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`,
+app/utils/reportGenerator.ts:1491:            isIade ? `-${totalPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL` : `${totalPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`,
+app/utils/reportGenerator.ts:1552:        doc.text(`${fisTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, pageWidth - 22, currentY + 5, { align: 'right' });
+app/utils/reportGenerator.ts:1558:          doc.text(`Veresiye Kalan: ${(fisTotal - payAmount).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, 22, currentY + 5);
+app/utils/reportGenerator.ts:1565:        doc.text(`Tutar: ${(fis.total || fis.amount || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, 22, currentY);
+app/utils/reportGenerator.ts:1594:    ['Toplam Siparis (Mal Bedeli)', `${totalSales.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, `${fisCount} fis`],
+app/utils/reportGenerator.ts:1595:    ['Iade Edilen Tutar', `-${totalReturn.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, ''],
+app/utils/reportGenerator.ts:1596:    ['Net Borc', `${(totalSales - totalReturn).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, ''],
+app/utils/reportGenerator.ts:1597:    ['Yapilan Odemeler', `-${totalPayment.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, payMethodSummaryStr],
+app/utils/reportGenerator.ts:1598:    ['KALAN BAKIYE', `${(cari.balance || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, (cari.balance || 0) > 0 ? 'BORCLU' : (cari.balance || 0) < 0 ? 'ALACAKLI' : 'DENGEDE'],
+app/utils/reportGenerator.ts:1712:    `${d.total.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`,
+app/utils/reportGenerator.ts:1728:    `Gunluk ciro: ${stats.revenue.toLocaleString('tr-TR')} TL. Toplam ${stats.salesCount} satis fisi kesilmistir.`,
+app/utils/reportGenerator.ts:1745:    { title: 'Gunluk Ciro', value: `${stats.revenue.toLocaleString('tr-TR')} TL`, color: [37, 99, 235] },
+app/utils/reportGenerator.ts:1792:      p.revenue.toLocaleString('tr-TR')
+app/utils/reportGenerator.ts:1880:    { label: 'Net Kasa:', value: `${data.netCash.toLocaleString('tr-TR')} TL` },
+app/utils/reportGenerator.ts:1887:    `Satis: ${data.totalSales.toLocaleString('tr-TR')} TL | Alis: ${data.totalPurchases.toLocaleString('tr-TR')} TL | Tahsilat: ${data.totalPayments.toLocaleString('tr-TR')} TL`,
+app/utils/reportGenerator.ts:1888:    `Net kasa: ${data.netCash.toLocaleString('tr-TR')} TL. ${data.warningCount > 0 ? `DIKKAT: ${data.warningCount} fiste eksik belge tespit edildi!` : 'Tum fisler tam.'}`,
+app/utils/reportGenerator.ts:1898:    { title: 'Satis', value: `${data.totalSales.toLocaleString('tr-TR')} TL`, color: [37, 99, 235] },
+app/utils/reportGenerator.ts:1899:    { title: 'Alis', value: `${data.totalPurchases.toLocaleString('tr-TR')} TL`, color: [147, 51, 234] },
+app/utils/reportGenerator.ts:1900:    { title: 'Tahsilat', value: `${data.totalPayments.toLocaleString('tr-TR')} TL`, color: [22, 163, 74] },
+app/utils/reportGenerator.ts:1901:    { title: 'Gider', value: `${data.totalExpenses.toLocaleString('tr-TR')} TL`, color: [220, 38, 38] },
+app/utils/reportGenerator.ts:1902:    { title: 'Net Kasa', value: `${data.netCash.toLocaleString('tr-TR')} TL`, color: data.netCash >= 0 ? [16, 185, 129] : [239, 68, 68] },
+app/utils/reportGenerator.ts:1945:      `Dashboard Ciro: ${cv.dashboardRevenue.toLocaleString('tr-TR')} TL | Gun Sonu Satis: ${cv.gunSonuSales.toLocaleString('tr-TR')} TL`,
+app/utils/reportGenerator.ts:1968:      `Giris: ${kv.kasaTodayIncome.toLocaleString('tr-TR')} TL | Cikis: ${kv.kasaTodayExpense.toLocaleString('tr-TR')} TL | Net: ${kv.kasaNet.toLocaleString('tr-TR')} TL | Toplam Bakiye: ${kv.kasaTotalBalance.toLocaleString('tr-TR')} TL`,
+app/utils/reportGenerator.ts:1991:        (t.amount > 0 ? '+' : '') + t.amount.toLocaleString('tr-TR'),
+app/utils/reportGenerator.ts:2057:    { label: 'Toplam Satis:', value: `${totSatis.toLocaleString('tr-TR')} TL` },
+app/utils/reportGenerator.ts:2062:    `${totPersonel} personel degerlendirmeye alindi. Toplam satis hasilati: ${totSatis.toLocaleString('tr-TR')} TL.`,
+app/utils/reportGenerator.ts:2063:    bestEmp ? `En basarili personel: ${sanitizeStr(bestEmp.name)} (${bestEmp.satisTutar.toLocaleString('tr-TR')} TL satis, ${bestEmp.satisCount} islem).` : 'Henuz performans verisi yok.',
+app/utils/reportGenerator.ts:2064:    `Kisi basi ortalama satis: ${totPersonel > 0 ? (totSatis / totPersonel).toLocaleString('tr-TR', { maximumFractionDigits: 0 }) : '0'} TL.`,
+app/utils/reportGenerator.ts:2115:      doc.text(`${emp.satisCount} satis | ${emp.satisTutar.toLocaleString('tr-TR')} TL`, bx + 5, currentY + 20);
+app/utils/reportGenerator.ts:2135:      p.satisTutar.toLocaleString('tr-TR'),
+app/utils/reportGenerator.ts:2137:      p.iadeTutar.toLocaleString('tr-TR'),
+app/utils/reportGenerator.ts:2139:      p.giderTutar.toLocaleString('tr-TR'),
+app/utils/reportGenerator.ts:2189:    `TOPLAM: ${totals.satisCount} Satis (${totals.satisTutar.toLocaleString('tr-TR')} TL) | ${totals.iadeCount} Iade (${totals.iadeTutar.toLocaleString('tr-TR')} TL) | ${totals.alisCount} Alis | Gider: ${totals.giderTutar.toLocaleString('tr-TR')} TL | ${totals.musteriCount} Musteri`,
+app/utils/thermalPrint.ts:18:  val.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' TL';
+app/utils/cariDetailPdf.ts:19:  return n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+app/utils/smsService.ts:104:  return `Sayın ${customerName}, ${total.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ₺ tutarındaki siparişiniz alındı. Fiş: #${fisId.slice(-6).toUpperCase()}. Teşekkürler.`;
+app/utils/smsService.ts:112:  return `Sayın ${customerName}, ${amount.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ₺ ${methodLabel[method] || method} ödemeniz alındı. İyi günler.`;
+app/utils/smsService.ts:117:  return `Sayın ${customerName}, ${faturaNo} nolu ${total.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ₺ tutarındaki faturanız düzenlendi.`;
+app/utils/notifications.ts:80:      `Ciro: ₺${stats.totalRevenue.toLocaleString('tr-TR')}`,
+app/utils/notifications.ts:82:      `Kasa: ₺${stats.kasaBalance.toLocaleString('tr-TR')}`,
+app/utils/fiyatListesiPdf.ts:33:  return Number(num).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+app/contexts/AuthContext.tsx:437:          lastLogin: new Date().toLocaleString('tr-TR'),
+app/contexts/AuthContext.tsx:438:          last_login: new Date().toLocaleString('tr-TR'),
+app/pages/FilesPage.tsx:239:      const timestamp = new Date().toLocaleString('tr-TR');
+app/pages/FilesPage.tsx:302:      const timestamp = new Date().toLocaleString('tr-TR');
+app/pages/FilesPage.tsx:524:                      {new Date(log.date).toLocaleString('tr-TR')}
+app/pages/CeklerPage.tsx:429:    updated = addAuditEntry(updated, 'partial_collect', `Kısmi tahsilat ₺${pAmount.toLocaleString()} (Toplam: ₺${collected.toLocaleString()})`, userName);
+app/pages/CeklerPage.tsx:502:    logActivity('cek_verilen', `Verilen çek: ₺${cek.amount.toLocaleString()} → ${cek.recipientName}`, { employeeName: user?.name });
+app/pages/CeklerPage.tsx:585:                 `Tutar: ₺${cek.amount.toLocaleString()}\n` +
+app/pages/CeklerPage.tsx:593:      navigator.clipboard.writeText(`${cek.bankName} - ₺${cek.amount.toLocaleString()} - ${cek.dueDate}`);
+app/pages/CeklerPage.tsx:652:              ₺{globalStats.alinanBeklemede.toLocaleString()}
+app/pages/CeklerPage.tsx:665:              ₺{globalStats.verilenBeklemede.toLocaleString()}
+app/pages/CeklerPage.tsx:677:              ₺{globalStats.netDurum.toLocaleString()}
+app/pages/CeklerPage.tsx:705:          value={`₺${stats.beklemedeTutar.toLocaleString()}`} 
+app/pages/CeklerPage.tsx:712:          value={`₺${stats.tahsilTutar.toLocaleString()}`} 
+app/pages/CeklerPage.tsx:719:          value={`₺${stats.karsiliksizTutar.toLocaleString()}`} 
+app/pages/CeklerPage.tsx:726:          value={`₺${stats.toplamTutar.toLocaleString()}`} 
+app/pages/CeklerPage.tsx:840:                      {x.label}: ₺{x.total.toLocaleString()}
+app/pages/CeklerPage.tsx:878:                          <p className="text-base sm:text-lg font-black text-foreground">₺{data.total.toLocaleString()}</p>
+app/pages/CeklerPage.tsx:900:                            <p className={`text-xs sm:text-sm font-black text-${color}-400`}>₺{value.toLocaleString()}</p>
+app/pages/CeklerPage.tsx:1067:                              {cekIsVerilen ? '-' : '+'}₺{cek.amount.toLocaleString()}
+app/pages/CeklerPage.tsx:1153:                                    <span>{cekIsVerilen ? 'Ödenen' : 'Tahsil edilen'}: ₺{collected.toLocaleString()}</span>
+app/pages/CeklerPage.tsx:1154:                                    <span>Kalan: ₺{remaining.toLocaleString()}</span>
+app/pages/CeklerPage.tsx:1258:                      ₺{modalCek.amount.toLocaleString()}
+app/pages/CeklerPage.tsx:1288:                       <span className="text-sm font-black text-foreground">₺{(modalCek.collectedAmount || 0).toLocaleString()}</span>
+app/pages/CeklerPage.tsx:1296:                       <span className="text-sm font-black text-yellow-500">₺{(modalCek.amount - (modalCek.collectedAmount || 0)).toLocaleString()}</span>
+app/pages/CeklerPage.tsx:1393:                  <span className="font-bold text-foreground">₺{modalCek.amount.toLocaleString()}</span>
+app/pages/CeklerPage.tsx:1427:                  <span className="font-bold text-foreground">₺{modalCek.amount.toLocaleString()}</span>
+app/pages/CeklerPage.tsx:1432:                    <span className="font-bold text-green-400">₺{(modalCek.collectedAmount || 0).toLocaleString()}</span>
+app/pages/CeklerPage.tsx:1437:                  <span className="font-bold text-yellow-400">₺{(modalCek.amount - (modalCek.collectedAmount || 0)).toLocaleString()}</span>
+app/pages/CeklerPage.tsx:1447:                    Tamamını Öde (₺{(modalCek.amount - (modalCek.collectedAmount || 0)).toLocaleString()})
+app/pages/IcebergPage.tsx:148:  const formatAmount = (val: number) => `₺${(val || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+app/pages/IcebergPage.tsx:150:    if (unit === 'KG') return val.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+app/pages/IcebergPage.tsx:151:    return val.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+app/pages/IcebergPage.tsx:647:                                    <span className="text-[10px] mt-1 font-mono text-muted-foreground">{new Date(m.date).toLocaleString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+app/pages/UretimPage.tsx:2676:                      <p className="text-xs md:text-sm font-bold text-orange-400 tech-number">₺{(calc.tupKullanilanKg * form.tupFiyatKg).toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</p>
+app/pages/UretimPage.tsx:2796:                          {calc.tupKullanilanKg.toFixed(1)}kg × ₺{form.tupFiyatKg} = ₺{(calc.tupKullanilanKg * form.tupFiyatKg).toLocaleString('tr-TR', { maximumFractionDigits: 0 })}
+app/pages/UretimPage.tsx:3002:                        <p className="text-xs md:text-sm font-bold text-foreground ml-2 flex-shrink-0">₺{item.value.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</p>
+app/pages/UretimPage.tsx:3013:                          ₺{calc.toplamMaliyet.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}
+app/pages/UretimPage.tsx:3465:                            <span className="text-foreground font-medium">₺{hizliCalc.hammaddeMaliyet.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</span>
+app/pages/UretimPage.tsx:3470:                              <span className="text-foreground font-medium">₺{hizliForm.iscilikMaliyeti.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</span>
+app/pages/UretimPage.tsx:3476:                              <span className="text-foreground font-medium">₺{hizliForm.ekMaliyet.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</span>
+app/pages/UretimPage.tsx:3481:                            <span className="text-emerald-400 font-bold">₺{hizliCalc.toplamMaliyet.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</span>
+app/pages/UretimPage.tsx:4219:                          <p className="text-lg font-bold text-emerald-400 tech-number">₺{(kayit.toplamMaliyet ?? 0).toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</p>
+app/pages/UretimPage.tsx:4241:                            <span className="text-sm font-bold text-emerald-400 tech-number">₺{(kayit.toplamMaliyet ?? 0).toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</span>
+app/pages/SunucuPage.tsx:299:          { label: 'PouchDB (Yerel)', value: totalLocalDocs.toLocaleString('tr-TR'), icon: <HardDrive className="w-4 h-4 text-purple-400" />, color: 'border-purple-500/20 bg-purple-950/10' },
+app/pages/SunucuPage.tsx:300:          { label: 'CouchDB (Sunucu)', value: tableStatus.length ? totalCouchDocs.toLocaleString('tr-TR') : '—', icon: <Cloud className="w-4 h-4 text-blue-400" />, color: 'border-blue-500/20 bg-blue-950/10' },
+app/pages/PazarlamaPage.tsx:263:          Son ziyaret: <span className="text-foreground font-semibold">{new Date(analytics.summary.lastVisit).toLocaleString('tr-TR')}</span>
+app/pages/PazarlamaPage.tsx:445:                  <td className="px-4 py-3 whitespace-nowrap text-xs">{new Date(t.createdAt).toLocaleString('tr-TR')}</td>
+app/pages/PazarlamaPage.tsx:1015:      price: p.sellPrice > 0 ? `₺${p.sellPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}` : 'Fiyat icin arayin',
+app/pages/StokPage.tsx:963:  const formatAmount = (val: number) => `₺${(val || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+app/pages/StokPage.tsx:965:    if (unit === 'KG') return val.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+app/pages/StokPage.tsx:966:    return val.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+app/pages/StokPage.tsx:1944:                      <Tooltip content={<PremiumTooltip formatter={(v: number) => `${v.toLocaleString('tr-TR')} TL`} />} cursor={{ fill: '#ffffff08' }} />
+app/pages/StokPage.tsx:2009:                    <p className="text-lg font-black text-orange-400">₺{stats.kdvSummary.alisKdv.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+app/pages/StokPage.tsx:2021:                    <p className="text-lg font-black text-emerald-400">₺{stats.kdvSummary.satisKdv.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+app/pages/StokPage.tsx:2034:                      ₺{(stats.kdvSummary.satisKdv - stats.kdvSummary.alisKdv).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+app/pages/CariPage.tsx:701:            {isPos ? '+' : ''}₺{Math.abs(cari.balance).toLocaleString('tr-TR')}
+app/pages/CariPage.tsx:793:        {cari.balance > 0 ? '+' : ''}₺{Math.abs(cari.balance).toLocaleString()}
+app/pages/CariPage.tsx:1439:                      {cari.balance > 0 ? '+' : ''}₺{Math.abs(cari.balance).toLocaleString()}
+app/pages/CariPage.tsx:2113:                                {openingTotal > 0 ? '+' : ''}₺{openingTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+app/pages/CariPage.tsx:2352:                      {selectedCari.balance > 0 ? '+' : ''}₺{Math.abs(selectedCari.balance).toLocaleString()}
+app/pages/CariPage.tsx:2368:                              {tx.amount > 0 ? '+' : ''}₺{Math.abs(tx.amount).toLocaleString()}
+app/pages/PersonelPage.tsx:509:          type: 'Satış İşlemi', desc: `${f.cariName || f.cari?.companyName || '-'} - ${(f.totalAmount || f.total || f.amount || 0).toLocaleString('tr-TR')} ₺`, page: 'Satış',
+app/pages/PersonelPage.tsx:520:          type: 'Kasa İşlemi', desc: `${k.type === 'income' ? 'Gelir' : 'Gider'}: ${(k.amount || 0).toLocaleString('tr-TR')} ₺`, page: 'Kasa',
+app/pages/ops/OpsCenterPage.tsx:146:  return new Date(ts).toLocaleString("tr-TR", {
+app/pages/ops/OpsCenterPage.tsx:1075:      `🤖 Operasyon Merkezi\nTest başarılı!\nZaman: ${new Date().toLocaleString("tr-TR")}`,
+app/pages/SalesPage.tsx:717:                      {stat.prefix}₺{stat.total.toLocaleString('tr-TR')}
+app/pages/SalesPage.tsx:746:                    <span className="text-[10px] sm:text-xs text-muted-foreground">₺<span className={`${w.text} font-bold`}>{w.value.toLocaleString('tr-TR')}</span></span>
+app/pages/SalesPage.tsx:965:                                {cari.transactions} işlem • Bakiye: ₺{(cari.balance || 0).toLocaleString()}
+app/pages/SalesPage.tsx:1335:                                            ₺{((productQuantity || 0) * (productUnitPrice || 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+app/pages/SalesPage.tsx:1409:                                        {Math.abs(item.quantity)} {item.unit} × ₺{(item.unitPrice || 0).toLocaleString('tr-TR')}
+app/pages/SalesPage.tsx:1433:                                    ₺{(Math.abs(item.totalPrice) || 0).toLocaleString('tr-TR')}
+app/pages/SalesPage.tsx:1446:                              ₺{calculateTotal().toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+app/pages/SalesPage.tsx:1505:                      {t('salesPage.totalAmount')}: ₺{calculateTotal().toLocaleString()}
+app/pages/SalesPage.tsx:2166:                        paymentDescription = `${t('salesPage.total')}: ₺${totalAmount.toLocaleString('tr-TR')} - ${t('salesPage.credit')} (${t('salesPage.noPayment')})`;
+app/pages/SalesPage.tsx:2168:                        paymentDescription = `${t('salesPage.paid')}: ₺${paidAmount.toLocaleString('tr-TR')} - ${t('salesPage.remaining')}: ₺${(totalAmount - paidAmount).toLocaleString('tr-TR')} ${t('salesPage.creditLower')}`;
+app/pages/SalesPage.tsx:2173:                        paymentDescription = `${t('salesPage.total')}: ₺${totalAmount.toLocaleString('tr-TR')} - ${methodName} (${t('salesPage.fullPayment')})`;
+app/pages/SalesPage.tsx:2596:                          <span className={`font-bold ${giderAmount > 0 ? 'text-red-400' : 'text-gray-600'}`}>{giderAmount > 0 ? `₺${giderAmount.toLocaleString('tr-TR')}` : '—'}</span>
+app/pages/SalesPage.tsx:2626:                          -₺{(giderAmount || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+app/pages/SalesPage.tsx:2729:                        description: `${giderCategory} - ₺${giderAmount.toLocaleString()}`
+app/pages/SalesPage.tsx:2736:                        description: `${giderCategory} - ₺${giderAmount.toLocaleString()}`,
+app/pages/SalesPage.tsx:2872:                  const amountStr = (fis.total || fis.amount || 0).toLocaleString('tr-TR');
+app/pages/SalesPage.tsx:2930:                                ₺{fis.payment.amount.toLocaleString('tr-TR')}
+app/pages/FisHistoryPage.tsx:70:  return <span>{prefix}{displayValue.toLocaleString('tr-TR')}{suffix}</span>;
+app/pages/FisHistoryPage.tsx:866:              `${qty.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`,
+app/pages/FisHistoryPage.tsx:868:              `${unitPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`,
+app/pages/FisHistoryPage.tsx:869:              `${isIade ? '-' : ''}${totalPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`,
+app/pages/FisHistoryPage.tsx:923:          doc.text(`${normalTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, boxX + boxW - 4, ty, { align: 'right' });
+app/pages/FisHistoryPage.tsx:930:          doc.text(`-${iadeTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, boxX + boxW - 4, ty, { align: 'right' });
+app/pages/FisHistoryPage.tsx:946:        doc.text(`${netTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, boxX + boxW - 4, ty, { align: 'right' });
+app/pages/FisHistoryPage.tsx:986:      doc.text(`${(fis.amount || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, pageWidth - 18, currentY + 12, { align: 'right' });
+app/pages/FisHistoryPage.tsx:1041:      doc.text(`${(fis.payment.amount || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, 55, paidY);
+app/pages/FisHistoryPage.tsx:1053:      doc.text(`${fisTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, pageWidth - 18, currentY + 6, { align: 'right' });
+app/pages/FisHistoryPage.tsx:1060:        doc.text(`${remaining.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`, pageWidth - 18, currentY + 13, { align: 'right' });
+app/pages/FisHistoryPage.tsx:1090:    doc.text(`${sanitizePDF(company.companyName)} ERP | ${new Date().toLocaleString('tr-TR')}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+app/pages/FisHistoryPage.tsx:1144:    doc.text(stats.totalSatis.toLocaleString('tr-TR') + ' TL', 14 + cardWidth * 1.5 - 1, cardY + 15, { align: 'center' });
+app/pages/FisHistoryPage.tsx:1154:    doc.text(stats.totalGider.toLocaleString('tr-TR') + ' TL', 14 + cardWidth * 2.5 - 1, cardY + 15, { align: 'center' });
+app/pages/FisHistoryPage.tsx:1166:    doc.text((isProfit ? '+' : '') + netProfit.toLocaleString('tr-TR') + ' TL', pageWidth / 2 + 15, cardY + 33);
+app/pages/FisHistoryPage.tsx:1191:          (fis.total || fis.amount || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }),
+app/pages/FisHistoryPage.tsx:1314:    doc.text(`${dayGroup.totalSatis.toLocaleString('tr-TR')} TL`, 14 + cardW * 1.5 + 3, cardY + 14, { align: 'center' });
+app/pages/FisHistoryPage.tsx:1326:    doc.text(`${dayGroup.totalAlis.toLocaleString('tr-TR')} TL`, 14 + cardW * 2.5 + 6, cardY + 14, { align: 'center' });
+app/pages/FisHistoryPage.tsx:1338:    doc.text(`${dayGroup.totalGider.toLocaleString('tr-TR')} TL`, 14 + cardW * 3.5 + 9, cardY + 14, { align: 'center' });
+app/pages/FisHistoryPage.tsx:1371:            (fis.total || fis.amount || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }),
+app/pages/FisHistoryPage.tsx:1437:          u.totalQty.toLocaleString('tr-TR', { minimumFractionDigits: 2 }),
+app/pages/FisHistoryPage.tsx:1438:          u.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 }),
+app/pages/FisHistoryPage.tsx:1724:                          ₺{(fis.total || fis.amount || 0).toLocaleString('tr-TR')}
+app/pages/FisHistoryPage.tsx:1825:                          <span className="text-emerald-400 font-medium">₺{dayGroup.totalSatis.toLocaleString('tr-TR')}</span>
+app/pages/FisHistoryPage.tsx:1828:                          <span className="text-blue-400 font-medium">₺{dayGroup.totalAlis.toLocaleString('tr-TR')}</span>
+app/pages/FisHistoryPage.tsx:1831:                          <span className="text-red-400 font-medium">-₺{dayGroup.totalGider.toLocaleString('tr-TR')}</span>
+app/pages/FisHistoryPage.tsx:1947:                                      ₺{(fis.total || fis.amount || 0).toLocaleString('tr-TR')}
+app/pages/FisHistoryPage.tsx:2004:                            {dayGroup.totalSatis > 0 && <span className="text-emerald-400">+₺{dayGroup.totalSatis.toLocaleString('tr-TR')}</span>}
+app/pages/FisHistoryPage.tsx:2005:                            {dayGroup.totalAlis > 0 && <span className="text-blue-400">₺{dayGroup.totalAlis.toLocaleString('tr-TR')}</span>}
+app/pages/FisHistoryPage.tsx:2006:                            {dayGroup.totalGider > 0 && <span className="text-red-400">-₺{dayGroup.totalGider.toLocaleString('tr-TR')}</span>}
+app/pages/FisHistoryPage.tsx:2104:                          ₺{(fis.total || fis.amount || 0).toLocaleString('tr-TR')}
+app/pages/FisHistoryPage.tsx:2289:                                        {product.unit} | ₺{(product.price || 0).toLocaleString('tr-TR')}
+app/pages/FisHistoryPage.tsx:2366:                                      <span className={`col-span-2 text-right text-sm font-bold ${isIade ? 'text-orange-400' : 'text-foreground'}`}>{isIade ? '-' : ''}₺{itemTotal.toLocaleString('tr-TR')}</span>
+app/pages/FisHistoryPage.tsx:2393:                                          <span className={`text-sm font-bold ${isIade ? 'text-orange-400' : 'text-foreground'}`}>{isIade ? '-' : ''}₺{itemTotal.toLocaleString('tr-TR')}</span>
+app/pages/FisHistoryPage.tsx:2409:                              ₺{calculateEditTotal().toLocaleString('tr-TR')}
+app/pages/FisHistoryPage.tsx:2548:                      {selectedFis?.date && new Date(selectedFis.date).toLocaleString('tr-TR')}
+app/pages/FisHistoryPage.tsx:2605:                        content: <span className="text-xl font-bold text-foreground">₺{(selectedFis.total || selectedFis.amount || 0).toLocaleString('tr-TR')}</span>
+app/pages/FisHistoryPage.tsx:2670:                                <td className="px-4 py-3 text-foreground/80 text-sm">₺{itemPrice.toLocaleString('tr-TR')}</td>
+app/pages/FisHistoryPage.tsx:2672:                                  {isIade ? '-' : ''}₺{Math.abs(itemTotal).toLocaleString('tr-TR')}
+app/pages/FisHistoryPage.tsx:2697:                                  {isIade ? '-' : ''}₺{Math.abs(itemTotal).toLocaleString('tr-TR')}
+app/pages/FisHistoryPage.tsx:2702:                                <span>x ₺{itemPrice.toLocaleString('tr-TR')}</span>
+app/pages/FisHistoryPage.tsx:2727:                          <p className="text-emerald-400 font-bold text-lg mt-0.5">₺{(selectedFis.payment.amount || 0).toLocaleString('tr-TR')}</p>
+app/pages/FisHistoryPage.tsx:2755:                                <p className="text-red-400 font-bold text-sm mt-0.5">₺{remaining.toLocaleString('tr-TR')}</p>
+app/pages/FisHistoryPage.tsx:2781:                         <p className="text-blue-400/60 text-xs mt-1">Son Düzenleme: {new Date(selectedFis.editedAt).toLocaleString('tr-TR')}</p>
+app/pages/AracPage.tsx:215:                    <span className="text-sm font-medium text-foreground font-mono">{vehicle.km.toLocaleString('tr-TR')} km</span>
+app/pages/SecurityPage.tsx:424:                        <p className="text-[10px] text-muted-foreground">{new Date(threat.timestamp).toLocaleString('tr-TR')}</p>
+app/pages/SecurityPage.tsx:514:                            <span>{new Date(threat.timestamp).toLocaleString('tr-TR')}</span>
+app/pages/SecurityPage.tsx:579:                          <span className="text-muted-foreground">{new Date(session.loginTime).toLocaleString('tr-TR')}</span>
+app/pages/SecurityPage.tsx:698:                  <div><span className="text-muted-foreground/60 block mb-0.5">Tam Tarih</span><span className="text-foreground font-mono">{new Date(log.timestamp).toLocaleString('tr-TR')}</span></div>
+app/pages/SecurityPage.tsx:900:                    <p className="text-[9px] text-gray-600 mt-0.5">{new Date(event.timestamp).toLocaleString('tr-TR')}</p>
+app/pages/SecurityPage.tsx:1005:                      {rule.lastTriggered && <span>Son tetik: {new Date(rule.lastTriggered).toLocaleString('tr-TR')}</span>}
+app/pages/SecurityPage.tsx:1075:                  <p className="text-[9px] text-gray-600">{device.loginAt ? new Date(device.loginAt).toLocaleString('tr-TR') : '-'}</p>
+app/pages/site/DashboardPage.tsx:451:    { label: 'Günlük Ciro', value: `₺${realtimeRevenue.toLocaleString('tr-TR')}`, icon: <DollarSign className="w-3 h-3 text-blue-400" /> },
+app/pages/site/DashboardPage.tsx:454:    { label: 'Kasa Bakiye', value: `₺${kasaStats.kasaBalance.toLocaleString('tr-TR')}`, icon: <Wallet className="w-3 h-3 text-amber-400" /> },
+app/pages/site/DashboardPage.tsx:456:    { label: 'Stok Değeri', value: `₺${totalStockValue >= 1000 ? `${(totalStockValue/1000).toFixed(0)}k` : totalStockValue.toLocaleString('tr-TR')}`, icon: <Package className="w-3 h-3 text-purple-400" /> },
+app/pages/site/DashboardPage.tsx:497:      { label: 'Haftalık Ciro', current: thisWeekSales, previous: prevWeekTotal, color: '#3b82f6', icon: <DollarSign className="w-3 h-3 text-blue-400" />, format: (v: number) => `₺${v >= 1000 ? `${(v/1000).toFixed(1)}k` : v.toLocaleString('tr-TR')}` },
+app/pages/site/DashboardPage.tsx:498:      { label: 'Haftalık Alış', current: thisWeekPurchase, previous: Math.round(prevWeekTotal * 0.6), color: '#f59e0b', icon: <ShoppingCart className="w-3 h-3 text-amber-400" />, format: (v: number) => `₺${v >= 1000 ? `${(v/1000).toFixed(1)}k` : v.toLocaleString('tr-TR')}` },
+app/pages/site/DashboardPage.tsx:499:      { label: 'Net Kâr', current: thisWeekProfit, previous: Math.round(prevWeekTotal * 0.4), color: '#10b981', icon: <TrendingUp className="w-3 h-3 text-emerald-400" />, format: (v: number) => `₺${v >= 1000 ? `${(v/1000).toFixed(1)}k` : v.toLocaleString('tr-TR')}` },
+app/pages/site/DashboardPage.tsx:500:      { label: 'Fiş Adedi', current: todaySales.length * 7, previous: Math.max(Math.round(todaySales.length * 6.2), 1), color: '#8b5cf6', icon: <BarChart3 className="w-3 h-3 text-purple-400" />, format: (v: number) => v.toLocaleString('tr-TR') },
+app/pages/site/DashboardPage.tsx:550:        amount: `₺${(safeNum(f.total) || safeNum(f.amount) || (f.items || []).reduce((s: number, p: any) => s + Math.abs(safeNum(p.totalPrice) || safeNum(p.total) || 0), 0)).toLocaleString('tr-TR')}`,
+app/pages/site/DashboardPage.tsx:569:        amount: (isSales ? '+' : '-') + `₺${fisTotal.toLocaleString('tr-TR')}`,
+app/pages/site/DashboardPage.tsx:579:        amount: (isIncome ? '+' : '-') + `₺${safeNum(k.amount).toLocaleString('tr-TR')}`,
+app/pages/site/DashboardPage.tsx:864:          { label: 'Stok Değeri', value: `₺${totalStockValue >= 1000 ? `${(totalStockValue/1000).toFixed(0)}k` : totalStockValue.toLocaleString('tr-TR')}`, icon: <Package className="w-4 h-4 text-amber-400" />, color: '#f59e0b' },
+app/pages/site/DashboardPage.tsx:865:          { label: 'Kasa Bakiye', value: `₺${kasaStats.kasaBalance.toLocaleString('tr-TR')}`, icon: <Wallet className="w-4 h-4 text-emerald-400" />, color: '#10b981' },
+app/pages/site/DashboardPage.tsx:947:                <p className={`text-xs sm:text-sm font-black ${s.valCls}`}>₺{s.val.toLocaleString('tr-TR')}</p>
+app/pages/site/DashboardPage.tsx:970:                    <Tooltip key="tt1" content={<PremiumTooltip formatter={(v: number) => `₺${v.toLocaleString('tr-TR')}`} />} cursor={{ stroke: '#ffffff10', strokeWidth: 1, strokeDasharray: '4 4' }} />
+app/pages/site/DashboardPage.tsx:991:                    <Tooltip key="tt2" content={<PremiumTooltip formatter={(v: number) => `₺${v.toLocaleString('tr-TR')}`} />} cursor={{ stroke: '#ffffff10' }} />
+app/pages/site/DashboardPage.tsx:1001:                    <Tooltip key="tt3" content={<PremiumTooltip formatter={(v: number) => `₺${v.toLocaleString('tr-TR')}`} />} cursor={{ fill: '#ffffff05' }} />
+app/pages/site/DashboardPage.tsx:1032:                      <Tooltip key="pie1-tt" contentStyle={{ backgroundColor: "var(--popover)", borderColor: "var(--border)", borderRadius: '12px', fontSize: '12px' }} formatter={(v: any) => `₺${Number(v).toLocaleString('tr-TR')}`} />
+app/pages/site/DashboardPage.tsx:1043:                      <span className="text-[10px] sm:text-[11px] font-bold text-foreground shrink-0">₺{e.value >= 1000 ? `${(e.value/1000).toFixed(1)}k` : e.value.toLocaleString('tr-TR')}</span>
+app/pages/site/DashboardPage.tsx:1068:              sublabel={`₺${realtimeRevenue.toLocaleString('tr-TR')}`}
+app/pages/site/DashboardPage.tsx:1119:                  <Tooltip content={<PremiumTooltip formatter={(v: number) => `₺${v.toLocaleString('tr-TR')}`} />} />
+app/pages/site/DashboardPage.tsx:1160:                  <Tooltip content={<PremiumTooltip formatter={(v: number) => v > 100 ? `₺${v.toLocaleString('tr-TR')}` : `%${v}`} />} />
+app/pages/site/DashboardPage.tsx:1177:                  {d.kar >= 0 ? '+' : ''}₺{d.kar.toLocaleString('tr-TR')}
+app/pages/site/DashboardPage.tsx:1213:                  <Tooltip key="tt4" content={<PremiumTooltip formatter={(v: number) => `₺${v.toLocaleString('tr-TR')}`} />} cursor={{ fill: '#ffffff03' }} />
+app/pages/site/DashboardPage.tsx:1227:              <p className="text-xs sm:text-sm font-black text-emerald-400">₺{kasaStats.totalIncome.toLocaleString('tr-TR')}</p>
+app/pages/site/DashboardPage.tsx:1231:              <p className="text-xs sm:text-sm font-black text-red-400">₺{kasaStats.totalExpense.toLocaleString('tr-TR')}</p>
+app/pages/site/DashboardPage.tsx:1235:              <p className={`text-xs sm:text-sm font-black ${kasaStats.kasaBalance >= 0 ? 'text-blue-400' : 'text-orange-400'}`}>₺{kasaStats.kasaBalance.toLocaleString('tr-TR')}</p>
+app/pages/site/DashboardPage.tsx:1277:                        <p className="text-xs sm:text-sm font-black text-foreground shrink-0">₺{p.revenue.toLocaleString('tr-TR')}</p>
+app/pages/site/DashboardPage.tsx:1598:              <p className="text-lg sm:text-xl font-black text-amber-400">₺{cariStats.toplamBorc.toLocaleString('tr-TR')}</p>
+app/pages/KasaPage.tsx:341:            <p className="text-2xl sm:text-4xl lg:text-5xl font-extrabold text-foreground break-all">₺{totalAssets.toLocaleString()}</p>
+app/pages/KasaPage.tsx:361:            <p className="text-lg sm:text-3xl lg:text-4xl font-bold text-green-400 break-all">+₺{todayIncome.toLocaleString()}</p>
+app/pages/KasaPage.tsx:380:            <p className="text-lg sm:text-3xl lg:text-4xl font-bold text-red-400 break-all">-₺{todayExpense.toLocaleString()}</p>
+app/pages/KasaPage.tsx:412:                {kasaGunSonuValidation.kasaNet >= 0 ? '+' : ''}₺{kasaGunSonuValidation.kasaNet.toLocaleString('tr-TR')}
+app/pages/KasaPage.tsx:417:              <span className="text-blue-400 font-bold">₺{kasaGunSonuValidation.gunSonuSalesTotal.toLocaleString('tr-TR')}</span>
+app/pages/KasaPage.tsx:533:                          {transaction.type === 'Gelir' ? '+' : '-'}₺{transaction.amount.toLocaleString('tr-TR')}
+app/pages/StokHareketPage.tsx:249:        { label: 'Toplam Giris:', value: `${(stats.totalGirisVal || 0).toLocaleString('tr-TR')} TL` },
+app/pages/StokHareketPage.tsx:250:        { label: 'Toplam Cikis:', value: `${(stats.totalCikisVal || 0).toLocaleString('tr-TR')} TL` }
+app/pages/StokHareketPage.tsx:257:        `${(h.unitPrice || 0).toLocaleString('tr-TR')} TL`,
+app/pages/StokHareketPage.tsx:258:        `${(h.total || 0).toLocaleString('tr-TR')} TL`,
+app/pages/StokHareketPage.tsx:393:          { title: 'Stok Girisi', value: `${stats.totalGiris} AD`, sub: `${(stats.totalGirisVal || 0).toLocaleString('tr-TR')} TL`, icon: ArrowDownCircle, color: 'from-green-600 to-green-700' },
+app/pages/StokHareketPage.tsx:394:          { title: 'Stok Cikisi', value: `${stats.totalCikis} AD`, sub: `${(stats.totalCikisVal || 0).toLocaleString('tr-TR')} TL`, icon: ArrowUpCircle, color: 'from-blue-600 to-blue-700' },
+app/pages/StokHareketPage.tsx:395:          { title: 'Iade', value: `${stats.totalIade} AD`, sub: `${(stats.totalIadeVal || 0).toLocaleString('tr-TR')} TL`, icon: RotateCcw, color: 'from-orange-600 to-orange-700' },
+app/pages/StokHareketPage.tsx:497:            render: (h) => <span className="font-mono text-xs sm:text-sm text-foreground/80">{(h.unitPrice || 0).toLocaleString('tr-TR')} TL</span>,
+app/pages/StokHareketPage.tsx:504:                {h.type === 'cikis' ? '-' : '+'}{(h.total || 0).toLocaleString('tr-TR')} TL
+app/pages/StokHareketPage.tsx:551:            <td className="py-3 px-4 text-right text-green-400 font-bold text-xs sm:text-sm font-mono">{filteredHareketler.reduce((s, h) => s + (h.total || 0), 0).toLocaleString('tr-TR')} TL</td>
+app/pages/StokHareketPage.tsx:667:                    Toplam: {(Number(gecmisForm.quantity) * Number(gecmisForm.unitPrice || 0)).toLocaleString('tr-TR')} ₺
+app/pages/CariDetailPage.tsx:612:              {totalBalance > 0 ? '+' : ''}₺{Math.abs(totalBalance).toLocaleString()}
+app/pages/CariDetailPage.tsx:651:              <p className="text-base sm:text-xl font-black text-emerald-400">₺{last30Stats.satis.toLocaleString('tr-TR')}</p>
+app/pages/CariDetailPage.tsx:655:              <p className="text-base sm:text-xl font-black text-red-400">₺{last30Stats.iade.toLocaleString('tr-TR')}</p>
+app/pages/CariDetailPage.tsx:659:              <p className="text-base sm:text-xl font-black text-blue-400">₺{last30Stats.odeme.toLocaleString('tr-TR')}</p>
+app/pages/CariDetailPage.tsx:663:              <p className="text-base sm:text-xl font-black text-amber-400">₺{last30Stats.netSatis.toLocaleString('tr-TR')}</p>
+app/pages/CariDetailPage.tsx:697:                        <span className="text-[9px] uppercase font-bold">{ex.date ? new Date(ex.date.split('.').reverse().join('-')).toLocaleString('tr-TR', {month:'short'}) : '—'}</span>
+app/pages/CariDetailPage.tsx:700:                        <p className="text-sm text-muted-foreground">Önceki: <span className="text-foreground">₺{(ex.previousBalance ?? 0).toLocaleString()}</span></p>
+app/pages/CariDetailPage.tsx:701:                        <p className="text-sm text-muted-foreground">Satış: <span className="text-blue-400">₺{(ex.orderAmount ?? 0).toLocaleString()}</span></p>
+app/pages/CariDetailPage.tsx:702:                        <p className="text-sm text-muted-foreground">Ödeme: <span className="text-emerald-400">₺{(ex.payment ?? 0).toLocaleString()}</span></p>
+app/pages/CariDetailPage.tsx:708:                        ₺{Math.abs(ex.newBalance ?? 0).toLocaleString()}
+app/pages/CariDetailPage.tsx:752:                      <p className="text-xs text-muted-foreground mt-0.5">{new Date(fis.date).toLocaleString('tr-TR')} • {fis.items?.length || 0} Kalem</p>
+app/pages/CariDetailPage.tsx:757:                      <p className="text-lg font-bold text-foreground">₺{(fis.total || 0).toLocaleString()}</p>
+app/pages/CariDetailPage.tsx:758:                      {fis.payment && fis.payment.amount > 0 && <p className="text-[10px] text-emerald-400 font-bold">Ödendi: ₺{fis.payment.amount.toLocaleString()}</p>}
+app/pages/CariDetailPage.tsx:852:                        <span className="font-bold">₺{(it.totalPrice || 0).toLocaleString()}</span>
+app/pages/CariDetailPage.tsx:857:                      <span>₺{(fis.total || 0).toLocaleString()}</span>
+app/pages/CariDetailPage.tsx:886:                      <p className="text-3xl font-black text-foreground">₺{(selectedFis.total || 0).toLocaleString()}</p>
+app/pages/CariDetailPage.tsx:887:                      {selectedFis.payment && selectedFis.payment.amount > 0 && <p className="text-sm font-bold text-emerald-400 mt-1">Ödenen: ₺{selectedFis.payment.amount.toLocaleString()}</p>}
+app/pages/CariDetailPage.tsx:896:                      <p className="font-bold text-foreground">{new Date(selectedFis.date).toLocaleString('tr-TR')}</p>
+app/pages/CariDetailPage.tsx:927:                              <span className={`text-lg font-bold ${sourceColor}`}>₺{tp.toLocaleString()}</span>
+app/pages/CariDetailPage.tsx:960:                            <span>₺{total.toLocaleString()}</span>
+app/pages/AracTakipPage.tsx:579:          { label: 'Bugun Toplam KM', value: todayStats.totalKm.toLocaleString(), icon: Route, color: 'text-blue-400', bgColor: 'bg-blue-500/10 border-blue-500/20' },
+app/pages/AracTakipPage.tsx:583:          { label: 'Haftalik KM', value: weekStats.totalKm.toLocaleString(), icon: TrendingUp, color: 'text-cyan-400', bgColor: 'bg-cyan-500/10 border-cyan-500/20' },
+app/pages/AracTakipPage.tsx:648:                { icon: Gauge, label: 'Baslangic KM', value: activeShift.startKm.toLocaleString() },
+app/pages/AracTakipPage.tsx:746:                              <span className="font-bold text-blue-400">{(shift.totalKm || 0).toLocaleString()} km</span>
+app/pages/AracTakipPage.tsx:748:                            <p className="text-xs text-muted-foreground">{shift.startKm.toLocaleString()} &rarr; {(shift.endKm || 0).toLocaleString()}</p>
+app/pages/AracTakipPage.tsx:844:                          <span className="text-muted-foreground font-mono">{log.km.toLocaleString()} km</span>
+app/pages/AracTakipPage.tsx:983:                    <span className="text-foreground font-medium">{activeShift.startKm.toLocaleString()}</span>
+app/pages/AracTakipPage.tsx:1016:                      Toplam: {(isNaN(parseInt(endKm, 10)) ? 0 : parseInt(endKm, 10) - activeShift.startKm).toLocaleString()} km
+app/pages/TahsilatPage.tsx:324:        relatedFisDescription: `${t('collection.title')} - ₺${paymentAmount.toLocaleString()}`,
+app/pages/TahsilatPage.tsx:355:          relatedFisDescription: `Taksit ${idx + 1}/${installmentPlan.length} - ₺${inst.amount.toLocaleString()}`,
+app/pages/TahsilatPage.tsx:378:      `${paymentTypeLabels[paymentType]} ${t('collection.title')}! ₺${paymentAmount.toLocaleString()} - ${currentEmployee?.name}`
+app/pages/TahsilatPage.tsx:430:                  {selectedCustomer.balance > 0 ? 'Borç' : 'Alacak'}: ₺{Math.abs(selectedCustomer.balance).toLocaleString()}
+app/pages/TahsilatPage.tsx:470:                      ₺{Math.abs(customer.balance).toLocaleString()}
+app/pages/TahsilatPage.tsx:504:              <span className="text-sm font-bold text-green-400">₺{todayTotal.toLocaleString()}</span>
+app/pages/TahsilatPage.tsx:524:                    <span className="text-sm font-bold text-green-400 ml-2">₺{p.amount?.toLocaleString()}</span>
+app/pages/TahsilatPage.tsx:544:                    {customer.balance > 0 ? '-' : customer.balance < 0 ? '+' : ''}₺{Math.abs(customer.balance).toLocaleString()}
+app/pages/TahsilatPage.tsx:551:                    <p className="text-sm font-bold text-red-400">₺{Math.abs(customer.balance).toLocaleString()}</p>
+app/pages/TahsilatPage.tsx:575:                ₺{Math.abs(selectedCustomer.balance).toLocaleString()}
+app/pages/TahsilatPage.tsx:620:                      ₺{todayTotal.toLocaleString('tr-TR')}
+app/pages/TahsilatPage.tsx:676:                      <span className="text-[10px] text-muted-foreground">₺{Math.round(amount).toLocaleString('tr-TR')}</span>
+app/pages/TahsilatPage.tsx:829:                        {t('checks.payFull')} (₺{selectedCustomer.balance.toLocaleString()})
+app/pages/TahsilatPage.tsx:846:                            {installmentPlan.length} x ₺{installmentPlan[0]?.amount.toLocaleString()}
+app/pages/TahsilatPage.tsx:856:                              <span className="text-sm font-bold text-foreground">₺{inst.amount.toLocaleString()}</span>
+app/pages/TahsilatPage.tsx:862:                          <span className="text-lg font-bold text-indigo-400">₺{installmentPlan.reduce((s, i) => s + i.amount, 0).toLocaleString()}</span>
+app/pages/TahsilatPage.tsx:919:                    value={`₺${paymentType === 'taksit' ? installmentPlan.reduce((s, i) => s + i.amount, 0).toLocaleString() : parseFloat(amount || '0').toLocaleString()}`}
+app/pages/TahsilatPage.tsx:931:                         ₺{Math.abs(selectedCustomer.balance).toLocaleString('tr-TR')}
+app/pages/TahsilatPage.tsx:938:                         ₺{Math.abs(selectedCustomer.balance - (paymentType === 'taksit' ? installmentPlan.reduce((s, i) => s + i.amount, 0) : parseFloat(amount || '0'))).toLocaleString('tr-TR')}
+app/pages/TahsilatPage.tsx:998:      {balance > 0 && <p className="text-xs text-muted-foreground mt-1">{t('checks.partialPaymentHint')}: ₺{balance.toLocaleString()}</p>}
+app/pages/TahsilatPage.tsx:1008:        {t('checks.payFull')} (₺{balance.toLocaleString()})
+app/pages/TahsilatPage.tsx:1012:        %50 (₺{(balance / 2).toLocaleString()})
+app/pages/TahsilatPage.tsx:1016:        %25 (₺{(balance / 4).toLocaleString()})
+app/pages/RaporlarPage.tsx:357:      time: l.timestamp ? new Date(l.timestamp).toLocaleString('tr-TR') : '-',
+app/pages/RaporlarPage.tsx:441:                  <Tooltip contentStyle={{ backgroundColor: "var(--popover)", borderColor: "var(--border)", borderRadius: '12px' }} formatter={v => `₺${Number(v).toLocaleString('tr-TR')}`} />
+app/pages/RaporlarPage.tsx:449:                  <span className="font-bold text-foreground">₺{e.value.toLocaleString('tr-TR')}</span>
+app/pages/RaporlarPage.tsx:475:                <Tooltip content={<PremiumTooltip formatter={v => `₺${v.toLocaleString('tr-TR')}`} />} />
+app/pages/RaporlarPage.tsx:503:                      <span className="text-sm font-bold text-foreground">₺{p.amount.toLocaleString('tr-TR')}</span>
+app/pages/RaporlarPage.tsx:539:                <Tooltip content={<PremiumTooltip formatter={v => `₺${v.toLocaleString('tr-TR')}`} />} />
+app/pages/RaporlarPage.tsx:570:                { label: t('reports.totalSales'), value: `₺${totalSales.toLocaleString('tr-TR')}`, color: '#3b82f6' },
+app/pages/RaporlarPage.tsx:572:                { label: t('reports.avgTransactionAmount'), value: `₺${filteredSales.length > 0 ? Math.round(totalSales / filteredSales.length).toLocaleString('tr-TR') : '0'}`, color: '#06b6d4' },
+app/pages/RaporlarPage.tsx:573:                { label: t('reports.return'), value: `₺${Math.abs(filteredSales.filter(s => s.amount < 0).reduce((s, i) => s + i.amount, 0)).toLocaleString('tr-TR')}`, color: '#ef4444' },
+app/pages/RaporlarPage.tsx:607:                        {i.amount < 0 ? '-' : ''}₺{Math.abs(i.amount).toLocaleString('tr-TR')}
+app/pages/RaporlarPage.tsx:627:                    <div><p className="text-muted-foreground mb-1">Birim Fiyat</p><p className="font-bold text-blue-400">₺{item.quantity > 0 ? (Math.abs(item.amount) / item.quantity).toLocaleString('tr-TR', { maximumFractionDigits: 2 }) : '0'}</p></div>
+app/pages/RaporlarPage.tsx:637:                    <td className="py-3 px-4 text-right text-xs text-muted-foreground">{filteredSales.reduce((s, i) => s + i.quantity, 0).toLocaleString('tr-TR')}</td>
+app/pages/RaporlarPage.tsx:638:                    <td className="py-3 px-4 text-right font-black text-sm text-blue-400">₺{filteredSales.reduce((s, i) => s + i.amount, 0).toLocaleString('tr-TR')}</td>
+app/pages/RaporlarPage.tsx:665:                      <span className="font-black text-sm text-orange-400">₺{Math.abs(i.amount).toLocaleString('tr-TR')}</span>
+app/pages/RaporlarPage.tsx:679:                    <div><p className="text-muted-foreground mb-1">Birim Maliyet</p><p className="font-bold text-orange-400">₺{item.quantity > 0 ? (Math.abs(item.amount) / item.quantity).toLocaleString('tr-TR', { maximumFractionDigits: 2 }) : '0'}</p></div>
+app/pages/RaporlarPage.tsx:689:                    <td className="py-3 px-4 text-right text-xs text-muted-foreground">{filteredPurchases.reduce((s, i) => s + i.quantity, 0).toLocaleString('tr-TR')}</td>
+app/pages/RaporlarPage.tsx:690:                    <td className="py-3 px-4 text-right font-black text-sm text-orange-400">₺{filteredPurchases.reduce((s, i) => s + i.amount, 0).toLocaleString('tr-TR')}</td>
+app/pages/RaporlarPage.tsx:713:                  <p className="text-sm font-bold text-foreground">₺{item.value.toLocaleString('tr-TR')}</p>
+app/pages/RaporlarPage.tsx:724:                  {netProfit >= 0 ? '+' : '-'}₺{Math.abs(netProfit).toLocaleString('tr-TR')} {netProfit >= 0 ? t('reports.profit') : t('reports.loss')}
+app/pages/RaporlarPage.tsx:737:                { key: 'amount', label: t('reports.amount'), align: 'right', render: i => <span className="font-black text-emerald-400">+₺{i.amount.toLocaleString('tr-TR')}</span> },
+app/pages/RaporlarPage.tsx:744:                    <td className="py-3 px-4 text-right font-black text-sm text-emerald-400">+₺{filteredIncome.reduce((s, i) => s + i.amount, 0).toLocaleString('tr-TR')}</td>
+app/pages/RaporlarPage.tsx:756:                { key: 'amount', label: t('reports.amount'), align: 'right', render: i => <span className="font-black text-red-400">-₺{i.amount.toLocaleString('tr-TR')}</span> },
+app/pages/RaporlarPage.tsx:763:                    <td className="py-3 px-4 text-right font-black text-sm text-red-400">-₺{filteredExpense.reduce((s, i) => s + i.amount, 0).toLocaleString('tr-TR')}</td>
+app/pages/RaporlarPage.tsx:778:                { label: t('reports.stockValue'), value: `₺${totalStockValue.toLocaleString('tr-TR')}`, color: '#3b82f6' },
+app/pages/RaporlarPage.tsx:829:                  { key: 'buyPrice', label: t('reports.buyPrice'), align: 'right', render: i => <span className="text-xs text-muted-foreground">₺{i.buyPrice.toLocaleString('tr-TR')}</span> },
+app/pages/RaporlarPage.tsx:830:                  { key: 'price', label: t('reports.sellPrice'), align: 'right', render: i => <span className="text-xs font-bold text-muted-foreground">₺{i.price.toLocaleString('tr-TR')}</span> },
+app/pages/RaporlarPage.tsx:837:                      <span className="font-black text-sm text-blue-400">₺{(i.stock * i.price).toLocaleString('tr-TR')}</span>
+app/pages/RaporlarPage.tsx:855:                        <div><p className="text-muted-foreground mb-1">Alış Fiyatı</p><p className="font-bold text-muted-foreground">₺{item.buyPrice.toLocaleString('tr-TR')}</p></div>
+app/pages/RaporlarPage.tsx:856:                        <div><p className="text-muted-foreground mb-1">Satış Fiyatı</p><p className="font-bold text-blue-400">₺{item.price.toLocaleString('tr-TR')}</p></div>
+app/pages/RaporlarPage.tsx:867:                                <span className="font-bold text-muted-foreground">₺{(m.totalAmount || 0).toLocaleString('tr-TR')}</span>
+app/pages/RaporlarPage.tsx:885:                    <td className="py-3 px-4 text-right font-black text-sm text-blue-400">₺{filteredStock.reduce((s, i) => s + (i.stock * i.price), 0).toLocaleString('tr-TR')}</td>
+app/pages/RaporlarPage.tsx:900:                { label: t('reports.totalSales'), value: `₺${personelPerformansData.reduce((s: number, p: any) => s + p.salesTotal, 0).toLocaleString('tr-TR')}`, color: '#10b981' },
+app/pages/RaporlarPage.tsx:901:                { label: t('reports.totalReturns'), value: `₺${personelPerformansData.reduce((s: number, p: any) => s + p.returnTotal, 0).toLocaleString('tr-TR')}`, color: '#f59e0b' },
+app/pages/RaporlarPage.tsx:902:                { label: t('reports.avgPerformance'), value: `₺${personelPerformansData.length > 0 ? Math.round(personelPerformansData.reduce((s: number, p: any) => s + p.netSales, 0) / personelPerformansData.length).toLocaleString('tr-TR') : '0'}`, color: '#3b82f6' },
+app/pages/RaporlarPage.tsx:943:                    <span className="text-emerald-400 font-bold text-sm">₺{i.salesTotal.toLocaleString('tr-TR')}</span>
+app/pages/RaporlarPage.tsx:946:                    <span className="text-orange-400 text-xs">-₺{i.returnTotal.toLocaleString('tr-TR')}</span>
+app/pages/RaporlarPage.tsx:950:                      <span className="font-black text-sm text-blue-400">₺{i.netSales.toLocaleString('tr-TR')}</span>
+app/pages/RaporlarPage.tsx:968:                    <div><p className="text-muted-foreground mb-1">Brüt Satış</p><p className="font-bold text-emerald-400">₺{item.salesTotal.toLocaleString('tr-TR')}</p></div>
+app/pages/RaporlarPage.tsx:969:                    <div><p className="text-muted-foreground mb-1">İadeler</p><p className="font-bold text-orange-400">₺{item.returnTotal.toLocaleString('tr-TR')}</p></div>
+app/pages/RaporlarPage.tsx:970:                    <div><p className="text-muted-foreground mb-1">Alışlar</p><p className="font-bold text-purple-400">₺{item.purchaseTotal.toLocaleString('tr-TR')}</p></div>
+app/pages/RaporlarPage.tsx:980:                    <td className="py-3 px-4 text-right text-xs text-emerald-400 font-bold">₺{personelPerformansData.reduce((s: number, p: any) => s + p.salesTotal, 0).toLocaleString('tr-TR')}</td>
+app/pages/RaporlarPage.tsx:981:                    <td className="py-3 px-4 text-right text-xs text-orange-400">-₺{personelPerformansData.reduce((s: number, p: any) => s + p.returnTotal, 0).toLocaleString('tr-TR')}</td>
+app/pages/RaporlarPage.tsx:982:                    <td className="py-3 px-4 text-right font-black text-sm text-blue-400">₺{personelPerformansData.reduce((s: number, p: any) => s + p.netSales, 0).toLocaleString('tr-TR')}</td>
+app/pages/RaporlarPage.tsx:1092:                    { label: t('reports.estimatedTotalProfit'), value: `₺${totalEstProfit.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}`, color: '#10b981' },
+app/pages/RaporlarPage.tsx:1171:                                    ? <span className={p.totalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}>₺{Math.abs(p.totalProfit).toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</span>
+app/pages/FaturaPage.tsx:128:  return <span>{prefix}{(displayValue || 0).toLocaleString('tr-TR')}{suffix}</span>;
+app/pages/FaturaPage.tsx:147:    `TOPLAM: ₺${Number(fatura.grossAmount).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`,
+app/pages/FaturaPage.tsx:759:          { label: t('fatura.purchaseInvoices'), value: stats.alisCount, sub: `₺${(stats.alisToplam || 0).toLocaleString('tr-TR')}`, icon: ArrowDownRight, color: 'orange' },
+app/pages/FaturaPage.tsx:760:          { label: t('fatura.salesInvoices'), value: stats.satisCount, sub: `₺${(stats.satisToplam || 0).toLocaleString('tr-TR')}`, icon: ArrowUpRight, color: 'emerald' },
+app/pages/FaturaPage.tsx:785:            <span className="text-sm font-bold text-blue-400">₺{(stats.toplamKdv || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+app/pages/FaturaPage.tsx:995:                  <p className="text-lg font-black text-foreground">₺{(fatura.grossAmount || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+app/pages/FaturaPage.tsx:1068:                <p className={`text-xl font-black text-${s.color}-400 mt-1`}>₺{(Math.abs(s.value) || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+app/pages/FaturaPage.tsx:1086:                    <span className="text-orange-300">₺{(data.alisNet || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+app/pages/FaturaPage.tsx:1087:                    <span className="text-orange-400 font-bold">₺{(data.alisKdv || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+app/pages/FaturaPage.tsx:1088:                    <span className="text-emerald-300">₺{(data.satisNet || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+app/pages/FaturaPage.tsx:1089:                    <span className="text-emerald-400 font-bold">₺{(data.satisKdv || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+app/pages/FaturaPage.tsx:1112:                    <span className="text-orange-400">₺{(data.alisKdv || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+app/pages/FaturaPage.tsx:1113:                    <span className="text-emerald-400">₺{(data.satisKdv || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+app/pages/FaturaPage.tsx:1114:                    <span className={`font-bold ${data.net >= 0 ? 'text-blue-400' : 'text-red-400'}`}>₺{(data.net || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+app/pages/FaturaPage.tsx:1268:                                ₺{(Math.abs(c.balance) || 0).toLocaleString('tr-TR')}
+app/pages/FaturaPage.tsx:1490:                      <p className="text-2xl font-black text-foreground">₺{(selectedFatura.grossAmount || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+app/pages/FaturaPage.tsx:1608:                        {selectedFatura.cancelledBy} tarafından {selectedFatura.cancelledAt ? new Date(selectedFatura.cancelledAt).toLocaleString('tr-TR') : ''} tarihinde iptal edildi.
+app/pages/FaturaPage.tsx:1730:                      <span className="text-sm font-bold text-blue-400">₺{(u.totalAmount || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+app/pages/YedeklerPage.tsx:518:                    <div className="flex justify-between"><span className="text-muted-foreground/60">Tarih:</span><span className="text-foreground">{restoreFileContent.createdAt ? new Date(restoreFileContent.createdAt).toLocaleString('tr-TR') : '-'}</span></div>
+app/components/PaymentSelector.tsx:34:          <p className="text-foreground text-base sm:text-lg font-bold">₺{totalAmount.toLocaleString('tr-TR')}</p>
+app/components/PaymentSelector.tsx:186:                      Kısmi Ödeme: Kalan ₺{(totalAmount - paymentInfo.amount).toLocaleString('tr-TR')} veresiye
+app/components/PaymentSelector.tsx:200:                    Tam Tutarı Gir (₺{totalAmount.toLocaleString('tr-TR')})
+app/components/AIChatGPT.tsx:435:                ? value.toLocaleString('tr-TR', { maximumFractionDigits: 2 })
+app/components/AIChatGPT.tsx:478:      pdf.text(`Tarih: ${new Date().toLocaleString('tr-TR')}`, 14, 28);
+app/components/InteractiveDataPanel.tsx:687:                <p className="text-sm font-bold text-foreground/80">{(Number.isFinite(max) ? max : 0).toLocaleString('tr-TR')}</p>
+app/components/DashboardAIChat.tsx:68:            <Tooltip formatter={(v: any) => `₺${Number(v).toLocaleString('tr-TR')}`} contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: '8px', color: "var(--foreground)" }} />
+app/components/DashboardAIChat.tsx:82:            <Tooltip formatter={(v: any) => `₺${Number(v).toLocaleString('tr-TR')}`} contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: '8px', color: "var(--foreground)" }} />
+app/components/DashboardAIChat.tsx:90:            <Tooltip formatter={(v: any) => `₺${Number(v).toLocaleString('tr-TR')}`} contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: '8px', color: "var(--foreground)" }} />
+app/components/DashboardAIChat.tsx:99:            <Tooltip formatter={(v: any) => `₺${Number(v).toLocaleString('tr-TR')}`} contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: '8px', color: "var(--foreground)" }} />
+app/components/ChartComponents.tsx:55:                {formatter ? formatter(entry.value || 0) : `${(entry.value || 0).toLocaleString('tr-TR')}`}
+app/components/ChartComponents.tsx:275:    : Math.round(display).toLocaleString('tr-TR');
+app/components/ChartComponents.tsx:692:        <span className="text-[12px] font-bold text-foreground tabular-nums">{value.toLocaleString('tr-TR')}{suffix}</span>
+app/components/ChartComponents.tsx:824:            ₺{item.value >= 1000 ? `${(item.value / 1000).toFixed(1)}k` : item.value.toLocaleString('tr-TR')}
+app/components/ChartComponents.tsx:1025:                {bar.end >= 0 ? '' : '-'}₺{Math.abs(bar.end).toLocaleString('tr-TR')}
+app/components/ChartComponents.tsx:1141:            <span className="text-[10px] sm:text-xs font-bold text-foreground tabular-nums">₺{thisWeek.toLocaleString('tr-TR')}</span>
+app/components/ChartComponents.tsx:1163:          <span className="text-[9px] sm:text-[11px] font-bold text-foreground/40 tabular-nums shrink-0">₺{lastWeek.toLocaleString('tr-TR')}</span>
+app/components/ChartComponents.tsx:1228:          <span className="text-sm sm:text-lg font-black text-foreground">₺{total >= 1000 ? `${(total/1000).toFixed(0)}k` : total.toLocaleString('tr-TR')}</span>
+app/components/ChartComponents.tsx:1455:                  <span className="text-[10px] sm:text-xs font-black text-foreground">{step.value.toLocaleString('tr-TR')}</span>
+app/components/ChartComponents.tsx:1499:            {actual.toLocaleString('tr-TR')}{suffix}
+app/components/ChartComponents.tsx:1534:          <span className="w-2.5 sm:w-3 h-0.5 bg-white/60 rounded" /> <span className="hidden sm:inline">Hedef: </span>{target.toLocaleString('tr-TR')}{suffix}
+app/components/ChartComponents.tsx:1536:        <span>{max.toLocaleString('tr-TR')}{suffix}</span>
+app/components/ChartComponents.tsx:1558:        const fmt = item.format || ((v: number) => v.toLocaleString('tr-TR'));
+app/components/ChartComponents.tsx:1706:            {value.toLocaleString('tr-TR')}
+app/components/ChartComponents.tsx:1807:                  {item.value.toLocaleString('tr-TR')}{suffix}
+app/components/ChartComponents.tsx:1846:                    {item.value.toLocaleString('tr-TR')}{suffix}
+app/components/NumberInput.tsx:260:          {value.toLocaleString('tr-TR', { maximumFractionDigits: precision })} {unit}
+app/components/ConflictResolver.tsx:16:  return d.toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+app/components/AIPendingApprovals.tsx:214:                    <span className="text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleString('tr-TR')}</span>
+app/components/ChangeLogModal.tsx:70:                        {new Date(entry.timestamp).toLocaleString('tr-TR')}
+app/hooks/useOpsBackgroundService.ts:30:  const msg = encodeURIComponent(`🚨 [ISLEYEN ET - CORTEX OTO. SISTEM]\n\nYeni Uyarı: ⚠️\n${message}\n\nZaman: ${new Date().toLocaleString('tr-TR')}`);

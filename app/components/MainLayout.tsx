@@ -1201,10 +1201,6 @@ export function MainLayout() {
                 </AnimatePresence>
               )}
 
-              <div className="hidden sm:block flex-shrink-0">
-                <NodeStatusBadge />
-              </div>
-
               {/* Breadcrumb (desktop) */}
               {currentPageLabel && (
                 <div className="hidden lg:flex items-center gap-1.5 text-sm flex-shrink-0">

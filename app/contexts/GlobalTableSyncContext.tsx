@@ -137,10 +137,6 @@ const TABLE_SYNC_CONFIGS: TableSyncConfig[] = [
   { tableName: 'favorite_items',      storageKey: 'isleyen_et_favorite_items',   orderBy: 'id',        orderAsc: true  },
   { tableName: 'performance_metrics', storageKey: 'isleyen_et_perf_metrics',     orderBy: 'timestamp', orderAsc: false },
   { tableName: 'nakliyeciler',        storageKey: 'isleyen_et_nakliyeciler',     orderBy: 'name',      orderAsc: true  },
-  { tableName: 'iceberg_cages',       storageKey: 'iceberg_cages_data',          orderBy: 'name',      orderAsc: true  },
-  { tableName: 'transporters',        storageKey: 'transporters_data',           orderBy: 'name',      orderAsc: true  },
-  { tableName: 'invoice_names',       storageKey: 'invoice_names_data',          orderBy: 'name',      orderAsc: true  },
-  { tableName: 'pos_devices',         storageKey: StorageKey.POS_DATA,           orderBy: 'name',      orderAsc: true  },
 ];
 
 // ─── Genel tablo senkronizasyon bileşeni ──────────────────────────────────────

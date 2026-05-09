@@ -4,6 +4,8 @@ import { isAppLocked, unlockApp, stopLockTimer, startLockTimer, updateActivity, 
 import { broadcastLock } from '../lib/broadcast-sync';
 import { useAuth } from '../contexts/AuthContext';
 
+import { motion, AnimatePresence } from 'motion/react';
+
 /**
  * Uygulama Kilit Ekranı
  * - 10 dakika hareketsizlikte otomatik kilitler
@@ -84,74 +86,108 @@ export function AppLockScreen({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('mert:lock_app', handleManualLock);
   }, []);
 
-  // Kilit yoksa veya kullanıcı yoksa normal akış (login ekranı zaten koruma sağlar)
-  if (!locked || !user) return <>{children}</>;
+  const containerVariants = {
+    hidden: { opacity: 0, backdropFilter: 'blur(0px)' },
+    show: { 
+      opacity: 1, 
+      backdropFilter: 'blur(10px)',
+      transition: {
+        duration: 0.3,
+        staggerChildren: 0.1,
+        delayChildren: 0.1
+      }
+    },
+    exit: { opacity: 0, backdropFilter: 'blur(0px)', transition: { duration: 0.2 } }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, scale: 0.95, y: 10 },
+    show: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 25 } }
+  };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#06090f]">
-      <div className="w-full max-w-sm px-6 py-8 flex flex-col items-center gap-6">
-        {/* İkon */}
-        <div className="w-20 h-20 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-          <Lock className="w-10 h-10 text-blue-400" />
-        </div>
-
-        <div className="text-center">
-          <h2 className="text-xl font-bold text-foreground">Uygulama Kilitlendi</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Devam etmek için şifrenizi girin
-          </p>
-          {user && (
-            <p className="text-xs text-blue-400 mt-1">{user.name}</p>
-          )}
-        </div>
-
-        <div className="w-full space-y-3">
-          <input
-            type="password"
-            value={pin}
-            onChange={e => { setPin(e.target.value); setError(''); }}
-            onKeyDown={e => e.key === 'Enter' && handleUnlock()}
-            placeholder="Şifreniz"
-            autoFocus
-            className="w-full px-4 py-3 bg-white/[0.05] border border-border rounded-xl text-foreground text-center text-lg tracking-widest placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-          />
-
-          {error && (
-            <p className="text-xs text-red-400 text-center">{error}</p>
-          )}
-
-          <button
-            onClick={handleUnlock}
-            disabled={loading || !pin.trim()}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-foreground font-bold rounded-xl transition-colors"
+    <>
+      {children}
+      <AnimatePresence>
+        {locked && user && (
+          <motion.div 
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#06090f]/90"
           >
-            {loading ? (
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              <LogIn className="w-4 h-4" />
-            )}
-            Kilidi Aç
-          </button>
-        </div>
+            <div className="w-full max-w-sm px-6 py-8 flex flex-col items-center gap-6">
+              {/* İkon */}
+              <motion.div variants={itemVariants} className="w-20 h-20 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+                <Lock className="w-10 h-10 text-blue-400" />
+              </motion.div>
 
-        <p className="text-xs text-gray-600 text-center">
-          10 dakika hareketsizlik sonrası otomatik kilitlendi
-        </p>
+              <motion.div variants={itemVariants} className="text-center">
+                <h2 className="text-xl font-bold text-white">Uygulama Kilitlendi</h2>
+                <p className="text-sm text-gray-400 mt-1">
+                  Devam etmek için şifrenizi girin
+                </p>
+                {user && (
+                  <p className="text-xs text-blue-400 mt-1">{user.name}</p>
+                )}
+              </motion.div>
 
-        {/* Acil çıkış: farklı kullanıcı veya şifre hatırlamama durumu */}
-        <button
-          onClick={() => {
-            unlockApp();
-            logout();
-            setLocked(false);
-            setPin('');
-          }}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline"
-        >
-          Farklı bir hesapla giriş yap
-        </button>
-      </div>
-    </div>
+              <motion.div variants={itemVariants} className="w-full space-y-3">
+                <input
+                  type="password"
+                  value={pin}
+                  onChange={e => { setPin(e.target.value); setError(''); }}
+                  onKeyDown={e => e.key === 'Enter' && handleUnlock()}
+                  placeholder="Şifreniz"
+                  autoFocus
+                  className="w-full px-4 py-3 bg-white/[0.05] border border-gray-800 rounded-xl text-white text-center text-lg tracking-widest placeholder:text-gray-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40"
+                />
+
+                <AnimatePresence>
+                  {error && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                      <p className="text-xs text-red-400 text-center mt-1">{error}</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <button
+                  onClick={handleUnlock}
+                  disabled={loading || !pin.trim()}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold rounded-xl transition-colors"
+                >
+                  {loading ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <LogIn className="w-4 h-4" />
+                  )}
+                  Kilidi Aç
+                </button>
+              </motion.div>
+
+              <motion.p variants={itemVariants} className="text-xs text-gray-600 text-center">
+                10 dakika hareketsizlik sonrası otomatik kilitlendi
+              </motion.p>
+
+              {/* Acil çıkış: farklı kullanıcı veya şifre hatırlamama durumu */}
+              <motion.button
+                variants={itemVariants}
+                onClick={() => {
+                  unlockApp();
+                  logout();
+                  setLocked(false);
+                  setPin('');
+                }}
+                className="text-xs text-gray-500 hover:text-white transition-colors underline-offset-2 hover:underline"
+              >
+                Farklı bir hesapla giriş yap
+              </motion.button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 

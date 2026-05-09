@@ -32,7 +32,6 @@ import { addPDFHeader, addPDFFooter, addReportInfoBox, tableStyles } from '../ut
 import { getPagePermissions } from '../utils/permissions';
 import { usePageSecurity } from '../hooks/usePageSecurity';
 import { InteractiveDataPanel, type PanelColumn } from '../components/InteractiveDataPanel';
-import { v4 as uuidv4 } from 'uuid';
 
 interface StokHareket {
   id: string;
@@ -247,16 +246,16 @@ export function StokHareketPage() {
       const nextY = addReportInfoBox(doc, [
         { label: 'Donem:', value: `${dateRange.start || '-'} / ${dateRange.end || '-'}` },
         { label: 'Toplam Hareket:', value: `${filteredHareketler.length} Islem` },
-        { label: 'Toplam Giris:', value: `${stats.totalGirisVal.toLocaleString('tr-TR')} TL` },
-        { label: 'Toplam Cikis:', value: `${stats.totalCikisVal.toLocaleString('tr-TR')} TL` }
+        { label: 'Toplam Giris:', value: `${(stats.totalGirisVal || 0).toLocaleString('tr-TR')} TL` },
+        { label: 'Toplam Cikis:', value: `${(stats.totalCikisVal || 0).toLocaleString('tr-TR')} TL` }
       ], 36);
       const tableData = filteredHareketler.map(h => [
         h.date ? new Date(h.date).toLocaleDateString('tr-TR') : '-',
         h.type === 'giris' ? 'Giris' : h.type === 'cikis' ? 'Cikis' : 'Iade',
         h.productName,
         `${h.quantity} ${h.unit}`,
-        `${h.unitPrice.toLocaleString('tr-TR')} TL`,
-        `${h.total.toLocaleString('tr-TR')} TL`,
+        `${(h.unitPrice || 0).toLocaleString('tr-TR')} TL`,
+        `${(h.total || 0).toLocaleString('tr-TR')} TL`,
         h.cari,
         h.employee,
         h.source,
@@ -310,7 +309,7 @@ export function StokHareketPage() {
     if (!product) { toast.error('Ürün bulunamadı!'); return; }
 
     const newGiris: StokGiris = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       date: gecmisForm.date || today.toISOString(),
       productId: gecmisForm.productId,
       productName: product.name,
@@ -391,9 +390,9 @@ export function StokHareketPage() {
       >
         {[
           { title: 'Toplam Hareket', value: stats.totalHareket.toString(), icon: Package, color: 'from-secondary to-accent' },
-          { title: 'Stok Girisi', value: `${stats.totalGiris} AD`, sub: `${stats.totalGirisVal.toLocaleString('tr-TR')} TL`, icon: ArrowDownCircle, color: 'from-green-600 to-green-700' },
-          { title: 'Stok Cikisi', value: `${stats.totalCikis} AD`, sub: `${stats.totalCikisVal.toLocaleString('tr-TR')} TL`, icon: ArrowUpCircle, color: 'from-blue-600 to-blue-700' },
-          { title: 'Iade', value: `${stats.totalIade} AD`, sub: `${stats.totalIadeVal.toLocaleString('tr-TR')} TL`, icon: RotateCcw, color: 'from-orange-600 to-orange-700' },
+          { title: 'Stok Girisi', value: `${stats.totalGiris} AD`, sub: `${(stats.totalGirisVal || 0).toLocaleString('tr-TR')} TL`, icon: ArrowDownCircle, color: 'from-green-600 to-green-700' },
+          { title: 'Stok Cikisi', value: `${stats.totalCikis} AD`, sub: `${(stats.totalCikisVal || 0).toLocaleString('tr-TR')} TL`, icon: ArrowUpCircle, color: 'from-blue-600 to-blue-700' },
+          { title: 'Iade', value: `${stats.totalIade} AD`, sub: `${(stats.totalIadeVal || 0).toLocaleString('tr-TR')} TL`, icon: RotateCcw, color: 'from-orange-600 to-orange-700' },
         ].map((card) => {
           const Icon = card.icon;
           return (
@@ -495,14 +494,14 @@ export function StokHareketPage() {
           },
           {
             key: 'unitPrice', label: 'Birim Fiyat', align: 'right', cardRole: 'meta',
-            render: (h) => <span className="font-mono text-xs sm:text-sm text-foreground/80">{h.unitPrice.toLocaleString('tr-TR')} TL</span>,
+            render: (h) => <span className="font-mono text-xs sm:text-sm text-foreground/80">{(h.unitPrice || 0).toLocaleString('tr-TR')} TL</span>,
             getValue: (h) => h.unitPrice,
           },
           {
             key: 'total', label: 'Toplam', align: 'right', cardRole: 'value', color: '#3b82f6',
             render: (h) => (
               <span className={`font-mono text-xs sm:text-sm font-bold ${h.type === 'giris' ? 'text-green-400' : h.type === 'iade' ? 'text-orange-400' : 'text-blue-400'}`}>
-                {h.type === 'cikis' ? '-' : '+'}{h.total.toLocaleString('tr-TR')} TL
+                {h.type === 'cikis' ? '-' : '+'}{(h.total || 0).toLocaleString('tr-TR')} TL
               </span>
             ),
             getValue: (h) => h.total,
@@ -547,9 +546,9 @@ export function StokHareketPage() {
           <tr className="border-t-2 border-border">
             <td className="py-3 px-4" />
             <td colSpan={2} className="py-3 px-4 text-foreground font-bold text-xs sm:text-sm">TOPLAM ({filteredHareketler.length} hareket)</td>
-            <td className="py-3 px-4 text-center text-foreground font-bold text-xs sm:text-sm font-mono">{filteredHareketler.reduce((s, h) => s + h.quantity, 0)}</td>
+            <td className="py-3 px-4 text-center text-foreground font-bold text-xs sm:text-sm font-mono">{filteredHareketler.reduce((s, h) => s + (h.quantity || 0), 0)}</td>
             <td className="py-3 px-4" />
-            <td className="py-3 px-4 text-right text-green-400 font-bold text-xs sm:text-sm font-mono">{filteredHareketler.reduce((s, h) => s + h.total, 0).toLocaleString('tr-TR')} TL</td>
+            <td className="py-3 px-4 text-right text-green-400 font-bold text-xs sm:text-sm font-mono">{filteredHareketler.reduce((s, h) => s + (h.total || 0), 0).toLocaleString('tr-TR')} TL</td>
             <td colSpan={3} />
           </tr>
         ) : undefined}

@@ -65,7 +65,7 @@ function ChartRenderer({ response }: { response: AIResponse }) {
                 <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
               ))}
             </Pie>
-            <Tooltip formatter={(v: any) => `₺${Number(v).toLocaleString('tr-TR')}`} contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: '8px', color: "var(--foreground)" }} />
+            <Tooltip formatter={(v: any) => `₺${Number(v || 0).toLocaleString('tr-TR')}`} contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: '8px', color: "var(--foreground)" }} />
             <Legend />
           </PieChart>
         ) : chartType === 'area' ? (
@@ -79,7 +79,7 @@ function ChartRenderer({ response }: { response: AIResponse }) {
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
             <XAxis dataKey={chartConfig?.xKey || 'name'} tick={{ fill: '#6b7280', fontSize: 10 }} />
             <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} />
-            <Tooltip formatter={(v: any) => `₺${Number(v).toLocaleString('tr-TR')}`} contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: '8px', color: "var(--foreground)" }} />
+            <Tooltip formatter={(v: any) => `₺${Number(v || 0).toLocaleString('tr-TR')}`} contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: '8px', color: "var(--foreground)" }} />
             <Area type="monotone" dataKey={chartConfig?.yKey || 'value'} stroke={chartConfig?.color || '#3b82f6'} fill="url(#aiAreaGrad)" strokeWidth={2} />
           </AreaChart>
         ) : chartType === 'line' ? (
@@ -87,7 +87,7 @@ function ChartRenderer({ response }: { response: AIResponse }) {
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
             <XAxis dataKey={chartConfig?.xKey || 'name'} tick={{ fill: '#6b7280', fontSize: 10 }} />
             <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} />
-            <Tooltip formatter={(v: any) => `₺${Number(v).toLocaleString('tr-TR')}`} contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: '8px', color: "var(--foreground)" }} />
+            <Tooltip formatter={(v: any) => `₺${Number(v || 0).toLocaleString('tr-TR')}`} contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: '8px', color: "var(--foreground)" }} />
             <Line type="monotone" dataKey={chartConfig?.yKey || 'value'} stroke={chartConfig?.color || '#3b82f6'} strokeWidth={2} dot={{ r: 3, fill: chartConfig?.color || '#3b82f6' }} />
           </LineChart>
         ) : (
@@ -96,7 +96,7 @@ function ChartRenderer({ response }: { response: AIResponse }) {
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
             <XAxis dataKey={chartConfig?.xKey || 'name'} tick={{ fill: '#6b7280', fontSize: 10 }} />
             <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} />
-            <Tooltip formatter={(v: any) => `₺${Number(v).toLocaleString('tr-TR')}`} contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: '8px', color: "var(--foreground)" }} />
+            <Tooltip formatter={(v: any) => `₺${Number(v || 0).toLocaleString('tr-TR')}`} contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: '8px', color: "var(--foreground)" }} />
             <Bar dataKey={chartConfig?.yKey || 'value'} fill={chartConfig?.color || '#3b82f6'} radius={[4, 4, 0, 0]}>
               {data.map((_: any, i: number) => (
                 <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />

@@ -31,7 +31,7 @@ export function PaymentSelector({ totalAmount, paymentInfo, onChange }: PaymentS
           <p className="text-muted-foreground/70 text-[10px] sm:text-xs mt-0.5 sm:mt-1">Müşteri nasıl ödeme yaptı?</p>
         </div>
         <div className="text-right">
-          <p className="text-foreground text-base sm:text-lg font-bold">₺{totalAmount.toLocaleString('tr-TR')}</p>
+          <p className="text-foreground text-base sm:text-lg font-bold">₺{Number(totalAmount || 0).toLocaleString('tr-TR')}</p>
           <p className="text-muted-foreground text-[10px] sm:text-xs">Toplam Tutar</p>
         </div>
       </div>
@@ -176,14 +176,14 @@ export function PaymentSelector({ totalAmount, paymentInfo, onChange }: PaymentS
                 />
                 
                 {/* Kalan Tutar Uyarısı */}
-                {paymentInfo?.amount > 0 && paymentInfo.amount < totalAmount && (
+                {paymentInfo?.amount > 0 && paymentInfo.amount < totalAmount && Number(
                   <motion.div
                     initial={{ opacity: 0, y: -5 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="mt-2 p-2 bg-yellow-600/10 border border-yellow-600/30 rounded-xl sm:rounded-lg"
                   >
                     <p className="text-yellow-400 text-[10px] sm:text-xs font-medium">
-                      Kısmi Ödeme: Kalan ₺{(totalAmount - paymentInfo.amount).toLocaleString('tr-TR')} veresiye
+                      Kısmi Ödeme: Kalan ₺{(totalAmount - paymentInfo.amount || 0).toLocaleString('tr-TR')} veresiye
                     </p>
                   </motion.div>
                 )}
@@ -197,7 +197,7 @@ export function PaymentSelector({ totalAmount, paymentInfo, onChange }: PaymentS
                     onClick={() => onChange({ ...paymentInfo, amount: totalAmount })}
                     className="mt-2 w-full px-3 py-2.5 sm:py-2 bg-blue-600/20 hover:bg-blue-600/30 active:bg-blue-600/40 text-blue-400 text-xs font-medium rounded-xl sm:rounded-lg transition-colors"
                   >
-                    Tam Tutarı Gir (₺{totalAmount.toLocaleString('tr-TR')})
+                    Tam Tutarı Gir (₺{Number(totalAmount || 0).toLocaleString('tr-TR')})
                   </motion.button>
                 )}
               </div>
